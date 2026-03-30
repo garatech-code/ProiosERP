@@ -18,7 +18,7 @@ Sigue estas instrucciones para levantar el proyecto en un entorno local mediante
 Abre tu terminal y clona este repositorio en tu máquina:
 
 ```bash
-git clone https://github.com/TU_USUARIO/proios-manager.git
+git clone https://github.com/Antonio-Riveros/Stock
 cd "Proios Manager" 
 # (o el nombre que tenga tu carpeta local)
 ```
