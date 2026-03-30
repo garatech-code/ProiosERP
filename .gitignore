@@ -1,0 +1,33 @@
+# Entorno
+.env
+.env.*
+!.env.example
+
+# IDEs y SO
+.idea/
+.vscode/
+*.swp
+*.suo
+.DS_Store
+Thumbs.db
+
+# Python / Django (Backend)
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+db.sqlite3
+backend/media/
+# Podrían ignorarse estáticos generados si se recolectan en produccion:
+# backend/static/
+
+# Node / Vite / React (Frontend)
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
