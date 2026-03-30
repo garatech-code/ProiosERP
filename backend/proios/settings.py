@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-import environ # python-dotenv is ok but django-environ is better, we will use os.environ + dotenv
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
