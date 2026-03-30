@@ -21,8 +21,8 @@ env/
 .pytest_cache/
 db.sqlite3
 backend/media/
-# Podrían ignorarse estáticos generados si se recolectan en produccion:
-# backend/static/
+ Podrían ignorarse estáticos generados si se recolectan en produccion:
+ backend/static/
 
 # Node / Vite / React (Frontend)
 node_modules/
@@ -31,3 +31,13 @@ dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Archivos estáticos y multimedia generados
+backend/static/
+static/
+media/
+backend/media/
+
+# Caché de Python (por las dudas)
+__pycache__/
+*.py[cod]
+*$py.class
