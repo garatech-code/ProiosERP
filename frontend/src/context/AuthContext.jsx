@@ -10,29 +10,36 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const token = localStorage.getItem('access_token');
         if (token) {
-            // Decode JWT to get user info, or fetch from backend
+            // El interceptor ya pondrá el token en las peticiones, pero también lo guardamos en el estado
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
                 setUser({ username: payload.username, role: payload.role });
             } catch (e) {
-                logout();
+                console.error('Error decoding token', e);
+                logout(); // Token inválido, limpiamos
             }
         }
         setLoading(false);
 
+        // Escuchar evento de logout (por si se dispara desde el interceptor)
         const handleLogoutEvent = () => logout();
         window.addEventListener('auth:logout', handleLogoutEvent);
         return () => window.removeEventListener('auth:logout', handleLogoutEvent);
     }, []);
 
     const login = async (username, password) => {
-        const response = await api.post('/core/auth/login/', { username, password });
-        localStorage.setItem('access_token', response.data.access);
-        localStorage.setItem('refresh_token', response.data.refresh);
-
-        // Parse JWT to set user
-        const payload = JSON.parse(atob(response.data.access.split('.')[1]));
-        setUser({ username: payload.username, role: payload.role });
+        try {
+            const response = await api.post('/core/auth/login/', { username, password });
+            const { access, refresh } = response.data;
+            localStorage.setItem('access_token', access);
+            localStorage.setItem('refresh_token', refresh);
+            // Decodificar token
+            const payload = JSON.parse(atob(access.split('.')[1]));
+            setUser({ username: payload.username, role: payload.role });
+        } catch (error) {
+            console.error('Login error', error);
+            throw error;
+        }
     };
 
     const logout = () => {

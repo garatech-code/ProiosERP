@@ -1,6 +1,8 @@
 from celery import shared_task
 from django.db import transaction
-from .models import Event
+from django.utils import timezone
+from datetime import timedelta
+from .models import Event, Operation
 import logging
 import time
 
@@ -55,3 +57,14 @@ def poll_pending_events():
     
     for event in pending_events:
         process_event_task.delay(event.id)
+
+@shared_task
+def check_eta_reminders():
+    """Envía notificaciones para operaciones con ETA en las próximas 24h."""
+    now = timezone.now()
+    soon = now + timedelta(days=1)
+    upcoming = Operation.objects.filter(eta__gte=now, eta__lte=soon, status__in=['confirmed', 'in_coordination'])
+    for op in upcoming:
+        # Aquí podrías enviar un email, guardar en base de datos, etc.
+        # Por ahora solo imprimir
+        print(f"Recordatorio: Operación {op.id} - Buque {op.ship.name} ETA {op.eta}")

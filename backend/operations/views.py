@@ -1,13 +1,19 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from django.db.models import F
-from .models import Resource, Event
-from .serializers import ResourceSerializer
+from .models import Resource, Event,Client, Ship, Port, Product, Agency, Operation
+from .serializers import (ResourceSerializer, ClientSerializer, ShipSerializer, PortSerializer, ProductSerializer,
+    AgencySerializer, OperationSerializer)
 from core.permissions import IsManagerOrAdmin
 import logging
+import csv
+from django.http import HttpResponse
+from django.utils import timezone
+
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +84,188 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
         except Resource.DoesNotExist:
             return Response({"error": "No encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+class ClientViewSet(viewsets.ModelViewSet):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class ShipViewSet(viewsets.ModelViewSet):
+    queryset = Ship.objects.all()
+    serializer_class = ShipSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class PortViewSet(viewsets.ModelViewSet):
+    queryset = Port.objects.all()
+    serializer_class = PortSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class AgencyViewSet(viewsets.ModelViewSet):
+    queryset = Agency.objects.all()
+    serializer_class = AgencySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class OperationViewSet(viewsets.ModelViewSet):
+    queryset = Operation.objects.all()
+    serializer_class = OperationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['client', 'ship', 'port', 'status']
+    search_fields = ['client__name', 'ship__name', 'notes']
+    ordering_fields = ['eta', 'created_at']
+
+    @action(detail=True, methods=['post'])
+    def upload_remito(self, request, pk=None):
+        operation = self.get_object()
+        operation.remito_file = request.FILES.get('file')
+        operation.save()
+        return Response({'status': 'remito uploaded'})
+
+    @action(detail=True, methods=['post'])
+    def confirm_operation(self, request, pk=None):
+        op = self.get_object()
+        try:
+            op.confirm()
+            return Response({'status': 'confirmed'})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def start_coordination(self, request, pk=None):
+        op = self.get_object()
+        try:
+            op.start_coordination()
+            return Response({'status': 'in_coordination'})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def mark_delivered(self, request, pk=None):
+        op = self.get_object()
+        try:
+            op.mark_delivered()
+            return Response({'status': 'delivered'})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def close_operation(self, request, pk=None):
+        op = self.get_object()
+        try:
+            op.close()
+            return Response({'status': 'closed'})
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def upload_packing(self, request, pk=None):
+        op = self.get_object()
+        op.packing_list_file = request.FILES.get('file')
+        op.save()
+        return Response({'status': 'packing uploaded'})
+    @action(detail=True, methods=['post'])
+    def upload_rancho(self, request, pk=None):
+        op = self.get_object()
+        op.rancho_file = request.FILES.get('file')
+        op.save()
+        return Response({'status': 'rancho uploaded'})
+    @action(detail=True, methods=['delete'])
+    def delete_packing(self, request, pk=None):
+        op = self.get_object()
+        if op.packing_list_file:
+            op.packing_list_file.delete(save=False)
+            op.packing_list_file = None
+            op.save()
+        return Response({'status': 'packing deleted'})
+
+    @action(detail=True, methods=['delete'])
+    def delete_remito(self, request, pk=None):
+        op = self.get_object()
+        if op.remito_file:
+            op.remito_file.delete(save=False)
+            op.remito_file = None
+            op.save()
+        return Response({'status': 'remito deleted'})
+
+    @action(detail=True, methods=['delete'])
+    def delete_rancho(self, request, pk=None):
+        op = self.get_object()
+        if op.rancho_file:
+            op.rancho_file.delete(save=False)
+            op.rancho_file = None
+            op.save()
+        return Response({'status': 'rancho deleted'})
+    @action(detail=True, methods=['post'])
+    def cancel_operation(self, request, pk=None):
+        op = self.get_object()
+        if op.status in ['closed', 'cancelled']:
+            return Response({'error': 'No se puede cancelar una operación ya cerrada o cancelada'}, status=400)
+        op.status = 'cancelled'
+        op.save()
+        return Response({'status': 'cancelled'})
+    @action(detail=True, methods=['get'])
+    def export_packing_csv(self, request, pk=None):
+        op = self.get_object()
+        # Crear respuesta HTTP con tipo CSV
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="packing_list_op_{op.id}.csv"'
+        writer = csv.writer(response)
+        # Escribir cabeceras
+        writer.writerow(['Producto', 'Cantidad', 'Presentación', 'Peso unitario (kg)', 'Peso total (kg)', 'Precio unitario', 'Total'])
+        total_weight = 0
+        total_price = 0
+        for prod in op.products.all():
+            product = prod.product
+            unit_weight = product.weight_kg
+            total_weight += prod.quantity * unit_weight
+            subtotal = prod.quantity * prod.unit_price
+            total_price += subtotal
+            writer.writerow([
+                product.name,
+                prod.quantity,
+                product.presentation,
+                unit_weight,
+                prod.quantity * unit_weight,
+                prod.unit_price,
+                subtotal,
+            ])
+        # Escribir totales
+        writer.writerow([])
+        writer.writerow(['TOTAL', '', '', '', total_weight, '', total_price])
+        return response
+    @action(detail=True, methods=['get'])
+    def packing_list_json(self, request, pk=None):
+        op = self.get_object()
+        data = {
+            'operation_id': op.id,
+            'client': op.client.name,
+            'ship': op.ship.name,
+            'port': op.port.name,
+            'eta': op.eta.isoformat(),
+            'products': []
+        }
+        total_weight = 0
+        total_price = 0
+        for prod in op.products.all():
+            product = prod.product
+            unit_weight = product.weight_kg
+            total_weight += prod.quantity * unit_weight
+            subtotal = prod.quantity * prod.unit_price
+            total_price += subtotal
+            data['products'].append({
+                'name': product.name,
+                'quantity': prod.quantity,
+                'presentation': product.presentation,
+                'unit_weight': unit_weight,
+                'total_weight': prod.quantity * unit_weight,
+                'unit_price': prod.unit_price,
+                'subtotal': subtotal,
+            })
+        data['total_weight'] = total_weight
+        data['total_price'] = total_price
+        return Response(data)
