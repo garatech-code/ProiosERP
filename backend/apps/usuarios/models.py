@@ -14,8 +14,5 @@ class User(AbstractUser):
         default=Role.VIEWER,
     )
     
-    # Agregar blank=True o null=True si se desea
-    # Evitar conflictos con auth.User
-    
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"

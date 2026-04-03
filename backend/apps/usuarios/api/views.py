@@ -3,7 +3,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from .serializers import CustomTokenObtainPairSerializer, UserSerializer
-from .permissions import IsAdminUser
+from apps.usuarios.permissions import IsAdminUser
 
 User = get_user_model()
 
