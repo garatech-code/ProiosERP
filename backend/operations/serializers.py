@@ -81,6 +81,39 @@ class OperationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['order_received_date', 'updated_at', 'created_by']
 
+    def to_internal_value(self, data):
+        # Auto-create related objects if frontend sends a string instead of an ID
+        mutable_data = data.copy() if hasattr(data, 'copy') else data
+
+        def _get_or_create_from_string(field, model, defaults):
+            val = mutable_data.get(field)
+            if val and isinstance(val, str) and not val.isdigit():
+                obj, _ = model.objects.get_or_create(name=val, defaults=defaults)
+                mutable_data[field] = obj.id
+
+        import random
+        _get_or_create_from_string('client', Client, {'email': 'default@email.com'})
+        _get_or_create_from_string('ship', Ship, {'imo': f'TBD{random.randint(1000, 9999)}', 'flag': 'TBD'})
+        _get_or_create_from_string('port', Port, {'country': 'TBD'})
+        _get_or_create_from_string('agency', Agency, {'email': 'default@email.com', 'phone': '0', 'contact_name': 'TBD'})
+
+        # Intercept products to allow string names
+        products_data = mutable_data.get('products')
+        if products_data and isinstance(products_data, list):
+            for i, p_data in enumerate(products_data):
+                p_val = p_data.get('product')
+                if p_val and isinstance(p_val, str) and not str(p_val).isdigit():
+                    prod, _ = Product.objects.get_or_create(
+                        name=p_val, 
+                        defaults={'presentation': 'Unidad', 'weight_kg': 1.0}
+                    )
+                    # We have to mutate the list item
+                    if hasattr(products_data[i], 'copy'):
+                        products_data[i] = products_data[i].copy()
+                    products_data[i]['product'] = prod.id
+
+        return super().to_internal_value(mutable_data)
+
     def create(self, validated_data):
         products_data = validated_data.pop('products', [])
         operation = Operation.objects.create(**validated_data)

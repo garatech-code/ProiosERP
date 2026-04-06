@@ -1,10 +1,74 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
+import AutocompleteCreate from '../components/AutocompleteCreate';
 
-export default function OperationForm() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+// Componente para una fila de producto (para mantener estado local)
+function ProductRow({ product, index, onUpdate, onRemove }) {
+  const [selectedProduct, setSelectedProduct] = useState(product.product ? { id: product.product } : null);
+
+  const handleProductSelect = (item) => {
+    setSelectedProduct(item);
+
+    onUpdate(index, 'product', item ? item.id : '');
+    onUpdate(index, 'weight_kg', item ? item.weight_kg : null); // 🔥
+    onUpdate(index, 'presentation', item ? item.presentation : '');
+  };
+
+  return (
+    <div className="grid grid-cols-14 gap-4 items-end border-b pb-4">
+      <div className="col-span-5">
+        <AutocompleteCreate
+          label="Producto"
+          endpoint="/operations/products/"
+          value={selectedProduct?.id || ''}
+          onSelect={handleProductSelect}
+          createFields={[
+            { name: 'presentation', label: 'Presentación', required: true },
+            { name: 'weight_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
+          ]}
+          placeholder="Buscar o crear producto..."
+        />
+      </div>
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-gray-700">Peso unitario (kg)</label>
+        <input
+          type="number"
+          value={product.weight_kg || ''}
+          disabled
+          className="mt-1 block w-full border border-gray-300 rounded-md bg-gray-100 py-2 px-3 text-sm"
+        />
+      </div>
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-gray-700">Cantidad</label>
+        <input
+          type="number"
+          value={product.quantity}
+          onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+      <div className="col-span-3">
+        <label className="block text-sm font-medium text-gray-700">Precio unitario</label>
+        <input
+          type="number"
+          step="0.01"
+          value={product.unit_price}
+          onChange={(e) => onUpdate(index, 'unit_price', parseFloat(e.target.value) || 0)}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+      <div className="col-span-2">
+        <button type="button" onClick={() => onRemove(index)} className="text-red-600 hover:text-red-800">
+          Eliminar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function OperationForm({ id, onClose, onSuccess }) {
+  const navigate = useNavigate(); // Kept for viewing the final operation if needed, or we can use onSuccess
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     client: '',
@@ -18,11 +82,6 @@ export default function OperationForm() {
     delivery_date: '',
     closed_date: '',
   });
-  const [clients, setClients] = useState([]);
-  const [ships, setShips] = useState([]);
-  const [ports, setPorts] = useState([]);
-  const [agencies, setAgencies] = useState([]);
-  const [products, setProducts] = useState([]);
   const [fetchingData, setFetchingData] = useState(true);
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -34,33 +93,11 @@ export default function OperationForm() {
   });
 
   useEffect(() => {
-    const fetchSelectData = async () => {
+    const loadInitialData = async () => {
       try {
-        const [clientsRes, shipsRes, portsRes, agenciesRes, productsRes] = await Promise.all([
-          axios.get('/operations/clients/'),
-          axios.get('/operations/ships/'),
-          axios.get('/operations/ports/'),
-          axios.get('/operations/agencies/'),
-          axios.get('/operations/products/'),
-        ]);
-        setClients(clientsRes.data);
-        setShips(shipsRes.data);
-        setPorts(portsRes.data);
-        setAgencies(agenciesRes.data);
-        setProducts(productsRes.data);
-      } catch (err) {
-        console.error(err);
-        setError('Error cargando datos iniciales.');
-      }
-    };
-
-    fetchSelectData();
-
-    if (id) {
-      const fetchOperation = async () => {
-        try {
-          const res = await axios.get(`/operations/operations/${id}/`);
-          const operation = res.data;
+        if (id) {
+          const opRes = await axios.get(`/operations/operations/${id}/`);
+          const operation = opRes.data;
           if (operation.eta) {
             operation.eta = new Date(operation.eta).toISOString().slice(0, 16);
           }
@@ -76,39 +113,41 @@ export default function OperationForm() {
             remito_file: operation.remito_file,
             rancho_file: operation.rancho_file,
           });
-        } catch (err) {
-          console.error(err);
-          setError('Error cargando la operación.');
-        } finally {
-          setFetchingData(false);
         }
-      };
-      fetchOperation();
-    } else {
-      setFetchingData(false);
-    }
+      } catch (err) {
+        console.error(err);
+        setError('Error cargando datos iniciales.');
+      } finally {
+        setFetchingData(false);
+      }
+    };
+    loadInitialData();
   }, [id]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleProductChange = (index, field, value) => {
-    const newProducts = [...formData.products];
-    newProducts[index][field] = value;
-    setFormData({ ...formData, products: newProducts });
-  };
-
-  const addProduct = () => {
-    setFormData({
-      ...formData,
-      products: [...formData.products, { product: '', quantity: 1, unit_price: 0 }],
+  const handleProductUpdate = (index, field, value) => {
+    setFormData(prev => {
+      const newProducts = [...prev.products];
+      newProducts[index] = { ...newProducts[index], [field]: value };
+      return { ...prev, products: newProducts };
     });
   };
 
+  const addProduct = () => {
+    setFormData(prev => ({
+      ...prev,
+      products: [...prev.products, { product: '', quantity: 1, unit_price: 0 }],
+    }));
+  };
+
   const removeProduct = (index) => {
-    const newProducts = formData.products.filter((_, i) => i !== index);
-    setFormData({ ...formData, products: newProducts });
+    setFormData(prev => ({
+      ...prev,
+      products: prev.products.filter((_, i) => i !== index)
+    }));
   };
 
   const handleFileUpload = async (event, type) => {
@@ -150,18 +189,37 @@ export default function OperationForm() {
     }
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return null;
+    return new Date(dateString).toISOString();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
     try {
+      const payload = {
+        ...formData,
+        eta: formatDate(formData.eta),
+        delivery_date: formatDate(formData.delivery_date),
+        closed_date: formatDate(formData.closed_date),
+      };
+
       let response;
+
       if (id) {
-        response = await axios.put(`/operations/operations/${id}/`, formData);
-        navigate(`/operations/${response.data.id}`);
+        response = await axios.put(`/operations/operations/${id}/`, payload);
       } else {
-        response = await axios.post('/operations/operations/', formData);
-        navigate(`/operations/${response.data.id}`);
+        response = await axios.post('/operations/operations/', payload);
+      }
+
+      if (onSuccess) {
+        onSuccess(response.data.id);
+      }
+      if (onClose) {
+        onClose();
       }
     } catch (err) {
       console.error(err);
@@ -178,9 +236,11 @@ export default function OperationForm() {
   if (fetchingData) return <div className="text-center mt-10">Cargando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white shadow sm:rounded-lg">
+    <div className="fixed inset-0 z-[100] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+      <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={onClose}></div>
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
               {id ? 'Editar operación' : 'Nueva operación'}
@@ -188,59 +248,55 @@ export default function OperationForm() {
             <form onSubmit={handleSubmit} className="mt-5 space-y-6">
               {error && <div className="text-red-600 text-sm">{error}</div>}
 
-              {/* Datos principales */}
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Cliente *</label>
-                  <select
-                    name="client"
-                    value={formData.client}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option value="">Seleccionar</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Buque *</label>
-                  <select
-                    name="ship"
-                    value={formData.ship}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option value="">Seleccionar</option>
-                    {ships.map(s => <option key={s.id} value={s.id}>{s.name} (IMO: {s.imo})</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Puerto *</label>
-                  <select
-                    name="port"
-                    value={formData.port}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option value="">Seleccionar</option>
-                    {ports.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Agencia</label>
-                  <select
-                    name="agency"
-                    value={formData.agency}
-                    onChange={handleChange}
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option value="">Seleccionar</option>
-                    {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
-                </div>
+                <AutocompleteCreate
+                  label="Cliente *"
+                  endpoint="/operations/clients/"
+                  value={formData.client}
+                  onSelect={(item) => setFormData(prev => ({ ...prev, client: item?.id || '' }))}
+                  extraCreateData={{ email: 'default@email.com' }}
+                  createFields={[
+                    { name: 'contact_person', label: 'Persona de contacto' },
+                    { name: 'phone', label: 'Teléfono' },
+                  ]}
+                />
+
+                <AutocompleteCreate
+                  label="Buque *"
+                  endpoint="/operations/ships/"
+                  value={formData.ship}
+                  onSelect={(item) => setFormData(prev => ({ ...prev, ship: item?.id || '' }))}
+                  createFields={[
+                    { name: 'imo', label: 'IMO *', required: true },
+                    { name: 'flag', label: 'Bandera *', required: true },
+                    { name: 'call_sign', label: 'Indicativo' },
+                    { name: 'gross_tonnage', label: 'Tonelaje bruto', type: 'number' },
+                  ]}
+                />
+
+                <AutocompleteCreate
+                  label="Puerto *"
+                  endpoint="/operations/ports/"
+                  value={formData.port}
+                  onSelect={(item) => setFormData(prev => ({ ...prev, port: item?.id || '' }))}
+                  createFields={[
+                    { name: 'country', label: 'País *', required: true },
+                    { name: 'code', label: 'Código' },
+                  ]}
+                />
+
+                <AutocompleteCreate
+                  label="Agencia"
+                  endpoint="/operations/agencies/"
+                  value={formData.agency}
+                  onSelect={(item) => setFormData(prev => ({ ...prev, agency: item?.id || '' }))}
+                  createFields={[
+                    { name: 'contact_name', label: 'Persona de contacto' },
+                    { name: 'phone', label: 'Teléfono' },
+                    { name: 'email', label: 'Email' },
+                  ]}
+                />
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">ETA *</label>
                   <input
@@ -252,6 +308,7 @@ export default function OperationForm() {
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Método de entrega</label>
                   <select
@@ -264,7 +321,7 @@ export default function OperationForm() {
                     <option value="lancha">Lancha</option>
                   </select>
                 </div>
-                {/* Nuevos campos: fecha entrega y cierre */}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Fecha de entrega</label>
                   <input
@@ -275,6 +332,7 @@ export default function OperationForm() {
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Fecha de cierre</label>
                   <input
@@ -285,6 +343,7 @@ export default function OperationForm() {
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
+
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Notas</label>
                   <textarea
@@ -297,7 +356,7 @@ export default function OperationForm() {
                 </div>
               </div>
 
-              {/* Productos */}
+              {/* Productos con AutocompleteCreate */}
               <div>
                 <div className="flex justify-between items-center">
                   <h4 className="text-md font-medium text-gray-900">Productos</h4>
@@ -307,43 +366,13 @@ export default function OperationForm() {
                 </div>
                 <div className="mt-4 space-y-4">
                   {formData.products.map((prod, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-4 items-end border-b pb-4">
-                      <div className="col-span-5">
-                        <label className="block text-sm font-medium text-gray-700">Producto</label>
-                        <select
-                          value={prod.product}
-                          onChange={(e) => handleProductChange(idx, 'product', e.target.value)}
-                          className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        >
-                          <option value="">Seleccionar</option>
-                          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700">Cantidad</label>
-                        <input
-                          type="number"
-                          value={prod.quantity}
-                          onChange={(e) => handleProductChange(idx, 'quantity', parseInt(e.target.value))}
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        />
-                      </div>
-                      <div className="col-span-3">
-                        <label className="block text-sm font-medium text-gray-700">Precio unitario</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={prod.unit_price}
-                          onChange={(e) => handleProductChange(idx, 'unit_price', parseFloat(e.target.value))}
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <button type="button" onClick={() => removeProduct(idx)} className="text-red-600 hover:text-red-800">
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
+                    <ProductRow
+                      key={idx}
+                      product={prod}
+                      index={idx}
+                      onUpdate={handleProductUpdate}
+                      onRemove={removeProduct}
+                    />
                   ))}
                 </div>
                 {formData.products.length > 0 && (
@@ -353,7 +382,7 @@ export default function OperationForm() {
                 )}
               </div>
 
-              {/* Documentos (solo en modo edición) */}
+              {/* Documentos (solo edición) */}
               {id && (
                 <div>
                   <h4 className="text-md font-medium text-gray-900 mb-4">Documentos</h4>
@@ -437,7 +466,7 @@ export default function OperationForm() {
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={onClose}
                   className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancelar
