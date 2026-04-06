@@ -44,6 +44,7 @@ class Agency(models.Model):
 
 class Operacion(models.Model):
     ESTADO_SOLICITADA = 'solicitada'
+    ESTADO_PENDIENTE_APROBACION = 'pendiente_aprobacion'
     ESTADO_PRESUPUESTADA = 'presupuestada'
     ESTADO_EN_PRODUCCION = 'en_produccion'
     ESTADO_LISTA_PARA_ENVIO = 'lista_para_envio'
@@ -53,6 +54,7 @@ class Operacion(models.Model):
 
     ESTADOS_CHOICES = (
         (ESTADO_SOLICITADA, 'Solicitada'),
+        (ESTADO_PENDIENTE_APROBACION, 'Pendiente de Aprobación (Borrador)'),
         (ESTADO_PRESUPUESTADA, 'Presupuestada / Confirmada'),
         (ESTADO_EN_PRODUCCION, 'En Producción / En Coordinación'),
         (ESTADO_LISTA_PARA_ENVIO, 'Lista para Envío'),
@@ -77,6 +79,11 @@ class Operacion(models.Model):
     estado = FSMField(default=ESTADO_SOLICITADA, choices=ESTADOS_CHOICES, protected=True)
 
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='operaciones_creadas')
+    
+    # Asignaciones designadas por el Owner (RBAC a nivel Objeto)
+    operadores_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_asignadas', blank=True)
+    contables_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_contables', blank=True)
+    operarios_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_operario', blank=True)
 
     class Meta:
         verbose_name = "Operación"
