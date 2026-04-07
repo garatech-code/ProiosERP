@@ -12,3 +12,5 @@ django-filter
 django-fsm
 weasyprint
 django-guardian
+requests==2.31.0
+beautifulsoup4==4.12.3

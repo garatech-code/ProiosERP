@@ -1,20 +1,15 @@
-# IMPORTANTE: Este archivo es estrictamente una Fachada (Anti-Corruption Layer) Temporal.
-# Su único objetivo es traducir la nueva estructura a la versión vieja que consume el Frontend actual.
-# DEBE SER ELIMINADO UNA VEZ REFACTORIZADO EL FRONTEND.
+# IMPORTANTE: Fachada temporal (Anti-Corruption Layer). Eliminar cuando se refactorice el frontend.
 from rest_framework import viewsets, serializers
 from rest_framework.response import Response
 from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency
 from apps.inventario.models import Articulo
+from .services import get_or_create_ship_from_imo, get_or_create_port_from_name
+from rest_framework.decorators import action
 
 class OperacionCompatSerializer(serializers.ModelSerializer):
-    """
-    Serializador temporal para emular el modelo Operation monolítico antiguo.
-    """
     client_name = serializers.CharField(source='cliente.name', read_only=True)
     ship_name = serializers.CharField(source='ship.name', read_only=True)
     port_name = serializers.CharField(source='port.name', read_only=True)
-    
-    # Mapeo de FSM a Front
     status = serializers.SerializerMethodField(read_only=True)
     products = serializers.JSONField(required=False)
 
@@ -23,20 +18,26 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'client_name', 'ship_name', 'port_name', 'eta',
             'delivery_method', 'status', 'products',
-            'cliente', 'ship', 'port', 'agency', 'notas'
+            'cliente', 'ship', 'port', 'agency', 'notas',
+            'order_received_date', 'client_confirmed_date',
+            'delivery_date', 'closed_date',
+            'packing_list_file', 'remito_file', 'rancho_file',
         ]
         extra_kwargs = {
             'cliente': {'required': False},
             'ship': {'required': False},
             'port': {'required': False},
-            'eta': {'required': False}, # Permisivo para creación rápida
+            'eta': {'required': False},
+            'order_received_date': {'required': False, 'allow_null': True},
+            'client_confirmed_date': {'required': False, 'allow_null': True},
+            'delivery_date': {'required': False, 'allow_null': True},
+            'closed_date': {'required': False, 'allow_null': True},
         }
 
     def to_internal_value(self, data):
         import random
-        # Trabajamos sobre una copia mutable para no alterar el request.data original
         mutable_data = data.copy() if hasattr(data, 'copy') else data
-        
+
         def _get_or_create(field, model, defaults, name_field='name'):
             val = mutable_data.get(field)
             if val and isinstance(val, str) and not str(val).isdigit():
@@ -45,27 +46,16 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                 return obj.id
             return val
 
-        # Mapeos Frontend -> Backend Model
         if 'client' in mutable_data:
             mutable_data['cliente'] = _get_or_create('client', Client, {'email': 'default@email.com'})
-        
         if 'ship' in mutable_data:
-            mutable_data['ship'] = _get_or_create('ship', Ship, {'imo': f'TBD{random.randint(1000, 9999)}', 'flag': 'TBD'})
-            
+            mutable_data['ship'] = _get_or_create('ship', Ship, {'imo': f'TBD{random.randint(1000,9999)}', 'flag': 'TBD'})
         if 'port' in mutable_data:
             mutable_data['port'] = _get_or_create('port', Port, {'country': 'TBD'})
-            
         if 'agency' in mutable_data:
-            mutable_data['agency'] = _get_or_create('agency', Agency, {
-                'email': 'default@email.com', 
-                'contact_name': 'TBD', 
-                'phone': '0'
-            })
-            
+            mutable_data['agency'] = _get_or_create('agency', Agency, {'email': 'default@email.com', 'contact_name': 'TBD', 'phone': '0'})
         if 'notes' in mutable_data:
             mutable_data['notas'] = mutable_data.pop('notes')
-
-        # Si viene ETA vacío, evitamos error de validación para permitir guardado rápido
         if 'eta' in mutable_data and not mutable_data['eta']:
             mutable_data['eta'] = None
 
@@ -73,7 +63,6 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         products_data = validated_data.pop('products', [])
-        # Manejamos los productos manualmente después de crear la operación
         operation = super().create(validated_data)
         self._handle_products(operation, products_data)
         return operation
@@ -97,7 +86,6 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                 articulo_id = articulo.id
             else:
                 articulo_id = p_val
-            
             if articulo_id:
                 OperacionDetalle.objects.create(
                     operacion=operation,
@@ -107,7 +95,6 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                 )
 
     def get_status(self, obj):
-        # Mapea del nuevo FSM al frontend viejo temporalmente
         mapper = {
             Operacion.ESTADO_SOLICITADA: 'pending',
             Operacion.ESTADO_PRESUPUESTADA: 'price_checked',
@@ -123,23 +110,20 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
         detalles = OperacionDetalle.objects.filter(operacion=obj)
         return [
             {
-                "quantity": d.cantidad, 
-                "unit_price": float(d.precio_unitario) if d.precio_unitario else 0
-            } 
+                "product": d.articulo_id,
+                "product_name": d.articulo.nombre,
+                "quantity": d.cantidad,
+                "unit_price": float(d.precio_unitario) if d.precio_unitario else 0,
+                "weight_kg": float(d.articulo.peso_kg) if d.articulo.peso_kg else None,
+                "presentation": d.articulo.presentacion,
+            }
             for d in detalles
         ]
 
 class OperacionCompatViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet temporal para emular /api/operations/operations/
-    """
     queryset = Operacion.objects.all().select_related('cliente', 'ship', 'port')
     serializer_class = OperacionCompatSerializer
 
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    from rest_framework.decorators import action
     @action(detail=True, methods=['post'])
     def cancel_operation(self, request, pk=None):
         op = self.get_object()
@@ -147,6 +131,33 @@ class OperacionCompatViewSet(viewsets.ModelViewSet):
         op.save()
         return Response({'status': 'cancelled'})
 
+    @action(detail=False, methods=['get'], url_path='auto_complete_imo')
+    def auto_complete_imo(self, request):
+        imo = request.query_params.get('imo')
+        if not imo or not imo.isdigit() or len(imo) != 7:
+            return Response({"error": "Se requiere un IMO válido de 7 dígitos"}, status=400)
+        ship, scraped_data = get_or_create_ship_from_imo(imo)
+        if not scraped_data:
+            return Response({"error": "No se pudo obtener información del buque."}, status=404)
+        port = None
+        port_id = None
+        port_name = scraped_data.get('destino')
+        if port_name:
+            port = get_or_create_port_from_name(port_name)
+            port_id = port.id if port else None
+        response_data = {
+            "ship_id": ship.id,
+            "ship_name": ship.name,
+            "flag": ship.flag,
+            "imo": ship.imo,
+            "eta": scraped_data.get('eta'),
+            "eta_raw": scraped_data.get('eta_raw'),
+            "port_id": port_id,
+            "port_name": port_name,
+        }
+        return Response(response_data)
+
+# Los siguientes ViewSets se mantienen igual (no se modifican)
 class ClientCompatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client

@@ -13,7 +13,7 @@ import logging
 import csv
 from django.http import HttpResponse
 from django.utils import timezone
-
+from .services import get_or_create_ship_from_imo, get_or_create_port_from_name
 
 logger = logging.getLogger(__name__)
 
@@ -269,3 +269,42 @@ class OperationViewSet(viewsets.ModelViewSet):
         data['total_weight'] = total_weight
         data['total_price'] = total_price
         return Response(data)
+        
+    @action(detail=False, methods=['get'], url_path='auto_complete_imo')
+    def auto_complete_imo(self, request):
+        """
+        GET ?imo=1234567
+        Devuelve datos del buque y puerto de destino obtenidos por scraping.
+        """
+        imo = request.query_params.get('imo')
+        if not imo or not imo.isdigit() or len(imo) != 7:
+            return Response(
+                {"error": "Se requiere un IMO válido de 7 dígitos"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        ship, scraped_data = get_or_create_ship_from_imo(imo)
+        if not scraped_data:
+            return Response(
+                {"error": "No se pudo obtener información del buque. Verifique el IMO."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        port = None
+        port_id = None
+        port_name = scraped_data.get('destino')
+        if port_name:
+            port = get_or_create_port_from_name(port_name)
+            port_id = port.id if port else None
+        
+        response_data = {
+            "ship_id": ship.id,
+            "ship_name": ship.name,
+            "flag": ship.flag,
+            "imo": ship.imo,
+            "eta": scraped_data.get('eta'),
+            "eta_raw": scraped_data.get('eta_raw'),
+            "port_id": port_id,
+            "port_name": port_name,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
