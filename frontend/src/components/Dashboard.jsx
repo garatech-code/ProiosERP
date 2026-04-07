@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import OperationForm from './OperationForm';
+import OperationFormWithIMO from './OperationFormWithIMO';
 
 export default function Dashboard() {
   const [operations, setOperations] = useState([]);
@@ -13,7 +14,11 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [showOperationForm, setShowOperationForm] = useState(false);
+  
+  // Estados para controlar qué formulario se muestra
+  const [showNormalForm, setShowNormalForm] = useState(false);
+  const [showIMOForm, setShowIMOForm] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Mapeo amigable de roles
   const roleDisplay = {
@@ -71,7 +76,6 @@ export default function Dashboard() {
   const approveOperation = async (id, event) => {
     event.stopPropagation();
     if (!window.confirm('¿Aprobar esta transición (Exclusivo Owner)?')) return;
-    // Solo simulacro temporal para el UI
     alert(`Operación ${id} aprobada por Owner.`);
   };
 
@@ -99,9 +103,21 @@ export default function Dashboard() {
     return products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
   };
 
-  // Vistas segmentadas por Rol
   const isOwner = user?.role === 'OWNER';
   const isOperario = user?.role === 'OPERARIO';
+
+  // Función para cerrar cualquier formulario
+  const closeForms = () => {
+    setShowNormalForm(false);
+    setShowIMOForm(false);
+    setShowMobileMenu(false);
+  };
+
+  // Manejo de éxito después de guardar
+  const handleSuccess = (newId) => {
+    closeForms();
+    navigate(`/operations/${newId}`);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -138,15 +154,25 @@ export default function Dashboard() {
         
         {/* Top Controls Area */}
         <div className="flex flex-col gap-4 mb-6">
-          <div className="flex justify-between items-end">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Tablero Operativo</h2>
+            
+            {/* Botones de creación visibles en escritorio */}
             {!isOperario && (
-              <button
-                onClick={() => setShowOperationForm(true)}
-                className="hidden sm:inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                + Crear Operación
-              </button>
+              <div className="hidden sm:flex gap-2">
+                <button
+                  onClick={() => setShowNormalForm(true)}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-all"
+                >
+                  + Formulario sin IMO
+                </button>
+                <button
+                  onClick={() => setShowIMOForm(true)}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all"
+                >
+                  + Formulario con IMO
+                </button>
+              </div>
             )}
           </div>
 
@@ -300,17 +326,43 @@ export default function Dashboard() {
         )}
       </main>
 
-      {/* FAB (Floating Action Button) de creación para Mobile */}
+      {/* Menú flotante para móvil (FAB con dos opciones) */}
       {!isOperario && (
-        <button
-          onClick={() => setShowOperationForm(true)}
-          className="sm:hidden fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 active:scale-95 transition-all z-40 focus:outline-none focus:ring-4 focus:ring-indigo-300"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-        </button>
+        <div className="sm:hidden fixed bottom-6 right-6 z-40">
+          {showMobileMenu ? (
+            <div className="flex flex-col gap-2 mb-2">
+              <button
+                onClick={() => {
+                  setShowMobileMenu(false);
+                  setShowNormalForm(true);
+                }}
+                className="w-12 h-12 bg-gray-100 text-gray-700 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-200 transition-all"
+                title="Formulario sin IMO"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+              </button>
+              <button
+                onClick={() => {
+                  setShowMobileMenu(false);
+                  setShowIMOForm(true);
+                }}
+                className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 transition-all"
+                title="Formulario con IMO"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              </button>
+            </div>
+          ) : null}
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 active:scale-95 transition-all focus:outline-none focus:ring-4 focus:ring-indigo-300"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+          </button>
+        </div>
       )}
 
-      {/* Estilos adicionales para utilidades visuales (se podría poner en index.css) */}
+      {/* Estilos adicionales */}
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
@@ -321,14 +373,17 @@ export default function Dashboard() {
         }
       `}} />
 
-      {/* Modal form */}
-      {showOperationForm && (
+      {/* Modales de formularios */}
+      {showNormalForm && (
         <OperationForm 
-           onClose={() => setShowOperationForm(false)} 
-           onSuccess={(newId) => {
-              setShowOperationForm(false);
-              navigate(`/operations/${newId}`);
-           }} 
+          onClose={closeForms}
+          onSuccess={handleSuccess}
+        />
+      )}
+      {showIMOForm && (
+        <OperationFormWithIMO 
+          onClose={closeForms}
+          onSuccess={handleSuccess}
         />
       )}
     </div>

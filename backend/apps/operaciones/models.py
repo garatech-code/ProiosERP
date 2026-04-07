@@ -68,19 +68,28 @@ class Operacion(models.Model):
     port = models.ForeignKey(Port, on_delete=models.PROTECT)
     agency = models.ForeignKey(Agency, on_delete=models.SET_NULL, null=True, blank=True)
     eta = models.DateTimeField(null=True, blank=True)
-    
+
     delivery_method = models.CharField(max_length=20, choices=[('muelle', 'Muelle'), ('lancha', 'Lancha')], default='muelle')
     notas = models.TextField(blank=True)
-    
+
+    # NUEVOS CAMPOS SOLICITADOS POR EL FRONTEND
+    order_received_date = models.DateTimeField(null=True, blank=True)
+    client_confirmed_date = models.DateTimeField(null=True, blank=True)
+    delivery_date = models.DateTimeField(null=True, blank=True)
+    closed_date = models.DateTimeField(null=True, blank=True)
+
+    # ARCHIVOS
+    packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
+    remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)
+    rancho_file = models.FileField(upload_to='ranchos/', null=True, blank=True)
+
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
-    
-    # Campo protegido por FSM
+
     estado = FSMField(default=ESTADO_SOLICITADA, choices=ESTADOS_CHOICES, protected=True)
 
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='operaciones_creadas')
-    
-    # Asignaciones designadas por el Owner (RBAC a nivel Objeto)
+
     operadores_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_asignadas', blank=True)
     contables_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_contables', blank=True)
     operarios_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_operario', blank=True)
@@ -93,32 +102,45 @@ class Operacion(models.Model):
     def __str__(self):
         return f"OP-{self.pk:05d} : {self.cliente} ({self.get_estado_display()})"
 
+    # Transiciones FSM que coinciden con las acciones del frontend
     @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_PRESUPUESTADA)
-    def presupuestar(self):
+    def confirm(self):
+        """Confirmar operación (cliente confirma presupuesto)"""
+        self.client_confirmed_date = timezone.now()
         pass
 
     @transition(field=estado, source=ESTADO_PRESUPUESTADA, target=ESTADO_EN_PRODUCCION)
-    def iniciar_produccion(self):
+    def start_coordination(self):
+        """Iniciar coordinación / producción"""
         pass
 
     @transition(field=estado, source=ESTADO_EN_PRODUCCION, target=ESTADO_LISTA_PARA_ENVIO)
-    def finalizar_produccion(self):
+    def finalize_production(self):
+        """Finalizar producción, lista para envío"""
         pass
 
-    @transition(field=estado, source=[ESTADO_EN_PRODUCCION, ESTADO_LISTA_PARA_ENVIO], target=ESTADO_REMITADA)
-    def remitar(self):
+    @transition(field=estado, source=ESTADO_LISTA_PARA_ENVIO, target=ESTADO_REMITADA)
+    def mark_delivered(self):
+        """Marcar como entregada (remitada)"""
+        self.delivery_date = timezone.now()
         pass
 
     @transition(field=estado, source=ESTADO_REMITADA, target=ESTADO_ENTREGADA)
-    def entregar(self):
+    def close(self):
+        """Cerrar operación"""
+        self.closed_date = timezone.now()
         pass
 
     @transition(field=estado, source='*', target=ESTADO_CANCELADA)
-    def cancelar(self):
+    def cancel(self):
+        """Cancelar operación"""
         pass
+
 class OperacionDetalle(models.Model):
     operacion = models.ForeignKey(Operacion, on_delete=models.CASCADE, related_name='detalles')
-    articulo_id = models.IntegerField() # Lax FK to inventario.Articulo
+    articulo_id = models.IntegerField()  # Lax FK to inventario.Articulo
     cantidad = models.IntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
-    def __str__(self): return f'Detalle OP-{self.operacion_id} Art-{self.articulo_id}'
+
+    def __str__(self):
+        return f'Detalle OP-{self.operacion_id} Art-{self.articulo_id}'

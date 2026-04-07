@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
-import AutocompleteCreate from '../components/AutocompleteCreate';
+import AutocompleteCreate from './AutocompleteCreate';
 
-// Componente para una fila de producto (para mantener estado local)
+// Componente para una fila de producto
 function ProductRow({ product, index, onUpdate, onRemove }) {
   const [selectedProduct, setSelectedProduct] = useState(product.product ? { id: product.product } : null);
 
@@ -66,8 +65,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   );
 }
 
-export default function OperationForm({ id, onClose, onSuccess }) {
-  const navigate = useNavigate();
+export default function OperationFormWithIMO({ id, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     client: '',
@@ -92,6 +90,10 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     remito_file: null,
     rancho_file: null,
   });
+  // Estados para autocompletado por IMO
+  const [imoInput, setImoInput] = useState('');
+  const [autoCompleting, setAutoCompleting] = useState(false);
+  const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -121,6 +123,15 @@ export default function OperationForm({ id, onClose, onSuccess }) {
             remito_file: operation.remito_file,
             rancho_file: operation.rancho_file,
           });
+          if (operation.ship) {
+            try {
+              const shipRes = await axios.get(`/operations/ships/${operation.ship}/`);
+              if (shipRes.data.imo) setImoInput(shipRes.data.imo);
+              if (shipRes.data.flag) setAutoCompleteFlag(shipRes.data.flag);
+            } catch (err) {
+              console.error("Error al obtener datos del buque:", err);
+            }
+          }
         }
       } catch (err) {
         console.error(err);
@@ -202,6 +213,50 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     return new Date(dateString).toISOString();
   };
 
+  // Función para formatear la fecha a datetime-local
+  const formatToDatetimeLocal = (isoString) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().slice(0, 16);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const handleAutoComplete = async () => {
+    if (!imoInput || imoInput.length !== 7) {
+      alert('Ingrese un IMO válido de 7 dígitos');
+      return;
+    }
+    setAutoCompleting(true);
+    try {
+      const response = await axios.get(`/operations/operations/auto_complete_imo/`, {
+        params: { imo: imoInput }
+      });
+      const data = response.data;
+      
+      // Formatear la fecha ETA si existe
+      const etaFormatted = formatToDatetimeLocal(data.eta);
+      
+      setFormData(prev => ({
+        ...prev,
+        ship: data.ship_id,
+        port: data.port_id || '',
+        eta: etaFormatted,
+      }));
+      setAutoCompleteFlag(data.flag || '');
+      
+      alert(`Buque "${data.ship_name}" cargado.\nBandera: ${data.flag || 'No disponible'}\nPuerto: ${data.port_name || 'No detectado'}\nETA: ${data.eta_raw || 'No disponible'}`);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Error al obtener datos del IMO');
+    } finally {
+      setAutoCompleting(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -218,19 +273,14 @@ export default function OperationForm({ id, onClose, onSuccess }) {
       };
 
       let response;
-
       if (id) {
         response = await axios.put(`/operations/operations/${id}/`, payload);
       } else {
         response = await axios.post('/operations/operations/', payload);
       }
 
-      if (onSuccess) {
-        onSuccess(response.data.id);
-      }
-      if (onClose) {
-        onClose();
-      }
+      if (onSuccess) onSuccess(response.data.id);
+      if (onClose) onClose();
     } catch (err) {
       console.error(err);
       setError('Error al guardar la operación. Revisa los datos.');
@@ -271,18 +321,58 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                   ]}
                 />
 
-                <AutocompleteCreate
-                  label="Buque *"
-                  endpoint="/operations/ships/"
-                  value={formData.ship}
-                  onSelect={(item) => setFormData(prev => ({ ...prev, ship: item?.id || '' }))}
-                  createFields={[
-                    { name: 'imo', label: 'IMO *', required: true },
-                    { name: 'flag', label: 'Bandera *', required: true },
-                    { name: 'call_sign', label: 'Indicativo' },
-                    { name: 'gross_tonnage', label: 'Tonelaje bruto', type: 'number' },
-                  ]}
-                />
+                <div>
+                  <AutocompleteCreate
+                    label="Buque *"
+                    endpoint="/operations/ships/"
+                    value={formData.ship}
+                    onSelect={(item) => {
+                      setFormData(prev => ({ ...prev, ship: item?.id || '' }));
+                      if (item && item.imo) setImoInput(item.imo);
+                      if (item && item.flag) setAutoCompleteFlag(item.flag);
+                      else setAutoCompleteFlag('');
+                    }}
+                    createFields={[
+                      { name: 'imo', label: 'IMO *', required: true },
+                      { name: 'flag', label: 'Bandera *', required: true },
+                      { name: 'call_sign', label: 'Indicativo' },
+                      { name: 'gross_tonnage', label: 'Tonelaje bruto', type: 'number' },
+                    ]}
+                  />
+                  {/* Sección de autocompletado por IMO */}
+                  <div className="flex items-end space-x-2 mt-2">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700">IMO (autocompletar)</label>
+                      <input
+                        type="text"
+                        value={imoInput}
+                        onChange={(e) => setImoInput(e.target.value)}
+                        placeholder="Ej: 9621871"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAutoComplete}
+                      disabled={autoCompleting}
+                      className="mb-0.5 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      {autoCompleting ? 'Buscando...' : 'Buscar por IMO'}
+                    </button>
+                  </div>
+                  {/* Campo de bandera autocompletada (solo lectura) */}
+                  {autoCompleteFlag && (
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-gray-700">Bandera (autocompletada)</label>
+                      <input
+                        type="text"
+                        value={autoCompleteFlag}
+                        disabled
+                        className="mt-1 block w-full border border-gray-300 rounded-md bg-gray-100 py-2 px-3 text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
 
                 <AutocompleteCreate
                   label="Puerto *"
@@ -389,7 +479,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* Productos con AutocompleteCreate */}
+              {/* Productos */}
               <div>
                 <div className="flex justify-between items-center">
                   <h4 className="text-md font-medium text-gray-900">Productos</h4>
