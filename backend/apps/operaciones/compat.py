@@ -1,10 +1,15 @@
 # IMPORTANTE: Fachada temporal (Anti-Corruption Layer). Eliminar cuando se refactorice el frontend.
 from rest_framework import viewsets, serializers
 from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.db.models import Q
+
 from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency
 from apps.inventario.models import Articulo
+from apps.usuarios.models import User
+
 from .services import get_or_create_ship_from_imo, get_or_create_port_from_name
-from rest_framework.decorators import action
+
 
 class OperacionCompatSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='cliente.name', read_only=True)
@@ -13,39 +18,65 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField(read_only=True)
     products = serializers.JSONField(required=False)
 
+    # 👇 Campos de asignación (develop)
+    operadores_id = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(),
+        source='operadores_asignados', required=False
+    )
+    operarios_id = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(),
+        source='operarios_asignados', required=False
+    )
+    contables_id = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(),
+        source='contables_asignados', required=False
+    )
+
     class Meta:
         model = Operacion
         fields = [
             'id', 'client_name', 'ship_name', 'port_name', 'eta',
             'delivery_method', 'status', 'products',
+
+            # relaciones
             'cliente', 'ship', 'port', 'agency', 'notas',
+
+            # fechas (tu versión)
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
+
+            # archivos
             'packing_list_file', 'remito_file', 'rancho_file',
+
+            # asignaciones (develop)
+            'operadores_id', 'operarios_id', 'contables_id',
         ]
         extra_kwargs = {
             'cliente': {'required': False},
             'ship': {'required': False},
             'port': {'required': False},
+            'agency': {'required': False},
             'eta': {'required': False},
+
             'order_received_date': {'required': False, 'allow_null': True},
             'client_confirmed_date': {'required': False, 'allow_null': True},
             'delivery_date': {'required': False, 'allow_null': True},
             'closed_date': {'required': False, 'allow_null': True},
         }
 
+    # -------------------------
+    # OUTPUT
+    # -------------------------
     def to_representation(self, instance):
-        """Asegura que el campo 'products' siempre sea una lista en la respuesta."""
         ret = super().to_representation(instance)
         ret['products'] = self.get_products(instance)
         return ret
 
     def get_products(self, obj):
-        """Obtiene los productos asociados a la operación."""
         detalles = OperacionDetalle.objects.filter(operacion=obj)
         productos = []
+
         for detalle in detalles:
-            # Como articulo_id es un IntegerField sin FK, buscamos el artículo manualmente
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
                 productos.append({
@@ -57,7 +88,6 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                     "presentation": articulo.presentacion,
                 })
             except Articulo.DoesNotExist:
-                # Si no existe el artículo, devolvemos datos básicos
                 productos.append({
                     "product": detalle.articulo_id,
                     "product_name": f"Artículo {detalle.articulo_id} (no encontrado)",
@@ -66,8 +96,24 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                     "weight_kg": None,
                     "presentation": "",
                 })
+
         return productos
 
+    def get_status(self, obj):
+        mapper = {
+            Operacion.ESTADO_SOLICITADA: 'pending',
+            Operacion.ESTADO_PRESUPUESTADA: 'price_checked',
+            Operacion.ESTADO_EN_PRODUCCION: 'in_coordination',
+            Operacion.ESTADO_LISTA_PARA_ENVIO: 'confirmed',
+            Operacion.ESTADO_REMITADA: 'delivered',
+            Operacion.ESTADO_ENTREGADA: 'closed',
+            Operacion.ESTADO_CANCELADA: 'cancelled'
+        }
+        return mapper.get(obj.estado, 'pending')
+
+    # -------------------------
+    # INPUT
+    # -------------------------
     def to_internal_value(self, data):
         import random
         mutable_data = data.copy() if hasattr(data, 'copy') else data
@@ -87,7 +133,9 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
         if 'port' in mutable_data:
             mutable_data['port'] = _get_or_create('port', Port, {'country': 'TBD'})
         if 'agency' in mutable_data:
-            mutable_data['agency'] = _get_or_create('agency', Agency, {'email': 'default@email.com', 'contact_name': 'TBD', 'phone': '0'})
+            mutable_data['agency'] = _get_or_create('agency', Agency, {
+                'email': 'default@email.com', 'contact_name': 'TBD', 'phone': '0'
+            })
         if 'notes' in mutable_data:
             mutable_data['notas'] = mutable_data.pop('notes')
         if 'eta' in mutable_data and not mutable_data['eta']:
@@ -104,14 +152,17 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         products_data = validated_data.pop('products', None)
         operation = super().update(instance, validated_data)
+
         if products_data is not None:
             operation.detalles.all().delete()
             self._handle_products(operation, products_data)
+
         return operation
 
     def _handle_products(self, operation, products):
         for prod in products:
             p_val = prod.get('product')
+
             if p_val and isinstance(p_val, str) and not str(p_val).isdigit():
                 articulo, _ = Articulo.objects.get_or_create(
                     nombre=p_val,
@@ -120,6 +171,7 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                 articulo_id = articulo.id
             else:
                 articulo_id = p_val
+
             if articulo_id:
                 OperacionDetalle.objects.create(
                     operacion=operation,
@@ -128,22 +180,24 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
                     precio_unitario=prod.get('unit_price', 0)
                 )
 
-    def get_status(self, obj):
-        mapper = {
-            Operacion.ESTADO_SOLICITADA: 'pending',
-            Operacion.ESTADO_PRESUPUESTADA: 'price_checked',
-            Operacion.ESTADO_EN_PRODUCCION: 'in_coordination',
-            Operacion.ESTADO_LISTA_PARA_ENVIO: 'confirmed',
-            Operacion.ESTADO_REMITADA: 'delivered',
-            Operacion.ESTADO_ENTREGADA: 'closed',
-            Operacion.ESTADO_CANCELADA: 'cancelled'
-        }
-        return mapper.get(obj.estado, 'pending')
-
 
 class OperacionCompatViewSet(viewsets.ModelViewSet):
-    queryset = Operacion.objects.all().select_related('cliente', 'ship', 'port')
     serializer_class = OperacionCompatSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Operacion.objects.all().select_related('cliente', 'ship', 'port', 'agency')
+
+        # Owner y Contable → acceso total
+        if user.role in [User.Role.OWNER, User.Role.CONTABLE]:
+            return qs
+
+        # Data isolation por asignación
+        return qs.filter(
+            Q(operadores_asignados=user) |
+            Q(operarios_asignados=user) |
+            Q(contables_asignados=user)
+        ).distinct()
 
     @action(detail=True, methods=['post'])
     def cancel_operation(self, request, pk=None):
@@ -155,18 +209,24 @@ class OperacionCompatViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='auto_complete_imo')
     def auto_complete_imo(self, request):
         imo = request.query_params.get('imo')
+
         if not imo or not imo.isdigit() or len(imo) != 7:
             return Response({"error": "Se requiere un IMO válido de 7 dígitos"}, status=400)
+
         ship, scraped_data = get_or_create_ship_from_imo(imo)
+
         if not scraped_data:
             return Response({"error": "No se pudo obtener información del buque."}, status=404)
+
         port = None
         port_id = None
         port_name = scraped_data.get('destino')
+
         if port_name:
             port = get_or_create_port_from_name(port_name)
             port_id = port.id if port else None
-        response_data = {
+
+        return Response({
             "ship_id": ship.id,
             "ship_name": ship.name,
             "flag": ship.flag,
@@ -175,46 +235,54 @@ class OperacionCompatViewSet(viewsets.ModelViewSet):
             "eta_raw": scraped_data.get('eta_raw'),
             "port_id": port_id,
             "port_name": port_name,
-        }
-        return Response(response_data)
+        })
 
 
-# Los siguientes ViewSets se mantienen igual (no se modifican)
+# --------- RESTO SIN CAMBIOS ---------
+
 class ClientCompatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = ['id', 'name', 'email', 'contact_person', 'phone']
 
+
 class ClientCompatViewSet(viewsets.ModelViewSet):
     queryset = Client.objects.all()
     serializer_class = ClientCompatSerializer
+
 
 class ShipCompatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = ['id', 'name', 'imo', 'flag', 'call_sign', 'gross_tonnage']
 
+
 class ShipCompatViewSet(viewsets.ModelViewSet):
     queryset = Ship.objects.all()
     serializer_class = ShipCompatSerializer
+
 
 class PortCompatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Port
         fields = ['id', 'name', 'country', 'code']
 
+
 class PortCompatViewSet(viewsets.ModelViewSet):
     queryset = Port.objects.all()
     serializer_class = PortCompatSerializer
+
 
 class AgencyCompatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Agency
         fields = ['id', 'name', 'contact_name', 'phone', 'email']
 
+
 class AgencyCompatViewSet(viewsets.ModelViewSet):
     queryset = Agency.objects.all()
     serializer_class = AgencyCompatSerializer
+
 
 class ProductCompatSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='nombre', required=True)
@@ -224,6 +292,7 @@ class ProductCompatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Articulo
         fields = ['id', 'name', 'presentation', 'weight_kg']
+
 
 class ProductCompatViewSet(viewsets.ModelViewSet):
     queryset = Articulo.objects.all()

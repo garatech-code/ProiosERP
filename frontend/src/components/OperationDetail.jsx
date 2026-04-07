@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import OperarioActionPanel from './OperarioActionPanel';
 
 export default function OperationDetail() {
   const { id } = useParams();
@@ -117,6 +118,9 @@ export default function OperationDetail() {
     return operation.products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
   };
 
+  const isOperario = user?.role === 'OPERARIO';
+  const isOwner = user?.role === 'OWNER';
+
   if (loading) return <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
   if (error) return <div className="text-center text-red-600 mt-10">{error}</div>;
   if (!operation) return <div className="text-center mt-10">No se encontró la operación</div>;
@@ -209,44 +213,60 @@ export default function OperationDetail() {
                   <dt className="text-sm font-medium text-gray-500">Fecha de cierre</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.closed_date)}</dd>
                 </div>
+                {/* Personal Asignado (Solo Owner) */}
+                {isOwner && (
+                  <div className="bg-white px-4 py-4 sm:px-6 border-t border-gray-100 italic">
+                     <p className="text-[10px] font-black text-gray-400 uppercase mb-2 text-center tracking-widest">Personal de Misión Asignado</p>
+                     <div className="flex justify-around text-xs">
+                        <span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100 font-bold">Operadores: {operation.operadores_id?.length || 0}</span>
+                        <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 font-bold">Operarios: {operation.operarios_id?.length || 0}</span>
+                     </div>
+                  </div>
+                )}
               </dl>
             </div>
 
-            {/* Productos */}
+            {/* Productos / Vista Operario */}
             <div className="border-t border-gray-200">
-              <div className="px-4 py-5 sm:px-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Productos</h3>
-                <div className="mt-4 flex flex-col">
-                  <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                    <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead>
-                          <tr>
-                            <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                            <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                            <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio unitario</th>
-                            <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {operation.products?.map((prod, idx) => (
-                            <tr key={idx}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.product_name}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.quantity}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${prod.unit_price}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${(prod.quantity * prod.unit_price).toFixed(2)}</td>
-                            </tr>
-                          ))}
-                          <tr className="bg-gray-50">
-                            <td colSpan="3" className="px-6 py-4 text-right text-sm font-medium text-gray-900">Total general</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${calculateTotal().toFixed(2)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                {!isOperario ? (
+                  <div className="px-4 py-5 sm:px-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 tracking-tight">Detalle de Productos</h3>
+                    <div className="mt-4 flex flex-col">
+                      <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                        <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+                          <div className="shadow-sm overflow-hidden border border-gray-200 rounded-xl">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead>
+                                <tr className="bg-slate-50 uppercase tracking-wider text-[10px] font-black text-slate-500">
+                                  <th className="px-6 py-4 text-left">Producto</th>
+                                  <th className="px-6 py-4 text-left">Cantidad</th>
+                                  <th className="px-6 py-4 text-left">Precio unitario</th>
+                                  <th className="px-6 py-4 text-left text-indigo-600">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {operation.products?.map((prod, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/50 transition">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{prod.product_name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{prod.quantity}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${prod.unit_price}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-600">${(prod.quantity * prod.unit_price).toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                                <tr className="bg-indigo-50/30">
+                                  <td colSpan="3" className="px-6 py-6 text-right text-sm font-black text-indigo-900 uppercase tracking-widest">Total general</td>
+                                  <td className="px-6 py-6 whitespace-nowrap text-xl font-black text-indigo-700 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
+                    </div>
+                ) : (
+                  <OperarioActionPanel products={operation.products} />
+                )}
             </div>
 
             {/* Documentos */}
@@ -311,59 +331,58 @@ export default function OperationDetail() {
             </div>
 
             {/* Acciones */}
-            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-              <div className="flex flex-wrap gap-4">
-                {operation.can_confirm && (
-                  <button
-                    onClick={() => handleAction('confirm_operation', '¿Confirmar la operación? Esto marcará que el cliente confirmó.')}
-                    disabled={actionLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
-                  >
-                    {actionLoading ? 'Procesando...' : 'Confirmar operación'}
-                  </button>
-                )}
-                {operation.can_coordinate && (
-                  <button
-                    onClick={() => handleAction('start_coordination', '¿Iniciar coordinación? Esto marca que se contactará a la agencia.')}
-                    disabled={actionLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    {actionLoading ? 'Procesando...' : 'Iniciar coordinación'}
-                  </button>
-                )}
-                {operation.can_deliver && (
-                  <button
-                    onClick={() => handleAction('mark_delivered', '¿Marcar como entregada? Asegúrate de tener el remito firmado.')}
-                    disabled={actionLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    {actionLoading ? 'Procesando...' : 'Marcar como entregada'}
-                  </button>
-                )}
-                {operation.can_close && (
-                  <button
-                    onClick={() => handleAction('close_operation', '¿Cerrar operación? Esto la enviará a facturación.')}
-                    disabled={actionLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700"
-                  >
-                    {actionLoading ? 'Procesando...' : 'Cerrar operación'}
-                  </button>
-                )}
-                {operation.status !== 'closed' && operation.status !== 'cancelled' && (
-                  <button
-                    onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y no se podrá continuar.')}
-                    disabled={actionLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
-                  >
-                    {actionLoading ? 'Procesando...' : 'Cancelar operación'}
-                  </button>
-                )}
-                <button
-                  onClick={() => navigate(`/operations/${id}/edit`)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Editar operación
-                </button>
+            <div className="border-t border-gray-200 px-4 py-5 sm:px-6 bg-slate-50">
+              <div className="flex flex-wrap gap-4 justify-between items-center">
+                <div className="flex gap-2">
+                  {operation.can_confirm && !isOperario && (
+                    <button
+                      onClick={() => handleAction('confirm_operation', '¿Confirmar la operación? Esto marcará que el cliente confirmó.')}
+                      disabled={actionLoading}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-green-600 hover:bg-green-700"
+                    >
+                      {actionLoading ? 'Procesando...' : 'Confirmar operación'}
+                    </button>
+                  )}
+                  {operation.can_coordinate && !isOperario && (
+                    <button
+                      onClick={() => handleAction('start_coordination', '¿Iniciar coordinación? Esto marca que se contactará a la agencia.')}
+                      disabled={actionLoading}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      {actionLoading ? 'Procesando...' : 'Iniciar coordinación'}
+                    </button>
+                  )}
+                  {operation.can_deliver && !isOperario && (
+                    <button
+                      onClick={() => handleAction('mark_delivered', '¿Marcar como entregada? Asegúrate de tener el remito firmado.')}
+                      disabled={actionLoading}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      {actionLoading ? 'Procesando...' : 'Marcar como entregada'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  {isOwner && (
+                    <button
+                      onClick={() => navigate(`/operations/${id}/edit`)}
+                      className="inline-flex items-center px-4 py-2 border-2 border-slate-200 text-sm font-bold rounded-xl shadow-sm text-slate-700 bg-white hover:bg-slate-50"
+                    >
+                      Configurar / Editar
+                    </button>
+                  )}
+                  
+                  {isOwner && operation.status !== 'closed' && operation.status !== 'cancelled' && (
+                    <button
+                      onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y no se podrá continuar.')}
+                      disabled={actionLoading}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-red-500 hover:bg-red-600"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -24,8 +24,8 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get_queryset(self):
-        # Si no es admin, solo puede ver su propio usuario
+        # Admin y Owner pueden ver todos los usuarios para gestiones y asignaciones
         user = self.request.user
-        if user.role == user.Role.ADMIN:
+        if user.role in [user.Role.ADMIN, user.Role.OWNER]:
             return User.objects.all()
         return User.objects.filter(id=user.id)
