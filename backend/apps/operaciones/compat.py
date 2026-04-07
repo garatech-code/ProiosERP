@@ -34,6 +34,40 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
             'closed_date': {'required': False, 'allow_null': True},
         }
 
+    def to_representation(self, instance):
+        """Asegura que el campo 'products' siempre sea una lista en la respuesta."""
+        ret = super().to_representation(instance)
+        ret['products'] = self.get_products(instance)
+        return ret
+
+    def get_products(self, obj):
+        """Obtiene los productos asociados a la operación."""
+        detalles = OperacionDetalle.objects.filter(operacion=obj)
+        productos = []
+        for detalle in detalles:
+            # Como articulo_id es un IntegerField sin FK, buscamos el artículo manualmente
+            try:
+                articulo = Articulo.objects.get(id=detalle.articulo_id)
+                productos.append({
+                    "product": detalle.articulo_id,
+                    "product_name": articulo.nombre,
+                    "quantity": detalle.cantidad,
+                    "unit_price": float(detalle.precio_unitario) if detalle.precio_unitario else 0,
+                    "weight_kg": float(articulo.peso_kg) if articulo.peso_kg else None,
+                    "presentation": articulo.presentacion,
+                })
+            except Articulo.DoesNotExist:
+                # Si no existe el artículo, devolvemos datos básicos
+                productos.append({
+                    "product": detalle.articulo_id,
+                    "product_name": f"Artículo {detalle.articulo_id} (no encontrado)",
+                    "quantity": detalle.cantidad,
+                    "unit_price": float(detalle.precio_unitario) if detalle.precio_unitario else 0,
+                    "weight_kg": None,
+                    "presentation": "",
+                })
+        return productos
+
     def to_internal_value(self, data):
         import random
         mutable_data = data.copy() if hasattr(data, 'copy') else data
@@ -106,19 +140,6 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
         }
         return mapper.get(obj.estado, 'pending')
 
-    def get_products(self, obj):
-        detalles = OperacionDetalle.objects.filter(operacion=obj)
-        return [
-            {
-                "product": d.articulo_id,
-                "product_name": d.articulo.nombre,
-                "quantity": d.cantidad,
-                "unit_price": float(d.precio_unitario) if d.precio_unitario else 0,
-                "weight_kg": float(d.articulo.peso_kg) if d.articulo.peso_kg else None,
-                "presentation": d.articulo.presentacion,
-            }
-            for d in detalles
-        ]
 
 class OperacionCompatViewSet(viewsets.ModelViewSet):
     queryset = Operacion.objects.all().select_related('cliente', 'ship', 'port')
@@ -156,6 +177,7 @@ class OperacionCompatViewSet(viewsets.ModelViewSet):
             "port_name": port_name,
         }
         return Response(response_data)
+
 
 # Los siguientes ViewSets se mantienen igual (no se modifican)
 class ClientCompatSerializer(serializers.ModelSerializer):
