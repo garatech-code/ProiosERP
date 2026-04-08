@@ -144,13 +144,36 @@ class OperacionCompatSerializer(serializers.ModelSerializer):
         return super().to_internal_value(mutable_data)
 
     def create(self, validated_data):
-        products_data = validated_data.pop('products', [])
+        # 👇 CORRECCIÓN PRODUCTOS: Rescatamos de initial_data si DRF lo vació
+        products_data = validated_data.pop('products', None)
+        if products_data is None:
+            products_data = self.initial_data.get('products', [])
+            
+        if isinstance(products_data, str):
+            import json
+            try:
+                products_data = json.loads(products_data)
+            except ValueError:
+                products_data = []
+
         operation = super().create(validated_data)
         self._handle_products(operation, products_data)
+        
         return operation
 
     def update(self, instance, validated_data):
+        # 👇 CORRECCIÓN PRODUCTOS: Aplicado a actualización también
         products_data = validated_data.pop('products', None)
+        if products_data is None:
+            products_data = self.initial_data.get('products', [])
+
+        if isinstance(products_data, str):
+            import json
+            try:
+                products_data = json.loads(products_data)
+            except ValueError:
+                products_data = []
+
         operation = super().update(instance, validated_data)
 
         if products_data is not None:
@@ -202,9 +225,13 @@ class OperacionCompatViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def cancel_operation(self, request, pk=None):
         op = self.get_object()
-        op.estado = Operacion.ESTADO_CANCELADA
-        op.save()
-        return Response({'status': 'cancelled'})
+        try:
+            # 👇 CORRECCIÓN FSM: Transición legal
+            op.cancel()
+            op.save()
+            return Response({'status': 'cancelled'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=False, methods=['get'], url_path='auto_complete_imo')
     def auto_complete_imo(self, request):

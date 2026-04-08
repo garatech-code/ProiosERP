@@ -236,10 +236,10 @@ export default function OperationFormWithIMO({ id, onClose, onSuccess }) {
         params: { imo: imoInput }
       });
       const data = response.data;
-      
+
       // Formatear la fecha ETA si existe
       const etaFormatted = formatToDatetimeLocal(data.eta);
-      
+
       setFormData(prev => ({
         ...prev,
         ship: data.ship_id,
@@ -247,7 +247,7 @@ export default function OperationFormWithIMO({ id, onClose, onSuccess }) {
         eta: etaFormatted,
       }));
       setAutoCompleteFlag(data.flag || '');
-      
+
       alert(`Buque "${data.ship_name}" cargado.\nBandera: ${data.flag || 'No disponible'}\nPuerto: ${data.port_name || 'No detectado'}\nETA: ${data.eta_raw || 'No disponible'}`);
     } catch (err) {
       console.error(err);
