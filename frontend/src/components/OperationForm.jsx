@@ -359,12 +359,14 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
                 />
                 <AutocompleteCreate
+                key={`ship-${formData.ship}`}
                   label="Buque"
                   endpoint="/operations/ships/"
                   value={formData.ship}
                   onSelect={(i) => setFormData(p => ({ ...p, ship: i?.id || '' }))}
                 />
                 <AutocompleteCreate
+                key={`port-${formData.port}`}
                   label="Puerto"
                   endpoint="/operations/ports/"
                   value={formData.port}

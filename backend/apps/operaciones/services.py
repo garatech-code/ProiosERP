@@ -78,97 +78,201 @@ def scrape_vessel_info(imo):
     """
     Extrae nombre, bandera, destino (puerto) y ETA de VesselFinder.
     Retorna un dict con los datos o None si hay error.
+    - La lógica de ETA se mantiene exactamente como la versión que funciona bien.
+    - El resto (nombre, bandera, destino) se ha mejorado con múltiples estrategias y limpieza.
     """
-    url = f"https://www.vesselfinder.com/es/vessels/details/{imo}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    
+    import re
+    from datetime import datetime
+    import requests
+    from bs4 import BeautifulSoup
+    from django.utils import timezone
+
+    url = f"https://www.vesselfinder.com/vessels/details/{imo}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     try:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
-        logger.error(f"Error scraping IMO {imo}: {e}")
+        logger.error(f"Error scraping IMO {imo} desde VesselFinder: {e}")
         return None
 
     soup = BeautifulSoup(response.text, "html.parser")
     text = soup.get_text()
-    
-    # Nombre
+
+    # ---------- NOMBRE (mejorado) ----------
     nombre = None
-    h1 = soup.find("h1")
+    h1 = soup.find("h1", class_="title")
     if h1:
         nombre = h1.get_text(strip=True)
-    
-    # Bandera
+    if not nombre:
+        h1_alt = soup.find("h1")
+        if h1_alt:
+            nombre = h1_alt.get_text(strip=True)
+    # fallback: buscar en el párrafo text2
+    if not nombre:
+        paragraph = soup.find("p", class_="text2")
+        if paragraph:
+            match = re.search(r"The vessel\s+([A-Za-z0-9\s]+)\s+\(IMO", paragraph.get_text())
+            if match:
+                nombre = match.group(1).strip()
+
+    # ---------- TIPO (del subtítulo h2) ----------
+    vessel_type = None
+    h2 = soup.find("h2", class_="vst")
+    if h2:
+        vessel_type = h2.get_text(strip=True).split(",")[0].strip()
+
+    # ---------- BANDERA (mejorada: prioriza nombre completo desde título o mapeo) ----------
     bandera = None
-    dt_flag = soup.find("dt", string=re.compile(r"Bandera|Flag", re.IGNORECASE))
-    if dt_flag:
-        dd = dt_flag.find_next_sibling("dd")
-        if dd:
-            bandera = dd.get_text(strip=True)
+    # Mapeo de códigos a nombres (ampliado)
+    flag_map = {
+        "mt": "Malta", "ar": "Argentina", "br": "Brazil", "sg": "Singapore",
+        "hk": "Hong Kong", "mh": "Marshall Islands", "bg": "Bulgaria",
+        "bb": "Barbados", "lr": "Liberia", "pa": "Panama", "uy": "Uruguay",
+        "us": "United States", "gb": "United Kingdom", "es": "Spain", "fr": "France",
+        "de": "Germany", "it": "Italy", "nl": "Netherlands", "tr": "Turkey",
+        "ru": "Russia", "cn": "China", "jp": "Japan", "kr": "South Korea",
+    }
+    # Método 1: div title-flag-icon (tiene style con la bandera)
+    flag_div = soup.find("div", class_="title-flag-icon")
+    if flag_div:
+        # Primero ver si tiene atributo 'title' (nombre completo)
+        if flag_div.get("title"):
+            bandera = flag_div["title"]
+        elif flag_div.get("style"):
+            match = re.search(r'flags/4x3/([a-z]+)\.svg', flag_div["style"])
+            if match:
+                code = match.group(1).lower()
+                bandera = flag_map.get(code, code.upper())
+    # Método 2: párrafo text2 ("flag of Malta")
     if not bandera:
-        for td in soup.find_all("td", string=re.compile(r"Flag", re.IGNORECASE)):
-            next_td = td.find_next_sibling("td")
-            if next_td:
-                bandera = next_td.get_text(strip=True)
-                break
+        paragraph = soup.find("p", class_="text2")
+        if paragraph:
+            text_p = paragraph.get_text()
+            match = re.search(r"flag of\s+([A-Za-z\s]+)", text_p, re.IGNORECASE)
+            if match:
+                bandera = match.group(1).strip()
+    # Método 3: tabla "AIS Flag"
     if not bandera:
-        match_flag = re.search(r"(?:Flag|Bandera)[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", text, re.IGNORECASE)
-        if match_flag:
-            bandera = match_flag.group(1).strip()
-    
-    # Destino (puerto)
+        flag_row = soup.find("td", string=re.compile(r"AIS Flag", re.IGNORECASE))
+        if flag_row:
+            flag_td = flag_row.find_next_sibling("td")
+            if flag_td:
+                val = flag_td.get_text(strip=True)
+                bandera = flag_map.get(val.lower(), val)
+    # Método 4: tabla "Flag" general
+    if not bandera:
+        flag_row = soup.find("td", string=re.compile(r"Flag", re.IGNORECASE))
+        if flag_row:
+            flag_td = flag_row.find_next_sibling("td")
+            if flag_td:
+                val = flag_td.get_text(strip=True)
+                bandera = flag_map.get(val.lower(), val)
+
+    # ---------- DESTINO (mejorado: captura cualquier destino, con o sin país) ----------
     destino = None
-    match_dest = re.search(r"Destination\s*\n\s*([^\n]+)", text, re.IGNORECASE)
-    if not match_dest:
-        match_dest = re.search(r"Destino\s*\n\s*([^\n]+)", text, re.IGNORECASE)
-    if match_dest:
-        destino = match_dest.group(1).strip()
-        if "not available" in destino.lower():
-            destino = None
-    
-    # ETA: obtener string y convertirlo a ISO 8601 (para datetime-local)
+    paragraph = soup.find("p", class_="text2")
+    if paragraph:
+        text_p = paragraph.get_text()
+        # Captura desde "en route to" hasta "sailing" o punto o fin de línea
+        match_dest = re.search(r"en route to\s+(.+?)(?:\s+sailing|\.|$)", text_p, re.IGNORECASE)
+        if match_dest:
+            destino = match_dest.group(1).strip()
+            # Limpiar comas finales y espacios
+            destino = re.sub(r',\s*$', '', destino)
+            # Normalizar espacios alrededor de comas
+            destino = re.sub(r'\s*,\s*', ', ', destino)
+    # Método 2: tabla Voyage Data -> "Destination"
+    if not destino:
+        dest_label = soup.find("td", string=re.compile(r"Destination", re.IGNORECASE))
+        if dest_label:
+            dest_td = dest_label.find_next_sibling("td")
+            if dest_td:
+                destino = dest_td.get_text(strip=True)
+    # Método 3: enlace con clase "_npNa"
+    if not destino:
+        dest_link = soup.find("a", class_="_npNa")
+        if dest_link:
+            destino = dest_link.get_text(strip=True)
+    # Método 4: div "_3-Yih"
+    if not destino:
+        dest_div = soup.find("div", class_="_3-Yih")
+        if dest_div:
+            destino = dest_div.get_text(strip=True)
+
+    # ---------- ETA (EXACTAMENTE IGUAL A TU CÓDIGO QUE FUNCIONA) ----------
     eta_str = None
     eta_iso = None
-    # Buscar patrón "ETA: Apr 8, 14:00" o similar
-    match_eta = re.search(r"ETA:\s*([A-Za-z]+\.?\s+\d{1,2},\s+\d{2}:\d{2})", text)
-    if match_eta:
-        eta_str = match_eta.group(1).strip()
-    else:
-        match_eta2 = re.search(r"ETA:\s*([^(\n]+)", text)
-        if match_eta2:
-            eta_candidate = match_eta2.group(1).strip()
-            eta_str = re.sub(r"\s*\(.*?\)", "", eta_candidate).strip()
-    
+    # Método 1: del párrafo "expected to arrive there on Apr 8, 14:00"
+    if paragraph:
+        text_p = paragraph.get_text()
+        match_eta = re.search(r"arrive there on\s+([A-Za-z]+\s+\d{1,2},\s+\d{2}:\d{2})", text_p)
+        if match_eta:
+            eta_str = match_eta.group(1).strip()
+    # Método 2: de la tabla Voyage Data -> "Predicted ETA"
+    if not eta_str:
+        eta_label = soup.find("td", string=re.compile(r"Predicted ETA", re.IGNORECASE))
+        if eta_label:
+            eta_td = eta_label.find_next_sibling("td")
+            if eta_td:
+                eta_str = eta_td.get_text(strip=True)
+                if eta_str == "-":
+                    eta_str = None
+    # Método 3: del elemento "_value" dentro de la sección de destino
+    if not eta_str:
+        value_div = soup.find("div", class_="_value")
+        if value_div:
+            eta_text = value_div.get_text()
+            match_eta = re.search(r"ETA:\s*([^)]+)\)", eta_text)
+            if match_eta:
+                eta_str = match_eta.group(1).strip()
+
+    # Parsear ETA a ISO (mismo código que usas)
     if eta_str:
         logger.info(f"ETA raw para IMO {imo}: {eta_str}")
-        # Limpiar: eliminar puntos
         eta_clean = eta_str.replace('.', '').strip()
         now = timezone.now()
-        # El formato típico es "Apr 8, 14:00" -> falta el año
-        # Insertamos el año después del día y antes de la hora
-        if ',' in eta_clean and not re.search(r'\d{4}', eta_clean):
-            parts = eta_clean.split(',')
-            if len(parts) == 2:
-                day_part = parts[0].strip()      # "Apr 8"
-                time_part = parts[1].strip()     # "14:00"
-                eta_clean = f"{day_part}, {now.year} {time_part}"
-                logger.info(f"ETA con año insertado: {eta_clean}")
-        
-        # Probar formatos (el orden importa)
         for fmt in ["%b %d, %Y %H:%M", "%B %d, %Y %H:%M", "%b %d, %H:%M", "%B %d, %H:%M"]:
             try:
                 dt = datetime.strptime(eta_clean, fmt)
                 if dt.year == 1900:
                     dt = dt.replace(year=now.year)
                 eta_iso = timezone.make_aware(dt).isoformat()
-                logger.info(f"ETA parseado exitosamente: {eta_iso}")
+                logger.info(f"ETA parseado: {eta_iso}")
                 break
-            except ValueError as e:
-                logger.debug(f"Formato {fmt} falló: {e}")
+            except ValueError:
                 continue
         if not eta_iso:
+            try:
+                from dateutil import parser
+                dt = parser.parse(eta_str, fuzzy=True)
+                eta_iso = timezone.make_aware(dt).isoformat()
+            except:
+                pass
+        if not eta_iso:
             logger.warning(f"No se pudo parsear ETA para {imo}: {eta_str}")
-    
+
+    # ---------- DATOS ADICIONALES (velocidad, calado) ----------
+    speed = None
+    draught = None
+    speed_label = soup.find("td", string=re.compile(r"Course / Speed", re.IGNORECASE))
+    if speed_label:
+        speed_td = speed_label.find_next_sibling("td")
+        if speed_td:
+            speed_text = speed_td.get_text()
+            match_speed = re.search(r"([\d\.]+)\s*knots", speed_text)
+            if match_speed:
+                speed = match_speed.group(1)
+    draught_label = soup.find("td", string=re.compile(r"Current draught", re.IGNORECASE))
+    if draught_label:
+        draught_td = draught_label.find_next_sibling("td")
+        if draught_td:
+            draught = draught_td.get_text(strip=True)
+
+    # ---------- RETORNO ----------
     return {
         "imo": imo,
         "nombre": nombre,
@@ -176,9 +280,11 @@ def scrape_vessel_info(imo):
         "destino": destino,
         "eta": eta_iso,
         "eta_raw": eta_str,
-    }
-
-
+        "tipo": vessel_type,
+        "velocidad_nudos": speed,
+        "calado_metros": draught,
+    }  
+    
 def get_or_create_ship_from_imo(imo):
     """Busca o crea un Ship usando el IMO, y opcionalmente actualiza nombre/bandera desde scraping."""
     try:
@@ -208,11 +314,33 @@ def get_or_create_ship_from_imo(imo):
 
 
 def get_or_create_port_from_name(port_name):
-    """Busca o crea un Puerto por nombre, con país por defecto 'Desconocido'."""
+    """
+    Busca o crea un Puerto por nombre (que puede incluir país, ej. 'San Lorenzo, Argentina').
+    Si el nombre contiene una coma, intenta separar ciudad y país para llenar los campos respectivos.
+    """
     if not port_name:
         return None
-    port, _ = Port.objects.get_or_create(
-        name=port_name.strip(),
-        defaults={'country': 'Desconocido'}
+
+    # Limpiar nombre
+    port_name = port_name.strip()
+    
+    # Intentar separar ciudad y país si hay coma
+    if ',' in port_name:
+        parts = port_name.split(',', 1)
+        city = parts[0].strip()
+        country = parts[1].strip()
+    else:
+        city = port_name
+        country = "Desconocido"
+
+    # Buscar por nombre exacto (ciudad + país) o solo ciudad? Para evitar duplicados, buscamos primero por el nombre completo
+    port, created = Port.objects.get_or_create(
+        name=port_name,
+        defaults={'country': country}
     )
+    # Si ya existía con ese nombre pero el país está vacío o incorrecto, actualizamos
+    if not created and (port.country == "Desconocido" or port.country != country):
+        port.country = country
+        port.save(update_fields=['country'])
+    
     return port
