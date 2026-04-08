@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import OperationForm from '../components/OperationForm'; // Asegúrate de que la ruta sea correcta
+import OperationForm from '../components/OperationForm';
 
 export default function OwnerDashboard() {
     const [operations, setOperations] = useState([]);
@@ -40,7 +40,6 @@ export default function OwnerDashboard() {
     const fetchOperations = async () => {
         try {
             setLoading(true);
-            // Gracias al compat, esta llamada sigue funcionando
             const res = await axios.get('/operations/operations/');
             setOperations(res.data);
             setError(null);
@@ -67,7 +66,6 @@ export default function OwnerDashboard() {
     const approveOperation = async (id, event) => {
         event.stopPropagation();
         if (!window.confirm('¿Autorizar esta operación para que pase a la siguiente fase?')) return;
-        // TODO: Conectar con el endpoint real de transición de estado cuando esté listo en el backend
         alert(`Operación ${id} aprobada.`);
     };
 
@@ -95,11 +93,41 @@ export default function OwnerDashboard() {
         );
     };
 
+    /* =========================================================
+       LÓGICA DEL SEMÁFORO DOCUMENTAL
+    ========================================================= */
+    const renderDocSemaphore = (label, fileUrl, opStatus) => {
+        let statusConfig = {};
+
+        if (fileUrl) {
+            // 🟢 Verde: El archivo existe
+            statusConfig = { dot: 'bg-emerald-500', box: 'bg-emerald-50 border-emerald-200 text-emerald-700', title: 'Completado' };
+        } else {
+            // Lógica para determinar si debería estar en proceso (Amarillo) o falta (Rojo)
+            const inProgressStates = ['in_coordination', 'confirmed', 'delivered'];
+            if (inProgressStates.includes(opStatus)) {
+                // 🟡 Amarillo: No está, pero la operación está en curso
+                statusConfig = { dot: 'bg-amber-400 animate-pulse', box: 'bg-amber-50 border-amber-200 text-amber-700', title: 'En Proceso / Pendiente' };
+            } else {
+                // 🔴 Rojo: No está, y la operación recién empieza o está frenada
+                statusConfig = { dot: 'bg-red-500', box: 'bg-red-50 border-red-200 text-red-700', title: 'Faltante' };
+            }
+        }
+
+        return (
+            <div
+                title={`${label}: ${statusConfig.title}`}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${statusConfig.box} text-[10px] font-bold uppercase tracking-wider cursor-help transition-colors`}
+            >
+                <div className={`w-2 h-2 rounded-full shadow-sm ${statusConfig.dot}`}></div>
+                {label}
+            </div>
+        );
+    };
+
     const handleFormSuccess = (id) => {
         setShowOperationForm(false);
-        fetchOperations(); // Refrescamos la lista tras crear/editar
-        // Opcional: navegar directo a la operación creada
-        // navigate(`/operations/${id}`);
+        fetchOperations();
     };
 
     return (
@@ -139,7 +167,6 @@ export default function OwnerDashboard() {
                     <div className="flex justify-between items-end">
                         <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Panel de Gerencia</h2>
 
-                        {/* Único botón de creación Desktop */}
                         <button
                             onClick={() => setShowOperationForm(true)}
                             className="hidden sm:inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -177,7 +204,6 @@ export default function OwnerDashboard() {
                     </div>
                 </div>
 
-                {/* Loading / Error States */}
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-20 space-y-4">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
@@ -191,7 +217,6 @@ export default function OwnerDashboard() {
                     </div>
                 )}
 
-                {/* Lista de Operaciones */}
                 {!loading && !error && (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filteredOps?.length === 0 ? (
@@ -206,7 +231,6 @@ export default function OwnerDashboard() {
                                     key={op.id}
                                     className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition-all flex flex-col group relative"
                                 >
-                                    {/* Decorative indicator band */}
                                     <div className={`absolute top-0 left-0 w-1 h-full ${op.status === 'pendiente_aprobacion' ? 'bg-orange-400 animate-pulse' : op.status === 'closed' ? 'bg-gray-300' : 'bg-indigo-500'}`}></div>
 
                                     <div className="p-5 pl-6 flex-1 flex flex-col">
@@ -234,6 +258,16 @@ export default function OwnerDashboard() {
                                                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                                 ETA: <span className="font-medium text-gray-700">{op.eta ? new Date(op.eta).toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Sin fecha'}</span>
                                             </div>
+
+                                            {/* PANEL DE SEMÁFOROS DOCUMENTALES */}
+                                            <div className="col-span-2 mt-1 pt-3 border-t border-slate-200/60">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Estado Documental</p>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {renderDocSemaphore('Packing List', op.packing_list_file, op.status)}
+                                                    {renderDocSemaphore('Remito', op.remito_file, op.status)}
+                                                    {renderDocSemaphore('Rancho', op.rancho_file, op.status)}
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
@@ -242,7 +276,6 @@ export default function OwnerDashboard() {
                                                 <span className="text-sm font-bold text-gray-900">${calculateTotal(op.products).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                             </div>
 
-                                            {/* Botones de acción dentro de la tarjeta para Owner */}
                                             <div className="flex gap-2 items-center">
                                                 {op.status === 'pendiente_aprobacion' && (
                                                     <button onClick={(e) => approveOperation(op.id, e)} className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 text-xs font-bold rounded-lg transition-colors shadow-sm">
@@ -256,7 +289,6 @@ export default function OwnerDashboard() {
                                                     </button>
                                                 )}
 
-                                                {/* NUEVO: Botón de Eliminar solo visible si está cancelada */}
                                                 {op.status === 'cancelled' && (
                                                     <button
                                                         onClick={(e) => {
@@ -306,7 +338,6 @@ export default function OwnerDashboard() {
                 />
             )}
 
-            {/* Estilos para ocultar scrollbar */}
             <style dangerouslySetInnerHTML={{
                 __html: `
         .hide-scrollbar::-webkit-scrollbar {

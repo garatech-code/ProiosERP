@@ -4,7 +4,7 @@ import AutocompleteCreate from './AutocompleteCreate';
 import { useAuth } from '../context/AuthContext';
 
 /* =========================
-   PRODUCT ROW
+   PRODUCT ROW (Lógica blindada y Estética limpia)
 ========================= */
 function ProductRow({ product, index, onUpdate, onRemove }) {
   const [selectedProduct, setSelectedProduct] = useState(
@@ -13,7 +13,14 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 
   const handleProductSelect = (item) => {
     setSelectedProduct(item);
-    onUpdate(index, 'product', item ? item.id : '');
+
+    // Escudo 1: Extracción segura de ID o nombre
+    let productValue = '';
+    if (item) {
+      productValue = item.id || item.name || item.inputValue || '';
+    }
+
+    onUpdate(index, 'product', productValue);
     onUpdate(index, 'weight_kg', item ? item.weight_kg : null);
     onUpdate(index, 'presentation', item ? item.presentation : '');
   };
@@ -22,7 +29,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 bg-gray-50 rounded-xl border border-gray-100 mb-3 relative group">
       <div className="sm:col-span-4">
         <AutocompleteCreate
-          label="Producto"
+          label="Producto *"
           endpoint="/operations/products/"
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
@@ -30,6 +37,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
             { name: 'presentation', label: 'Presentación', required: true },
             { name: 'weight_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
           ]}
+          placeholder="Buscar o crear..."
         />
       </div>
 
@@ -44,7 +52,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       </div>
 
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Cantidad</label>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Cantidad *</label>
         <input
           type="number"
           min="1"
@@ -91,10 +99,19 @@ export default function OperationForm({ id, onClose, onSuccess }) {
   const [fetchingData, setFetchingData] = useState(true);
   const [error, setError] = useState(null);
 
-  // Estados para la búsqueda por IMO
+  // Archivos (de OperationFormWithIMO)
+  const [uploading, setUploading] = useState(false);
+  const [existingFiles, setExistingFiles] = useState({
+    packing_list_file: null,
+    remito_file: null,
+    rancho_file: null,
+  });
+
+  // Búsqueda IMO
   const [imoNumber, setImoNumber] = useState('');
   const [searchingImo, setSearchingImo] = useState(false);
   const [imoSuccess, setImoSuccess] = useState(false);
+  const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
   const [formData, setFormData] = useState({
     client: '',
@@ -118,40 +135,52 @@ export default function OperationForm({ id, onClose, onSuccess }) {
       try {
         if (currentUser?.role === 'OWNER') {
           const res = await axios.get('/usuarios/users/');
-
-          console.log("Respuesta cruda de /usuarios/:", res.data);
-
           const fetchedUsers = res.data?.results || res.data;
-
-          if (Array.isArray(fetchedUsers)) {
-            setAvailableUsers(fetchedUsers);
-          } else {
-            console.error("La API de usuarios no devolvió una lista:", fetchedUsers);
-            setAvailableUsers([]);
-          }
+          if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
         }
 
         if (id) {
           const res = await axios.get(`/operations/operations/${id}/`);
           const op = res.data;
-          const format = (d) => d ? new Date(d).toISOString().slice(0, 16) : '';
+
+          const formatToDatetimeLocal = (isoString) => {
+            if (!isoString) return '';
+            try {
+              const date = new Date(isoString);
+              return isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16);
+            } catch { return ''; }
+          };
 
           setFormData({
             client: op.client || '',
             ship: op.ship || '',
             port: op.port || '',
             agency: op.agency || '',
-            eta: format(op.eta),
+            eta: formatToDatetimeLocal(op.eta),
             delivery_method: op.delivery_method || 'muelle',
             notes: op.notes || '',
             products: op.products || [],
-            delivery_date: format(op.delivery_date),
-            closed_date: format(op.closed_date),
-            order_received_date: format(op.order_received_date),
-            client_confirmed_date: format(op.client_confirmed_date),
+            delivery_date: formatToDatetimeLocal(op.delivery_date),
+            closed_date: formatToDatetimeLocal(op.closed_date),
+            order_received_date: formatToDatetimeLocal(op.order_received_date),
+            client_confirmed_date: formatToDatetimeLocal(op.client_confirmed_date),
             operadores_id: op.operadores_id || [],
             operarios_id: op.operarios_id || [],
           });
+
+          setExistingFiles({
+            packing_list_file: op.packing_list_file,
+            remito_file: op.remito_file,
+            rancho_file: op.rancho_file,
+          });
+
+          if (op.ship) {
+            try {
+              const shipRes = await axios.get(`/operations/ships/${op.ship}/`);
+              if (shipRes.data.imo) setImoNumber(shipRes.data.imo);
+              if (shipRes.data.flag) setAutoCompleteFlag(shipRes.data.flag);
+            } catch (err) { console.error(err); }
+          }
         }
       } catch (err) {
         console.error(err);
@@ -164,18 +193,17 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     loadData();
   }, [id, currentUser]);
 
+  const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
-  /* --- Funciones Auxiliares --- */
-  const handleChange = (e) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleProductUpdate = (index, field, value) => {
+    setFormData(prev => {
+      // Usar 'prev' garantiza que siempre tengamos la versión más reciente del array,
+      // incluso si llamamos a esta función 3 veces en un milisegundo.
+      const newProducts = [...prev.products];
+      newProducts[index] = { ...newProducts[index], [field]: value };
+      return { ...prev, products: newProducts };
+    });
   };
-
-  const handleProductUpdate = (i, field, value) => {
-    const updated = [...formData.products];
-    updated[i] = { ...updated[i], [field]: value };
-    setFormData(prev => ({ ...prev, products: updated }));
-  };
-
   const addProduct = () => {
     setFormData(prev => ({
       ...prev,
@@ -190,8 +218,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     }));
   };
 
-  const formatDate = (d) => d ? new Date(d).toISOString() : null;
-
   /* --- Búsqueda IMO --- */
   const handleImoSearch = async () => {
     if (!imoNumber || imoNumber.length !== 7 || isNaN(imoNumber)) {
@@ -199,76 +225,115 @@ export default function OperationForm({ id, onClose, onSuccess }) {
       return;
     }
 
-    // 1. Limpiamos los datos del buque/puerto/eta anterior antes de buscar
-    setFormData(prev => ({
-      ...prev,
-      ship: '',
-      port: '',
-      eta: ''
-    }));
-
+    setFormData(prev => ({ ...prev, ship: '', port: '', eta: '' }));
     setSearchingImo(true);
     setError(null);
     setImoSuccess(false);
 
     try {
-      // 2. Corregido: Usamos la variable imoNumber en lugar del valor hardcodeado
-      const res = await axios.get('/operations/operations/auto_complete_imo/', {
-        params: { imo: imoNumber }
-      });
+      const res = await axios.get('/operations/operations/auto_complete_imo/', { params: { imo: imoNumber } });
       const data = res.data;
 
-      const formatETA = (d) => d ? new Date(d).toISOString().slice(0, 16) : '';
+      const formatToDatetimeLocal = (isoString) => {
+        if (!isoString) return '';
+        try {
+          const date = new Date(isoString);
+          return isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16);
+        } catch { return ''; }
+      };
 
       setFormData(prev => ({
         ...prev,
         ship: data.ship_id || prev.ship,
         port: data.port_id || prev.port,
-        eta: data.eta ? formatETA(data.eta) : prev.eta,
+        eta: data.eta ? formatToDatetimeLocal(data.eta) : prev.eta,
       }));
+      setAutoCompleteFlag(data.flag || '');
 
       setImoSuccess(true);
       setTimeout(() => setImoSuccess(false), 3000);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || 'Error al conectar con el servicio de búsqueda IMO.');
+      setError(err.response?.data?.error || 'Error al obtener datos del IMO');
     } finally {
       setSearchingImo(false);
     }
   };
 
-  /* --- Manejo del Cierre del Modal --- */
-  const handleCloseModal = () => {
-    // Reseteamos el campo del IMO en caso de que lo oculten sin desmontarlo
-    setImoNumber('');
-    onClose();
+  /* --- Manejo de Archivos --- */
+  const handleFileUpload = async (event, fieldName) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const formDataFile = new FormData();
+    formDataFile.append(fieldName, file); // IMPORTANTE: Usar el nombre del campo del backend
+
+    try {
+      await axios.patch(`/operations/operations/${id}/`, formDataFile, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const res = await axios.get(`/operations/operations/${id}/`);
+      setExistingFiles({
+        packing_list_file: res.data.packing_list_file,
+        remito_file: res.data.remito_file,
+        rancho_file: res.data.rancho_file,
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Error al subir archivo');
+    } finally {
+      setUploading(false);
+    }
   };
 
-  /* --- Submit --- */
+  /* --- Submit Mejorado --- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      // Escudo 2: Validación estricta de productos
+      const validProducts = formData.products.filter(p => p.product && String(p.product).trim() !== '');
+
+      if (formData.products.length > 0 && validProducts.length !== formData.products.length) {
+        setError("Error: Tienes filas de productos vacías en la lista. Por favor selecciona un producto o elimina la fila.");
+        setLoading(false);
+        return;
+      }
+
+      const safeFormatDate = (dateStr) => {
+        if (!dateStr || dateStr.trim() === '') return null;
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d.toISOString();
+        } catch { return null; }
+      };
+
       const payload = {
         ...formData,
-        products: products,
-        eta: formatDate(formData.eta),
-        delivery_date: formatDate(formData.delivery_date),
-        closed_date: formatDate(formData.closed_date),
-        order_received_date: formatDate(formData.order_received_date),
-        client_confirmed_date: formatDate(formData.client_confirmed_date),
+        products: validProducts,
+        eta: safeFormatDate(formData.eta),
+        delivery_date: safeFormatDate(formData.delivery_date),
+        closed_date: safeFormatDate(formData.closed_date),
+        order_received_date: safeFormatDate(formData.order_received_date),
+        client_confirmed_date: safeFormatDate(formData.client_confirmed_date),
       };
-      console.log("PAYLOAD LISTO PARA ENVIAR:", payload);
-      const res = id
-        ? await axios.put(`/operations/operations/${id}/`, payload)
-        : await axios.post('/operations/operations/', payload);
 
-      onSuccess?.(res.data.id);
+      let res;
+      if (id) {
+        res = await axios.put(`/operations/operations/${id}/`, payload);
+      } else {
+        res = await axios.post('/operations/operations/', payload);
+      }
+
+      if (onSuccess) onSuccess(res.data.id);
+      if (onClose) onClose();
+
     } catch (err) {
-      console.error(err);
-      setError('Ocurrió un error al guardar la operación. Verifique los datos.');
+      console.error("Error en submit:", err);
+      const errorMessage = err.response?.data ? JSON.stringify(err.response.data) : 'Verifique los datos obligatorios.';
+      setError(`Error del Servidor: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -294,8 +359,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
           <h2 className="text-xl font-bold text-gray-800">
             {id ? `Editar Operación #${id}` : 'Nueva Operación'}
           </h2>
-          {/* Corregido: Llamamos a handleCloseModal en lugar de onClose directo */}
-          <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -309,7 +373,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Sección Opcional IMO */}
+          {/* Sección IMO */}
           {!id && (
             <div className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-xl p-5">
               <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
@@ -347,10 +411,12 @@ export default function OperationForm({ id, onClose, onSuccess }) {
               <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Datos Generales</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <AutocompleteCreate
-                  label="Cliente"
+                  label="Cliente *"
                   endpoint="/operations/clients/"
                   value={formData.client}
                   onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
+                  extraCreateData={{ email: 'default@email.com' }}
+                  createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
                 />
                 <AutocompleteCreate
                   label="Agencia"
@@ -358,32 +424,41 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
                 />
+                <div>
+                  <AutocompleteCreate
+                    key={`ship-${formData.ship}`}
+                    label="Buque *"
+                    endpoint="/operations/ships/"
+                    value={formData.ship}
+                    onSelect={(i) => {
+                      setFormData(p => ({ ...p, ship: i?.id || '' }));
+                      if (i && i.flag) setAutoCompleteFlag(i.flag);
+                    }}
+                    createFields={[{ name: 'imo', label: 'IMO *', required: true }, { name: 'flag', label: 'Bandera *', required: true }]}
+                  />
+                  {autoCompleteFlag && <p className="text-xs text-gray-500 mt-1 font-medium">Bandera: {autoCompleteFlag}</p>}
+                </div>
                 <AutocompleteCreate
-                key={`ship-${formData.ship}`}
-                  label="Buque"
-                  endpoint="/operations/ships/"
-                  value={formData.ship}
-                  onSelect={(i) => setFormData(p => ({ ...p, ship: i?.id || '' }))}
-                />
-                <AutocompleteCreate
-                key={`port-${formData.port}`}
-                  label="Puerto"
+                  key={`port-${formData.port}`}
+                  label="Puerto *"
                   endpoint="/operations/ports/"
                   value={formData.port}
                   onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
+                  createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ETA Estimado</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">ETA Estimado *</label>
                   <input
                     type="datetime-local"
                     name="eta"
                     value={formData.eta}
                     onChange={handleChange}
+                    required
                     className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Método de Entrega</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Método de Entrega</label>
                   <select
                     name="delivery_method"
                     value={formData.delivery_method}
@@ -398,11 +473,11 @@ export default function OperationForm({ id, onClose, onSuccess }) {
               </div>
             </div>
 
-            {/* SECCIÓN ASIGNACIONES (Solo Owner) */}
+            {/* SECCIÓN ASIGNACIONES */}
             {currentUser?.role === 'OWNER' && (
               <div>
                 <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Equipo Asignado</h3>
-                <p className="text-xs text-gray-500 mb-4">Seleccione quiénes tendrán acceso a la gestión operativa y de planta de esta orden.</p>
+                <p className="text-xs text-gray-500 mb-4">Seleccione quiénes tendrán acceso a la gestión de esta orden.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
                   {/* Operadores */}
@@ -417,9 +492,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                             type="checkbox"
                             checked={formData.operadores_id.includes(u.id)}
                             onChange={(e) => {
-                              const ids = e.target.checked
-                                ? [...formData.operadores_id, u.id]
-                                : formData.operadores_id.filter(id => id !== u.id);
+                              const ids = e.target.checked ? [...formData.operadores_id, u.id] : formData.operadores_id.filter(id => id !== u.id);
                               setFormData(p => ({ ...p, operadores_id: ids }));
                             }}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
@@ -427,7 +500,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                           <span className="text-sm text-gray-700 font-medium">{u.username}</span>
                         </label>
                       ))}
-                      {availableUsers.filter(u => u.role === 'OPERADOR').length === 0 && <span className="text-sm text-gray-400">No hay operadores disponibles.</span>}
                     </div>
                   </div>
 
@@ -443,9 +515,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                             type="checkbox"
                             checked={formData.operarios_id.includes(u.id)}
                             onChange={(e) => {
-                              const ids = e.target.checked
-                                ? [...formData.operarios_id, u.id]
-                                : formData.operarios_id.filter(id => id !== u.id);
+                              const ids = e.target.checked ? [...formData.operarios_id, u.id] : formData.operarios_id.filter(id => id !== u.id);
                               setFormData(p => ({ ...p, operarios_id: ids }));
                             }}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
@@ -453,7 +523,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                           <span className="text-sm text-gray-700 font-medium">{u.username}</span>
                         </label>
                       ))}
-                      {availableUsers.filter(u => u.role === 'OPERARIO').length === 0 && <span className="text-sm text-gray-400">No hay operarios disponibles.</span>}
                     </div>
                   </div>
 
@@ -468,7 +537,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                 <button
                   type="button"
                   onClick={addProduct}
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                 >
                   <span>+</span> Añadir Ítem
                 </button>
@@ -486,7 +555,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                 </div>
               )}
 
-              {/* Total Card */}
               {formData.products.length > 0 && (
                 <div className="mt-4 flex justify-end">
                   <div className="bg-slate-800 text-white px-6 py-3 rounded-xl shadow-md flex items-center gap-4">
@@ -510,15 +578,66 @@ export default function OperationForm({ id, onClose, onSuccess }) {
               />
             </div>
 
+            {/* DOCUMENTOS */}
+            {id && (
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <h4 className="text-md font-bold text-gray-900 mb-4 border-b pb-2">Documentos de la Operación</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                  {/* Packing List */}
+                  <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-gray-800 block">Packing List</span>
+                      {existingFiles.packing_list_file ? (
+                        <a href={existingFiles.packing_list_file} target="_blank" rel="noreferrer" className="text-indigo-600 text-xs font-medium hover:underline">Ver Archivo</a>
+                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
+                    </div>
+                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                      {existingFiles.packing_list_file ? 'Reemplazar' : 'Subir'}
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'packing_list_file')} disabled={uploading} />
+                    </label>
+                  </div>
+
+                  {/* Remito */}
+                  <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-gray-800 block">Remito</span>
+                      {existingFiles.remito_file ? (
+                        <a href={existingFiles.remito_file} target="_blank" rel="noreferrer" className="text-emerald-600 text-xs font-medium hover:underline">Ver Archivo</a>
+                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
+                    </div>
+                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                      {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
+                    </label>
+                  </div>
+
+                  {/* Rancho */}
+                  <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-gray-800 block">Rancho</span>
+                      {existingFiles.rancho_file ? (
+                        <a href={existingFiles.rancho_file} target="_blank" rel="noreferrer" className="text-amber-600 text-xs font-medium hover:underline">Ver Archivo</a>
+                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
+                    </div>
+                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                      {existingFiles.rancho_file ? 'Reemplazar' : 'Subir'}
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'rancho_file')} disabled={uploading} />
+                    </label>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
           </form>
         </div>
 
         {/* Modal Footer (Sticky) */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
-          {/* Corregido: Llamamos a handleCloseModal en lugar de onClose directo */}
           <button
             type="button"
-            onClick={handleCloseModal}
+            onClick={onClose}
             className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 shadow-sm transition-colors"
           >
             Cancelar
@@ -530,13 +649,12 @@ export default function OperationForm({ id, onClose, onSuccess }) {
             className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed shadow-md transition-colors flex items-center gap-2"
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-            {loading ? 'Guardando...' : (id ? 'Guardar Cambios' : 'Confirmar Operación')}
+            {id ? 'Guardar Cambios' : 'Confirmar Operación'}
           </button>
         </div>
 
       </div>
 
-      {/* Scrollbar styling embedded */}
       <style dangerouslySetInnerHTML={{
         __html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
