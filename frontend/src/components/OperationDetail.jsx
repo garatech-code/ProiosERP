@@ -23,7 +23,7 @@ export default function OperationDetail() {
 
   const fetchOperation = async () => {
     try {
-      const res = await axios.get(`/operations/operations/${id}/`);
+      const res = await axios.get(`/operaciones/operations/${id}/`);
       setOperation(res.data);
       setError(null);
     } catch (err) {
@@ -37,7 +37,7 @@ export default function OperationDetail() {
   const fetchPackingData = async () => {
     setLoadingPacking(true);
     try {
-      const res = await axios.get(`/operations/operations/${id}/packing_list_json/`);
+      const res = await axios.get(`/operaciones/operations/${id}/packing_list_json/`);
       setPackingData(res.data);
       setShowPackingModal(true);
     } catch (err) {
@@ -52,7 +52,7 @@ export default function OperationDetail() {
     if (confirmMessage && !window.confirm(confirmMessage)) return;
     setActionLoading(true);
     try {
-      await axios.post(`/operations/operations/${id}/${action}/`);
+      await axios.post(`/operaciones/operations/${id}/${action}/`);
       fetchOperation();
     } catch (err) {
       console.error(err);
@@ -70,7 +70,7 @@ export default function OperationDetail() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      await axios.post(`/operations/operations/${id}/${type}/`, formData, {
+      await axios.post(`/operaciones/operations/${id}/${type}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       fetchOperation();
@@ -216,11 +216,11 @@ export default function OperationDetail() {
                 {/* Personal Asignado (Solo Owner) */}
                 {isOwner && (
                   <div className="bg-white px-4 py-4 sm:px-6 border-t border-gray-100 italic">
-                     <p className="text-[10px] font-black text-gray-400 uppercase mb-2 text-center tracking-widest">Personal de Misión Asignado</p>
-                     <div className="flex justify-around text-xs">
-                        <span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100 font-bold">Operadores: {operation.operadores_id?.length || 0}</span>
-                        <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 font-bold">Operarios: {operation.operarios_id?.length || 0}</span>
-                     </div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2 text-center tracking-widest">Personal de Misión Asignado</p>
+                    <div className="flex justify-around text-xs">
+                      <span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100 font-bold">Operadores: {operation.operadores_id?.length || 0}</span>
+                      <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 font-bold">Operarios: {operation.operarios_id?.length || 0}</span>
+                    </div>
                   </div>
                 )}
               </dl>
@@ -228,45 +228,45 @@ export default function OperationDetail() {
 
             {/* Productos / Vista Operario */}
             <div className="border-t border-gray-200">
-                {!isOperario ? (
-                  <div className="px-4 py-5 sm:px-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 tracking-tight">Detalle de Productos</h3>
-                    <div className="mt-4 flex flex-col">
-                      <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                        <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                          <div className="shadow-sm overflow-hidden border border-gray-200 rounded-xl">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead>
-                                <tr className="bg-slate-50 uppercase tracking-wider text-[10px] font-black text-slate-500">
-                                  <th className="px-6 py-4 text-left">Producto</th>
-                                  <th className="px-6 py-4 text-left">Cantidad</th>
-                                  <th className="px-6 py-4 text-left">Precio unitario</th>
-                                  <th className="px-6 py-4 text-left text-indigo-600">Total</th>
+              {!isOperario ? (
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 tracking-tight">Detalle de Productos</h3>
+                  <div className="mt-4 flex flex-col">
+                    <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                      <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+                        <div className="shadow-sm overflow-hidden border border-gray-200 rounded-xl">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead>
+                              <tr className="bg-slate-50 uppercase tracking-wider text-[10px] font-black text-slate-500">
+                                <th className="px-6 py-4 text-left">Producto</th>
+                                <th className="px-6 py-4 text-left">Cantidad</th>
+                                <th className="px-6 py-4 text-left">Precio unitario</th>
+                                <th className="px-6 py-4 text-left text-indigo-600">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {operation.products?.map((prod, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50 transition">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{prod.product_name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{prod.quantity}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${prod.unit_price}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-600">${(prod.quantity * prod.unit_price).toFixed(2)}</td>
                                 </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {operation.products?.map((prod, idx) => (
-                                  <tr key={idx} className="hover:bg-slate-50/50 transition">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{prod.product_name}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{prod.quantity}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${prod.unit_price}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-600">${(prod.quantity * prod.unit_price).toFixed(2)}</td>
-                                  </tr>
-                                ))}
-                                <tr className="bg-indigo-50/30">
-                                  <td colSpan="3" className="px-6 py-6 text-right text-sm font-black text-indigo-900 uppercase tracking-widest">Total general</td>
-                                  <td className="px-6 py-6 whitespace-nowrap text-xl font-black text-indigo-700 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
+                              ))}
+                              <tr className="bg-indigo-50/30">
+                                <td colSpan="3" className="px-6 py-6 text-right text-sm font-black text-indigo-900 uppercase tracking-widest">Total general</td>
+                                <td className="px-6 py-6 whitespace-nowrap text-xl font-black text-indigo-700 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     </div>
-                    </div>
-                ) : (
-                  <OperarioActionPanel products={operation.products} />
-                )}
+                  </div>
+                </div>
+              ) : (
+                <OperarioActionPanel products={operation.products} />
+              )}
             </div>
 
             {/* Documentos */}
@@ -372,7 +372,7 @@ export default function OperationDetail() {
                       Configurar / Editar
                     </button>
                   )}
-                  
+
                   {isOwner && operation.status !== 'closed' && operation.status !== 'cancelled' && (
                     <button
                       onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y no se podrá continuar.')}

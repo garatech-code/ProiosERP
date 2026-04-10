@@ -21,7 +21,7 @@ export default function OperadorDashboard() {
 
     const fetchMyOperations = async () => {
         try {
-            const res = await axios.get('/operations/operations/');
+            const res = await axios.get('/operaciones/operations/');
             const data = res.data?.results || res.data;
             setOperations(Array.isArray(data) ? data : []);
         } catch (err) {
@@ -70,7 +70,7 @@ export default function OperadorDashboard() {
         setUploading(true);
         try {
             // Usamos PATCH para actualizar solo los archivos sin tocar el resto de la operación
-            await axios.patch(`/operations/operations/${selectedOp.id}/`, formData, {
+            await axios.patch(`/operaciones/operations/${selectedOp.id}/`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }

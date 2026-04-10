@@ -40,7 +40,7 @@ export default function OwnerDashboard() {
     const fetchOperations = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('/operations/operations/');
+            const res = await axios.get('/operaciones/operations/');
             setOperations(res.data);
             setError(null);
         } catch (err) {
@@ -55,7 +55,7 @@ export default function OwnerDashboard() {
         event.stopPropagation();
         if (!window.confirm('¿Está seguro de anular esta operación? Esta acción cambiará el estado a Cancelada.')) return;
         try {
-            await axios.post(`/operations/operations/${id}/cancel_operation/`);
+            await axios.post(`/operaciones/operations/${id}/cancel_operation/`);
             fetchOperations();
         } catch (err) {
             console.error(err);
@@ -294,7 +294,7 @@ export default function OwnerDashboard() {
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (window.confirm('¿ELIMINAR DEFINITIVAMENTE esta operación? No se puede deshacer.')) {
-                                                                axios.delete(`/operations/operations/${op.id}/`)
+                                                                axios.delete(`/operaciones/operations/${op.id}/`)
                                                                     .then(() => fetchOperations())
                                                                     .catch(err => alert("Error al eliminar"));
                                                             }

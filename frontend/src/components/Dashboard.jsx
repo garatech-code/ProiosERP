@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   const fetchOperations = async () => {
     try {
-      const res = await axios.get('/operations/operations/');
+      const res = await axios.get('/operaciones/operations/');
       setOperations(res.data);
       setError(null);
     } catch (err) {
@@ -65,7 +65,7 @@ export default function Dashboard() {
     event.stopPropagation();
     if (!window.confirm('¿Cancelar esta operación? Se marcará como cancelada.')) return;
     try {
-      await axios.post(`/operations/operations/${id}/cancel_operation/`);
+      await axios.post(`/operaciones/operations/${id}/cancel_operation/`);
       fetchOperations();
     } catch (err) {
       console.error(err);

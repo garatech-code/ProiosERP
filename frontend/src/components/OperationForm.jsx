@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from '../api/axios';
-import AutocompleteCreate from './AutocompleteCreate';
 import { useAuth } from '../context/AuthContext';
+import AutocompleteCreate from './AutocompleteCreate';
 
 /* =========================
    PRODUCT ROW (Lógica blindada y Estética limpia)
@@ -28,9 +29,10 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 bg-gray-50 rounded-xl border border-gray-100 mb-3 relative group">
       <div className="sm:col-span-4">
+        {/* CORRECCIÓN DE RUTA: "/inventario/products/" (sin /api/) */}
         <AutocompleteCreate
           label="Producto *"
-          endpoint="/operations/products/"
+          endpoint="/inventario/products/"
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
@@ -134,13 +136,14 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     const loadData = async () => {
       try {
         if (currentUser?.role === 'OWNER') {
+          // CORRECCIÓN: La ruta es "/usuarios/users/" ya que baseURL pone el /api al inicio
           const res = await axios.get('/usuarios/users/');
           const fetchedUsers = res.data?.results || res.data;
           if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
         }
 
         if (id) {
-          const res = await axios.get(`/operations/operations/${id}/`);
+          const res = await axios.get(`/operaciones/operations/${id}/`);
           const op = res.data;
 
           const formatToDatetimeLocal = (isoString) => {
@@ -176,7 +179,8 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
           if (op.ship) {
             try {
-              const shipRes = await axios.get(`/operations/ships/${op.ship}/`);
+              // CORRECCIÓN DE RUTA
+              const shipRes = await axios.get(`/operaciones/ships/${op.ship}/`);
               if (shipRes.data.imo) setImoNumber(shipRes.data.imo);
               if (shipRes.data.flag) setAutoCompleteFlag(shipRes.data.flag);
             } catch (err) { console.error(err); }
@@ -197,13 +201,12 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
   const handleProductUpdate = (index, field, value) => {
     setFormData(prev => {
-      // Usar 'prev' garantiza que siempre tengamos la versión más reciente del array,
-      // incluso si llamamos a esta función 3 veces en un milisegundo.
       const newProducts = [...prev.products];
       newProducts[index] = { ...newProducts[index], [field]: value };
       return { ...prev, products: newProducts };
     });
   };
+
   const addProduct = () => {
     setFormData(prev => ({
       ...prev,
@@ -231,7 +234,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     setImoSuccess(false);
 
     try {
-      const res = await axios.get('/operations/operations/auto_complete_imo/', { params: { imo: imoNumber } });
+      const res = await axios.get('/operaciones/operations/auto_complete_imo/', { params: { imo: imoNumber } });
       const data = res.data;
 
       const formatToDatetimeLocal = (isoString) => {
@@ -269,10 +272,10 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     formDataFile.append(fieldName, file); // IMPORTANTE: Usar el nombre del campo del backend
 
     try {
-      await axios.patch(`/operations/operations/${id}/`, formDataFile, {
+      await axios.patch(`/operaciones/operations/${id}/`, formDataFile, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const res = await axios.get(`/operations/operations/${id}/`);
+      const res = await axios.get(`/operaciones/operations/${id}/`);
       setExistingFiles({
         packing_list_file: res.data.packing_list_file,
         remito_file: res.data.remito_file,
@@ -322,9 +325,9 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
       let res;
       if (id) {
-        res = await axios.put(`/operations/operations/${id}/`, payload);
+        res = await axios.put(`/operaciones/operations/${id}/`, payload);
       } else {
-        res = await axios.post('/operations/operations/', payload);
+        res = await axios.post('/operaciones/operations/', payload);
       }
 
       if (onSuccess) onSuccess(res.data.id);
@@ -410,9 +413,10 @@ export default function OperationForm({ id, onClose, onSuccess }) {
             <div>
               <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Datos Generales</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* CORRECCIÓN DE RUTAS */}
                 <AutocompleteCreate
                   label="Cliente *"
-                  endpoint="/operations/clients/"
+                  endpoint="/operaciones/clients/"
                   value={formData.client}
                   onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
                   extraCreateData={{ email: 'default@email.com' }}
@@ -420,7 +424,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                 />
                 <AutocompleteCreate
                   label="Agencia"
-                  endpoint="/operations/agencies/"
+                  endpoint="/operaciones/agencies/"
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
                 />
@@ -428,7 +432,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                   <AutocompleteCreate
                     key={`ship-${formData.ship}`}
                     label="Buque *"
-                    endpoint="/operations/ships/"
+                    endpoint="/operaciones/ships/"
                     value={formData.ship}
                     onSelect={(i) => {
                       setFormData(p => ({ ...p, ship: i?.id || '' }));
@@ -441,7 +445,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                 <AutocompleteCreate
                   key={`port-${formData.port}`}
                   label="Puerto *"
-                  endpoint="/operations/ports/"
+                  endpoint="/operaciones/ports/"
                   value={formData.port}
                   onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
                   createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
