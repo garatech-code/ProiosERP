@@ -63,11 +63,8 @@ export default function OwnerDashboard() {
         }
     };
 
-    const approveOperation = async (id, event) => {
-        event.stopPropagation();
-        if (!window.confirm('¿Autorizar esta operación para que pase a la siguiente fase?')) return;
-        alert(`Operación ${id} aprobada.`);
-    };
+    // CORREGIDO: Eliminada función approveOperation (no existe en backend)
+    // Ahora las acciones se realizan desde el detalle de la operación
 
     const calculateTotal = (products) => {
         if (!products) return 0;
@@ -75,14 +72,15 @@ export default function OwnerDashboard() {
     };
 
     const getStatusBadge = (status) => {
+        // CORREGIDO: Mapeo de estados alineado con backend
         const maps = {
-            pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pendiente' },
-            pendiente_aprobacion: { color: 'bg-orange-100 text-orange-800 border bg-orange-50 border-orange-200 animate-pulse', label: 'Requiere Aprobación' },
-            price_checked: { color: 'bg-blue-100 text-blue-800', label: 'Verificado' },
-            confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmada' },
-            in_coordination: { color: 'bg-purple-100 text-purple-800', label: 'En proceso' },
-            delivered: { color: 'bg-indigo-100 text-indigo-800', label: 'Entregada' },
-            closed: { color: 'bg-gray-100 text-gray-800', label: 'Cerrada' },
+            pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Solicitada' },
+            draft: { color: 'bg-orange-100 text-orange-800', label: 'Borrador' },
+            price_checked: { color: 'bg-blue-100 text-blue-800', label: 'Presupuestada' },
+            confirmed: { color: 'bg-green-100 text-green-800', label: 'Lista para envío' },
+            in_coordination: { color: 'bg-purple-100 text-purple-800', label: 'En producción' },
+            delivered: { color: 'bg-indigo-100 text-indigo-800', label: 'Remitada' },
+            closed: { color: 'bg-gray-100 text-gray-800', label: 'Entregada' },
             cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
         };
         const mapped = maps[status] || { color: 'bg-gray-100 text-gray-800', label: status };
@@ -94,22 +92,18 @@ export default function OwnerDashboard() {
     };
 
     /* =========================================================
-       LÓGICA DEL SEMÁFORO DOCUMENTAL
+       SEMÁFORO DOCUMENTAL (sin cambios, funciona correctamente)
     ========================================================= */
     const renderDocSemaphore = (label, fileUrl, opStatus) => {
         let statusConfig = {};
 
         if (fileUrl) {
-            // 🟢 Verde: El archivo existe
             statusConfig = { dot: 'bg-emerald-500', box: 'bg-emerald-50 border-emerald-200 text-emerald-700', title: 'Completado' };
         } else {
-            // Lógica para determinar si debería estar en proceso (Amarillo) o falta (Rojo)
             const inProgressStates = ['in_coordination', 'confirmed', 'delivered'];
             if (inProgressStates.includes(opStatus)) {
-                // 🟡 Amarillo: No está, pero la operación está en curso
                 statusConfig = { dot: 'bg-amber-400 animate-pulse', box: 'bg-amber-50 border-amber-200 text-amber-700', title: 'En Proceso / Pendiente' };
             } else {
-                // 🔴 Rojo: No está, y la operación recién empieza o está frenada
                 statusConfig = { dot: 'bg-red-500', box: 'bg-red-50 border-red-200 text-red-700', title: 'Faltante' };
             }
         }
@@ -130,6 +124,18 @@ export default function OwnerDashboard() {
         fetchOperations();
     };
 
+    // CORREGIDO: Opciones de filtro alineadas con los estados reales del backend
+    const statusFilterOptions = [
+        { value: '', label: 'Status: Todos' },
+        { value: 'pending', label: 'Solicitadas' },
+        { value: 'price_checked', label: 'Presupuestadas' },
+        { value: 'in_coordination', label: 'En producción' },
+        { value: 'confirmed', label: 'Listas para envío' },
+        { value: 'delivered', label: 'Remitadas' },
+        { value: 'closed', label: 'Entregadas' },
+        { value: 'cancelled', label: 'Canceladas' },
+    ];
+
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
             {/* Header Sticky */}
@@ -142,18 +148,17 @@ export default function OwnerDashboard() {
                             </div>
                             <h1 className="text-xl font-bold text-gray-900 tracking-tight">ProIOS</h1>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex flex-col text-right">
-                                <span className="text-sm font-semibold text-gray-900 leading-tight">{user?.username || 'Owner'}</span>
-                                <span className="text-xs text-indigo-600 font-medium">Gerencia</span>
-                            </div>
-                            <button
-                                onClick={logout}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                title="Cerrar sesión"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                            </button>
+                        <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => navigate('/inventory')}
+                            className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-900"
+                        >
+                            📦 Inventario
+                        </button>
+                        <span className="text-sm text-gray-600">Hola, {user?.username}</span>
+                        <button onClick={logout} className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700">
+                            Cerrar sesión
+                        </button>
                         </div>
                     </div>
                 </div>
@@ -195,11 +200,9 @@ export default function OwnerDashboard() {
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
-                            <option value="">Status: Todos</option>
-                            <option value="pendiente_aprobacion">Requiere Aprobación</option>
-                            <option value="pending">Pendientes</option>
-                            <option value="confirmed">Confirmadas</option>
-                            <option value="in_coordination">En Proceso</option>
+                            {statusFilterOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -231,7 +234,7 @@ export default function OwnerDashboard() {
                                     key={op.id}
                                     className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition-all flex flex-col group relative"
                                 >
-                                    <div className={`absolute top-0 left-0 w-1 h-full ${op.status === 'pendiente_aprobacion' ? 'bg-orange-400 animate-pulse' : op.status === 'closed' ? 'bg-gray-300' : 'bg-indigo-500'}`}></div>
+                                    <div className={`absolute top-0 left-0 w-1 h-full ${op.status === 'cancelled' ? 'bg-gray-300' : 'bg-indigo-500'}`}></div>
 
                                     <div className="p-5 pl-6 flex-1 flex flex-col">
                                         <div className="flex justify-between items-start mb-3">
@@ -277,11 +280,7 @@ export default function OwnerDashboard() {
                                             </div>
 
                                             <div className="flex gap-2 items-center">
-                                                {op.status === 'pendiente_aprobacion' && (
-                                                    <button onClick={(e) => approveOperation(op.id, e)} className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 text-xs font-bold rounded-lg transition-colors shadow-sm">
-                                                        Autorizar
-                                                    </button>
-                                                )}
+                                                {/* ELIMINADO: Botón "Autorizar" que no existe en backend */}
 
                                                 {op.status !== 'closed' && op.status !== 'cancelled' && (
                                                     <button onClick={(e) => cancelOperation(op.id, e)} className="px-3 py-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 text-xs font-semibold rounded-lg transition-colors">

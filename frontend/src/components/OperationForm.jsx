@@ -5,31 +5,32 @@ import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
 
 /* =========================
-   PRODUCT ROW (Lógica blindada y Estética limpia)
+   PRODUCT ROW (con verificación de stock)
 ========================= */
 function ProductRow({ product, index, onUpdate, onRemove }) {
   const [selectedProduct, setSelectedProduct] = useState(
-    product.product ? { id: product.product } : null
+    product.product ? { id: product.product, stock_actual: product.stock_actual || 0 } : null
   );
 
   const handleProductSelect = (item) => {
     setSelectedProduct(item);
-
-    // Escudo 1: Extracción segura de ID o nombre
-    let productValue = '';
-    if (item) {
-      productValue = item.id || item.name || item.inputValue || '';
-    }
-
+    // Asegurar que enviamos el ID numérico, no el nombre
+    let productValue = item?.id ? Number(item.id) : '';
     onUpdate(index, 'product', productValue);
-    onUpdate(index, 'weight_kg', item ? item.weight_kg : null);
-    onUpdate(index, 'presentation', item ? item.presentation : '');
+    onUpdate(index, 'weight_kg', item?.weight_kg || null);
+    onUpdate(index, 'presentation', item?.presentation || '');
+    onUpdate(index, 'stock_actual', item?.stock_actual || 0);
   };
 
+  const cantidad = product.quantity || 0;
+  const stockActual = product.stock_actual || 0;
+  const isStockInsufficient = cantidad > stockActual;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 bg-gray-50 rounded-xl border border-gray-100 mb-3 relative group">
+    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${
+      isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
+    }`}>
       <div className="sm:col-span-4">
-        {/* CORRECCIÓN DE RUTA: "/inventario/products/" (sin /api/) */}
         <AutocompleteCreate
           label="Producto *"
           endpoint="/inventario/products/"
@@ -58,21 +59,33 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         <input
           type="number"
           min="1"
-          value={product.quantity}
+          value={cantidad}
           onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-          className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${
+            isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
+          }`}
         />
+        {isStockInsufficient && (
+          <p className="text-xs text-red-600 mt-1">
+            ⚠ Stock insuficiente (disponible: {stockActual})
+          </p>
+        )}
       </div>
 
-      <div className="sm:col-span-3">
+      <div className="sm:col-span-2">
+        <label className="block text-xs font-medium text-gray-700 mb-1">Stock actual</label>
+        <div className="text-sm font-semibold text-gray-800">{stockActual}</div>
+      </div>
+
+      <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. ($)</label>
         <input
           type="number"
           min="0"
           step="0.01"
-          value={product.unit_price}
+          value={product.unit_price || 0}
           onChange={(e) => onUpdate(index, 'unit_price', parseFloat(e.target.value) || 0)}
-          className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+          className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         />
       </div>
 
@@ -101,7 +114,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
   const [fetchingData, setFetchingData] = useState(true);
   const [error, setError] = useState(null);
 
-  // Archivos (de OperationFormWithIMO)
   const [uploading, setUploading] = useState(false);
   const [existingFiles, setExistingFiles] = useState({
     packing_list_file: null,
@@ -109,7 +121,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     rancho_file: null,
   });
 
-  // Búsqueda IMO
   const [imoNumber, setImoNumber] = useState('');
   const [searchingImo, setSearchingImo] = useState(false);
   const [imoSuccess, setImoSuccess] = useState(false);
@@ -136,7 +147,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     const loadData = async () => {
       try {
         if (currentUser?.role === 'OWNER') {
-          // CORRECCIÓN: La ruta es "/usuarios/users/" ya que baseURL pone el /api al inicio
           const res = await axios.get('/usuarios/users/');
           const fetchedUsers = res.data?.results || res.data;
           if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
@@ -154,15 +164,21 @@ export default function OperationForm({ id, onClose, onSuccess }) {
             } catch { return ''; }
           };
 
+          // Cargar productos con stock_actual
+          const productsWithStock = (op.products || []).map(p => ({
+            ...p,
+            stock_actual: p.stock_actual || 0
+          }));
+
           setFormData({
-            client: op.client || '',
+            client: op.cliente || '',
             ship: op.ship || '',
             port: op.port || '',
             agency: op.agency || '',
             eta: formatToDatetimeLocal(op.eta),
             delivery_method: op.delivery_method || 'muelle',
             notes: op.notes || '',
-            products: op.products || [],
+            products: productsWithStock,
             delivery_date: formatToDatetimeLocal(op.delivery_date),
             closed_date: formatToDatetimeLocal(op.closed_date),
             order_received_date: formatToDatetimeLocal(op.order_received_date),
@@ -179,7 +195,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
           if (op.ship) {
             try {
-              // CORRECCIÓN DE RUTA
               const shipRes = await axios.get(`/operaciones/ships/${op.ship}/`);
               if (shipRes.data.imo) setImoNumber(shipRes.data.imo);
               if (shipRes.data.flag) setAutoCompleteFlag(shipRes.data.flag);
@@ -210,7 +225,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
   const addProduct = () => {
     setFormData(prev => ({
       ...prev,
-      products: [...prev.products, { product: '', quantity: 1, unit_price: 0 }],
+      products: [...prev.products, { product: '', quantity: 1, unit_price: 0, stock_actual: 0 }],
     }));
   };
 
@@ -221,7 +236,13 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     }));
   };
 
-  /* --- Búsqueda IMO --- */
+  // Verificar si algún producto tiene stock insuficiente o falta ID
+  const hasStockIssues = () => {
+    return formData.products.some(p => 
+      !p.product || (p.quantity || 0) > (p.stock_actual || 0)
+    );
+  };
+
   const handleImoSearch = async () => {
     if (!imoNumber || imoNumber.length !== 7 || isNaN(imoNumber)) {
       setError('El número IMO debe tener exactamente 7 dígitos numéricos.');
@@ -263,13 +284,13 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     }
   };
 
-  /* --- Manejo de Archivos --- */
+  // CORREGIDO: usar PATCH al detalle de la operación para subir archivos
   const handleFileUpload = async (event, fieldName) => {
     const file = event.target.files[0];
     if (!file) return;
     setUploading(true);
     const formDataFile = new FormData();
-    formDataFile.append(fieldName, file); // IMPORTANTE: Usar el nombre del campo del backend
+    formDataFile.append(fieldName, file);
 
     try {
       await axios.patch(`/operaciones/operations/${id}/`, formDataFile, {
@@ -289,21 +310,38 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     }
   };
 
-  /* --- Submit Mejorado --- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    try {
-      // Escudo 2: Validación estricta de productos
-      const validProducts = formData.products.filter(p => p.product && String(p.product).trim() !== '');
-
-      if (formData.products.length > 0 && validProducts.length !== formData.products.length) {
-        setError("Error: Tienes filas de productos vacías en la lista. Por favor selecciona un producto o elimina la fila.");
+    // Validación de productos: todos deben tener ID y cantidad positiva
+    for (let i = 0; i < formData.products.length; i++) {
+      const p = formData.products[i];
+      if (!p.product) {
+        setError(`Fila ${i+1}: debe seleccionar un producto.`);
         setLoading(false);
         return;
       }
+      if (p.quantity <= 0) {
+        setError(`Fila ${i+1}: la cantidad debe ser mayor a cero.`);
+        setLoading(false);
+        return;
+      }
+      if (p.unit_price < 0) {
+        setError(`Fila ${i+1}: el precio unitario no puede ser negativo.`);
+        setLoading(false);
+        return;
+      }
+      if (p.quantity > (p.stock_actual || 0)) {
+        setError(`Fila ${i+1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    try {
+      const validProducts = formData.products.filter(p => p.product && String(p.product).trim() !== '');
 
       const safeFormatDate = (dateStr) => {
         if (!dateStr || dateStr.trim() === '') return null;
@@ -315,7 +353,11 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
       const payload = {
         ...formData,
-        products: validProducts,
+        products: validProducts.map(p => ({
+          product: Number(p.product), // Asegurar número
+          quantity: p.quantity,
+          unit_price: p.unit_price,
+        })),
         eta: safeFormatDate(formData.eta),
         delivery_date: safeFormatDate(formData.delivery_date),
         closed_date: safeFormatDate(formData.closed_date),
@@ -335,8 +377,17 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
     } catch (err) {
       console.error("Error en submit:", err);
-      const errorMessage = err.response?.data ? JSON.stringify(err.response.data) : 'Verifique los datos obligatorios.';
-      setError(`Error del Servidor: ${errorMessage}`);
+      let errorMessage = 'Error al guardar. ';
+      if (err.response?.data) {
+        if (typeof err.response.data === 'object') {
+          errorMessage += JSON.stringify(err.response.data);
+        } else {
+          errorMessage += err.response.data;
+        }
+      } else {
+        errorMessage += err.message;
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -357,7 +408,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-full flex flex-col overflow-hidden my-auto">
 
-        {/* Modal Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50">
           <h2 className="text-xl font-bold text-gray-800">
             {id ? `Editar Operación #${id}` : 'Nueva Operación'}
@@ -367,16 +417,14 @@ export default function OperationForm({ id, onClose, onSuccess }) {
           </button>
         </div>
 
-        {/* Modal Body (Scrollable) */}
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
 
           {error && (
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
-              <p className="text-red-700 text-sm font-medium">{error}</p>
+              <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
             </div>
           )}
 
-          {/* Sección IMO */}
           {!id && (
             <div className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-xl p-5">
               <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
@@ -409,11 +457,9 @@ export default function OperationForm({ id, onClose, onSuccess }) {
 
           <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
 
-            {/* GRID PRINCIPAL */}
             <div>
               <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Datos Generales</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {/* CORRECCIÓN DE RUTAS */}
                 <AutocompleteCreate
                   label="Cliente *"
                   endpoint="/operaciones/clients/"
@@ -477,14 +523,11 @@ export default function OperationForm({ id, onClose, onSuccess }) {
               </div>
             </div>
 
-            {/* SECCIÓN ASIGNACIONES */}
             {currentUser?.role === 'OWNER' && (
               <div>
                 <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Equipo Asignado</h3>
                 <p className="text-xs text-gray-500 mb-4">Seleccione quiénes tendrán acceso a la gestión de esta orden.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-
-                  {/* Operadores */}
                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
                       <span className="text-sm font-bold text-gray-700">Operadores (Logística)</span>
@@ -507,7 +550,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                     </div>
                   </div>
 
-                  {/* Operarios */}
                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
                       <span className="text-sm font-bold text-gray-700">Operarios (Planta)</span>
@@ -529,12 +571,10 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                       ))}
                     </div>
                   </div>
-
                 </div>
               </div>
             )}
 
-            {/* SECCIÓN PRODUCTOS */}
             <div>
               <div className="flex justify-between items-end border-b pb-2 mb-4">
                 <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Carga (Productos)</h3>
@@ -569,7 +609,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
               )}
             </div>
 
-            {/* NOTAS */}
             <div>
               <label className="block text-sm font-bold text-gray-800 mb-2">Notas Adicionales</label>
               <textarea
@@ -582,13 +621,10 @@ export default function OperationForm({ id, onClose, onSuccess }) {
               />
             </div>
 
-            {/* DOCUMENTOS */}
             {id && (
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h4 className="text-md font-bold text-gray-900 mb-4 border-b pb-2">Documentos de la Operación</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-                  {/* Packing List */}
                   <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
                     <div>
                       <span className="text-sm font-bold text-gray-800 block">Packing List</span>
@@ -602,7 +638,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                     </label>
                   </div>
 
-                  {/* Remito */}
                   <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
                     <div>
                       <span className="text-sm font-bold text-gray-800 block">Remito</span>
@@ -616,7 +651,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                     </label>
                   </div>
 
-                  {/* Rancho */}
                   <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
                     <div>
                       <span className="text-sm font-bold text-gray-800 block">Rancho</span>
@@ -629,7 +663,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'rancho_file')} disabled={uploading} />
                     </label>
                   </div>
-
                 </div>
               </div>
             )}
@@ -637,7 +670,6 @@ export default function OperationForm({ id, onClose, onSuccess }) {
           </form>
         </div>
 
-        {/* Modal Footer (Sticky) */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
           <button
             type="button"
@@ -649,8 +681,11 @@ export default function OperationForm({ id, onClose, onSuccess }) {
           <button
             type="submit"
             form="operation-form"
-            disabled={loading}
-            className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed shadow-md transition-colors flex items-center gap-2"
+            disabled={loading || hasStockIssues()}
+            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${
+              hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+            title={hasStockIssues() ? "Hay productos sin stock suficiente o sin seleccionar" : ""}
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
             {id ? 'Guardar Cambios' : 'Confirmar Operación'}

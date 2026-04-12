@@ -16,10 +16,21 @@ export default function OperationDetail() {
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingData, setPackingData] = useState(null);
   const [loadingPacking, setLoadingPacking] = useState(false);
+  
+  // NUEVO: Estado para verificación de stock
+  const [stockVerification, setStockVerification] = useState(null);
+  const [checkingStock, setCheckingStock] = useState(false);
 
   useEffect(() => {
     fetchOperation();
   }, [id]);
+
+  // NUEVO: Verificar stock automáticamente al cargar la operación
+  useEffect(() => {
+    if (operation && operation.status === 'pending') {
+      checkStock();
+    }
+  }, [operation]);
 
   const fetchOperation = async () => {
     try {
@@ -31,6 +42,19 @@ export default function OperationDetail() {
       setError('Error al cargar la operación');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // NUEVO: Función para verificar stock
+  const checkStock = async () => {
+    setCheckingStock(true);
+    try {
+      const res = await axios.get(`/operaciones/operations/${id}/verificar_stock/`);
+      setStockVerification(res.data);
+    } catch (err) {
+      console.error('Error verificando stock:', err);
+    } finally {
+      setCheckingStock(false);
     }
   };
 
@@ -48,15 +72,30 @@ export default function OperationDetail() {
     }
   };
 
+  // MODIFICADO: handleAction para confirmar con verificación de stock
   const handleAction = async (action, confirmMessage) => {
-    if (confirmMessage && !window.confirm(confirmMessage)) return;
+    if (action === 'confirm_operation') {
+      // Verificar stock antes de confirmar
+      if (!stockVerification?.todo_suficiente) {
+        alert('❌ No se puede confirmar la operación porque hay productos sin stock suficiente.\nVerifique la tabla de productos para más detalles.');
+        return;
+      }
+      if (confirmMessage && !window.confirm(confirmMessage)) return;
+    } else {
+      if (confirmMessage && !window.confirm(confirmMessage)) return;
+    }
+    
     setActionLoading(true);
     try {
-      await axios.post(`/operaciones/operations/${id}/${action}/`);
+      const response = await axios.post(`/operaciones/operations/${id}/${action}/`);
+      if (action === 'confirm_operation') {
+        alert('✅ Operación confirmada y stock consumido correctamente');
+      }
       fetchOperation();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || 'Error al ejecutar la acción');
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Error al ejecutar la acción';
+      alert(`Error: ${errorMsg}`);
     } finally {
       setActionLoading(false);
     }
@@ -160,7 +199,10 @@ export default function OperationDetail() {
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Detalles de la operación</h3>
                 <p className="mt-1 max-w-2xl text-sm text-gray-500">Información completa y documentos</p>
               </div>
-              {statusBadge(operation.status)}
+              <div className="flex items-center gap-3">
+                {checkingStock && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
+                {statusBadge(operation.status)}
+              </div>
             </div>
 
             <div className="border-t border-gray-200">
@@ -196,7 +238,6 @@ export default function OperationDetail() {
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{operation.notes || '-'}</dd>
                 </div>
 
-                {/* Fechas clave */}
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Pedido recibido</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.order_received_date)}</dd>
@@ -213,7 +254,7 @@ export default function OperationDetail() {
                   <dt className="text-sm font-medium text-gray-500">Fecha de cierre</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.closed_date)}</dd>
                 </div>
-                {/* Personal Asignado (Solo Owner) */}
+                
                 {isOwner && (
                   <div className="bg-white px-4 py-4 sm:px-6 border-t border-gray-100 italic">
                     <p className="text-[10px] font-black text-gray-400 uppercase mb-2 text-center tracking-widest">Personal de Misión Asignado</p>
@@ -226,11 +267,29 @@ export default function OperationDetail() {
               </dl>
             </div>
 
-            {/* Productos / Vista Operario */}
+            {/* MODIFICADO: Tabla de productos con indicador visual de stock */}
             <div className="border-t border-gray-200">
               {!isOperario ? (
                 <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 tracking-tight">Detalle de Productos</h3>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 tracking-tight">Detalle de Productos</h3>
+                    {operation.status === 'pending' && (
+                      <button
+                        onClick={checkStock}
+                        disabled={checkingStock}
+                        className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                      >
+                        {checkingStock ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        )}
+                        Verificar stock
+                      </button>
+                    )}
+                  </div>
                   <div className="mt-4 flex flex-col">
                     <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                       <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
@@ -240,29 +299,83 @@ export default function OperationDetail() {
                               <tr className="bg-slate-50 uppercase tracking-wider text-[10px] font-black text-slate-500">
                                 <th className="px-6 py-4 text-left">Producto</th>
                                 <th className="px-6 py-4 text-left">Cantidad</th>
+                                <th className="px-6 py-4 text-left">Stock disponible</th>
+                                <th className="px-6 py-4 text-left">Estado</th>
                                 <th className="px-6 py-4 text-left">Precio unitario</th>
                                 <th className="px-6 py-4 text-left text-indigo-600">Total</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {operation.products?.map((prod, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50/50 transition">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{prod.product_name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{prod.quantity}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${prod.unit_price}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-600">${(prod.quantity * prod.unit_price).toFixed(2)}</td>
-                                </tr>
-                              ))}
+                              {operation.products?.map((prod, idx) => {
+                                const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
+                                return (
+                                  <tr key={idx} className={`hover:bg-slate-50/50 transition ${!isSuficiente ? 'bg-red-50' : ''}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                      {prod.product_name}
+                                      {!isSuficiente && (
+                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                          Sin stock
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{prod.quantity}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                      <span className={prod.stock_actual < prod.quantity ? 'text-red-600 font-bold' : 'text-gray-600'}>
+                                        {prod.stock_actual?.toFixed(2) || '0'}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      {prod.stock_actual >= prod.quantity ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                          ✓ Disponible
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                          ⚠ Sin stock suficiente
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${prod.unit_price}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-600">
+                                      ${(prod.quantity * prod.unit_price).toFixed(2)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                               <tr className="bg-indigo-50/30">
-                                <td colSpan="3" className="px-6 py-6 text-right text-sm font-black text-indigo-900 uppercase tracking-widest">Total general</td>
+                                <td colSpan="5" className="px-6 py-6 text-right text-sm font-black text-indigo-900 uppercase tracking-widest">Total general</td>
                                 <td className="px-6 py-6 whitespace-nowrap text-xl font-black text-indigo-700 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                              </tr>
+                               </tr>
                             </tbody>
                           </table>
                         </div>
                       </div>
                     </div>
                   </div>
+                  
+                  {/* NUEVO: Resumen de stock si hay problemas */}
+                  {stockVerification && !stockVerification.todo_suficiente && operation.status === 'pending' && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-red-800">Stock insuficiente para confirmar</h4>
+                          <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
+                            {stockVerification.errores?.map((err, idx) => (
+                              <li key={idx}>
+                                {err.nombre || `Artículo ID ${err.articulo_id}`}: 
+                                requiere {err.necesario}, disponible {err.disponible}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <OperarioActionPanel products={operation.products} />
@@ -316,7 +429,6 @@ export default function OperationDetail() {
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading} />
                     </label>
                   </div>
-                  {/* Botón para ver/imprimir packing list */}
                   <div className="mt-6 flex justify-end">
                     <button
                       onClick={fetchPackingData}
@@ -336,9 +448,12 @@ export default function OperationDetail() {
                 <div className="flex gap-2">
                   {operation.can_confirm && !isOperario && (
                     <button
-                      onClick={() => handleAction('confirm_operation', '¿Confirmar la operación? Esto marcará que el cliente confirmó.')}
-                      disabled={actionLoading}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-green-600 hover:bg-green-700"
+                      onClick={() => handleAction('confirm_operation', '¿Confirmar la operación? Esto consumirá el stock automáticamente.')}
+                      disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
+                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white 
+                        ${(stockVerification && !stockVerification.todo_suficiente) 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-green-600 hover:bg-green-700'}`}
                     >
                       {actionLoading ? 'Procesando...' : 'Confirmar operación'}
                     </button>
@@ -389,7 +504,7 @@ export default function OperationDetail() {
         </div>
       </div>
 
-      {/* Modal de Packing List */}
+      {/* Modal de Packing List (sin cambios) */}
       {showPackingModal && packingData && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -441,7 +556,7 @@ export default function OperationDetail() {
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${packingData.total_price.toFixed(2)}</td>
                             </tr>
                           </tbody>
-                        </table>
+                         </table>
                       </div>
                     </div>
                   </div>

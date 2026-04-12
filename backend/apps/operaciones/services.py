@@ -178,7 +178,7 @@ def scrape_vessel_info(imo):
     if paragraph:
         text_p = paragraph.get_text()
         # Captura desde "en route to" hasta "sailing" o punto o fin de línea
-        match_dest = re.search(r"en route to\s+(.+?)(?:\s+sailing|\.|$)", text_p, re.IGNORECASE)
+        match_dest = re.search(r"en route to\s+(?:(?:the\s+port\s+of\s+)?)(.+?)(?:\s+sailing|\.|$)", text_p, re.IGNORECASE)
         if match_dest:
             destino = match_dest.group(1).strip()
             # Limpiar comas finales y espacios

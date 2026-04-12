@@ -2,6 +2,8 @@ from django.db import models
 from django.conf import settings
 from django_fsm import FSMField, transition
 from django.utils import timezone
+from django.core.exceptions import ValidationError
+
 
 class Client(models.Model):
     name = models.CharField(max_length=200)
@@ -15,6 +17,7 @@ class Client(models.Model):
     def __str__(self):
         return self.name
 
+
 class Ship(models.Model):
     name = models.CharField(max_length=200)
     imo = models.CharField(max_length=7, unique=True)
@@ -25,6 +28,7 @@ class Ship(models.Model):
     def __str__(self):
         return f"{self.name} (IMO: {self.imo})"
 
+
 class Port(models.Model):
     name = models.CharField(max_length=200)
     country = models.CharField(max_length=100)
@@ -32,6 +36,7 @@ class Port(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class Agency(models.Model):
     name = models.CharField(max_length=200)
@@ -41,6 +46,7 @@ class Agency(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class Operacion(models.Model):
     ESTADO_SOLICITADA = 'solicitada'
@@ -82,7 +88,7 @@ class Operacion(models.Model):
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)
     rancho_file = models.FileField(upload_to='ranchos/', null=True, blank=True)
-
+    stock_consumido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -106,8 +112,14 @@ class Operacion(models.Model):
     @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_PRESUPUESTADA)
     def confirm(self):
         """Confirmar operación (cliente confirma presupuesto)"""
+        # Verificar stock antes de permitir la transición
+        ok, errores = self.verificar_stock()
+        if not ok:
+            raise ValidationError(f"Stock insuficiente para confirmar: {errores}")
+        
         self.client_confirmed_date = timezone.now()
-        pass
+        # Nota: El consumo real se hará en la vista, no aquí, para mantener la atomicidad
+        # con la creación de movimientos en la misma transacción
 
     @transition(field=estado, source=ESTADO_PRESUPUESTADA, target=ESTADO_EN_PRODUCCION)
     def start_coordination(self):
@@ -135,6 +147,67 @@ class Operacion(models.Model):
     def cancel(self):
         """Cancelar operación"""
         pass
+
+    def verificar_stock(self):
+        """
+        Verifica si hay stock suficiente para todos los detalles de la operación.
+        Retorna: (bool, list) - (todo_ok, lista_de_errores)
+        """
+        from apps.inventario.models import Articulo
+        
+        errores = []
+        for detalle in self.detalles.all():
+            try:
+                articulo = Articulo.objects.get(id=detalle.articulo_id)
+                if articulo.stock_actual < detalle.cantidad:
+                    errores.append({
+                        'articulo_id': detalle.articulo_id,
+                        'nombre': articulo.nombre,
+                        'disponible': float(articulo.stock_actual),
+                        'necesario': float(detalle.cantidad)
+                    })
+            except Articulo.DoesNotExist:
+                errores.append({
+                    'articulo_id': detalle.articulo_id,
+                    'error': f'Artículo ID {detalle.articulo_id} no existe en inventario'
+                })
+        
+        return len(errores) == 0, errores
+
+    def consumir_stock(self):
+        """
+        Consume el stock de todos los artículos de la operación.
+        Debe llamarse dentro de una transacción atómica.
+        """
+        from apps.inventario.models import Articulo, MovimientoStock
+        
+        if self.stock_consumido:
+            raise ValueError("El stock de esta operación ya fue consumido")
+        
+        ok, errores = self.verificar_stock()
+        if not ok:
+            raise ValueError(f"Stock insuficiente: {errores}")
+        
+        for detalle in self.detalles.all():
+            articulo = Articulo.objects.select_for_update().get(id=detalle.articulo_id)
+            
+            # Crear movimiento de salida
+            MovimientoStock.objects.create(
+                articulo=articulo,
+                tipo='SALIDA',
+                cantidad=detalle.cantidad,
+                stock_resultante=articulo.stock_actual - detalle.cantidad,
+                operacion_id=self.id,
+                razon=f"Consumo por operación {self.id} - {self.cliente.name}"
+            )
+            
+            # Actualizar stock
+            articulo.stock_actual -= detalle.cantidad
+            articulo.save()
+        
+        self.stock_consumido = True
+        self.save(update_fields=['stock_consumido'])
+
 
 class OperacionDetalle(models.Model):
     operacion = models.ForeignKey(Operacion, on_delete=models.CASCADE, related_name='detalles')

@@ -4,32 +4,81 @@ from apps.inventario.models import Articulo
 from apps.usuarios.models import User
 import json
 
+
 class ClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = ['id', 'name', 'email', 'contact_person', 'phone']
+
 
 class ShipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = ['id', 'name', 'imo', 'flag', 'call_sign', 'gross_tonnage']
 
+
 class PortSerializer(serializers.ModelSerializer):
     class Meta:
         model = Port
         fields = ['id', 'name', 'country', 'code']
+
 
 class AgencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Agency
         fields = ['id', 'name', 'contact_name', 'phone', 'email']
 
+
+class OperacionDetalleSerializer(serializers.ModelSerializer):
+    articulo_nombre = serializers.SerializerMethodField()
+    articulo_presentacion = serializers.SerializerMethodField()
+    stock_disponible = serializers.SerializerMethodField()
+    suficiente = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OperacionDetalle
+        fields = ['id', 'operacion', 'articulo_id', 'cantidad', 'precio_unitario',
+                  'articulo_nombre', 'articulo_presentacion', 'stock_disponible', 'suficiente']
+        read_only_fields = ['id', 'operacion']
+
+    def get_articulo(self, obj):
+        try:
+            return Articulo.objects.get(id=obj.articulo_id)
+        except Articulo.DoesNotExist:
+            return None
+
+    def get_articulo_nombre(self, obj):
+        articulo = self.get_articulo(obj)
+        return articulo.nombre if articulo else f"ID {obj.articulo_id} (no existe)"
+
+    def get_articulo_presentacion(self, obj):
+        articulo = self.get_articulo(obj)
+        return articulo.presentacion if articulo else ""
+
+    def get_stock_disponible(self, obj):
+        articulo = self.get_articulo(obj)
+        return float(articulo.stock_actual) if articulo else 0
+
+    def get_suficiente(self, obj):
+        articulo = self.get_articulo(obj)
+        if not articulo:
+            return False
+        return articulo.stock_actual >= obj.cantidad
+
+
 class OperacionSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='cliente.name', read_only=True)
     ship_name = serializers.CharField(source='ship.name', read_only=True)
     port_name = serializers.CharField(source='port.name', read_only=True)
+    agency_name = serializers.CharField(source='agency.name', read_only=True)
     status = serializers.SerializerMethodField(read_only=True)
     products = serializers.JSONField(required=False)
+
+    can_confirm = serializers.SerializerMethodField()
+    can_coordinate = serializers.SerializerMethodField()
+    can_deliver = serializers.SerializerMethodField()
+
+    detalles = OperacionDetalleSerializer(many=True, read_only=True, source='detalles')
 
     operadores_id = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(),
@@ -47,13 +96,15 @@ class OperacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Operacion
         fields = [
-            'id', 'client_name', 'ship_name', 'port_name', 'eta',
-            'delivery_method', 'status', 'products',
+            'id', 'client_name', 'ship_name', 'port_name', 'agency_name', 'eta',
+            'delivery_method', 'status', 'products', 'detalles',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
             'packing_list_file', 'remito_file', 'rancho_file',
             'operadores_id', 'operarios_id', 'contables_id',
+            'can_confirm', 'can_coordinate', 'can_deliver',
+            'stock_consumido'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -67,13 +118,23 @@ class OperacionSerializer(serializers.ModelSerializer):
             'closed_date': {'required': False, 'allow_null': True},
         }
 
+    def get_can_confirm(self, obj):
+        return obj.estado == Operacion.ESTADO_SOLICITADA
+
+    def get_can_coordinate(self, obj):
+        return obj.estado == Operacion.ESTADO_PRESUPUESTADA
+
+    def get_can_deliver(self, obj):
+        return obj.estado == Operacion.ESTADO_LISTA_PARA_ENVIO
+
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         ret['products'] = self.get_products(instance)
         return ret
 
     def get_products(self, obj):
-        detalles = OperacionDetalle.objects.filter(operacion=obj)
+        # Usar detalles precargados (prefetch_related en view)
+        detalles = obj.detalles.all()
         productos = []
         for detalle in detalles:
             try:
@@ -85,6 +146,8 @@ class OperacionSerializer(serializers.ModelSerializer):
                     "unit_price": float(detalle.precio_unitario) if detalle.precio_unitario else 0,
                     "weight_kg": float(articulo.peso_kg) if articulo.peso_kg else None,
                     "presentation": articulo.presentacion,
+                    "stock_actual": float(articulo.stock_actual),
+                    "suficiente": articulo.stock_actual >= detalle.cantidad
                 })
             except Articulo.DoesNotExist:
                 productos.append({
@@ -94,12 +157,15 @@ class OperacionSerializer(serializers.ModelSerializer):
                     "unit_price": float(detalle.precio_unitario) if detalle.precio_unitario else 0,
                     "weight_kg": None,
                     "presentation": "",
+                    "stock_actual": 0,
+                    "suficiente": False
                 })
         return productos
 
     def get_status(self, obj):
         mapper = {
             Operacion.ESTADO_SOLICITADA: 'pending',
+            Operacion.ESTADO_PENDIENTE_APROBACION: 'draft',
             Operacion.ESTADO_PRESUPUESTADA: 'price_checked',
             Operacion.ESTADO_EN_PRODUCCION: 'in_coordination',
             Operacion.ESTADO_LISTA_PARA_ENVIO: 'confirmed',
@@ -110,6 +176,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         return mapper.get(obj.estado, 'pending')
 
     def _resolve_nested(self, data_dict, field, model_class, defaults):
+        """Resuelve campos anidados (solo para Client, Port, Agency) pero NO para Ship"""
         val = data_dict.get(field)
         if val and isinstance(val, str) and not str(val).isdigit():
             obj, _ = model_class.objects.get_or_create(name=val, defaults=defaults)
@@ -120,13 +187,9 @@ class OperacionSerializer(serializers.ModelSerializer):
         import random
         mutable_data = data.copy() if hasattr(data, 'copy') else data
 
+        # Cliente, puerto y agencia pueden crearse automáticamente (solo por nombre)
         if 'client' in mutable_data:
             mutable_data['cliente'] = self._resolve_nested(mutable_data, 'client', Client, {'email': 'default@email.com'})
-        if 'ship' in mutable_data:
-            val = mutable_data.get('ship')
-            if val and isinstance(val, str) and not str(val).isdigit():
-                obj, _ = Ship.objects.get_or_create(name=val, defaults={'imo': f'TBD{random.randint(1000,9999)}', 'flag': 'TBD'})
-                mutable_data['ship'] = obj.id
         if 'port' in mutable_data:
             mutable_data['port'] = self._resolve_nested(mutable_data, 'port', Port, {'country': 'TBD'})
         if 'agency' in mutable_data:
@@ -134,7 +197,12 @@ class OperacionSerializer(serializers.ModelSerializer):
             if val and isinstance(val, str) and not str(val).isdigit():
                 obj, _ = Agency.objects.get_or_create(name=val, defaults={'email': 'default@email.com', 'contact_name': 'TBD', 'phone': '0'})
                 mutable_data['agency'] = obj.id
-                
+
+        # Ship NO se crea automáticamente: solo acepta ID numérico existente
+        ship_val = mutable_data.get('ship')
+        if ship_val and isinstance(ship_val, str) and not ship_val.isdigit():
+            raise serializers.ValidationError({'ship': 'El buque debe ser un ID numérico existente. No se permite creación automática.'})
+
         if 'notes' in mutable_data:
             mutable_data['notas'] = mutable_data.pop('notes')
         if 'eta' in mutable_data and not mutable_data['eta']:
@@ -146,7 +214,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         products_data = validated_data.pop('products', None)
         if products_data is None:
             products_data = self.initial_data.get('products', [])
-            
+
         if isinstance(products_data, str):
             try:
                 products_data = json.loads(products_data)
@@ -177,20 +245,37 @@ class OperacionSerializer(serializers.ModelSerializer):
         return operation
 
     def _handle_products(self, operation, products):
+        """
+        Maneja productos de la operación.
+        IMPORTANTE: No crea artículos automáticamente. Solo acepta IDs numéricos existentes.
+        """
         for prod in products:
             p_val = prod.get('product')
-            if p_val and isinstance(p_val, str) and not str(p_val).isdigit():
-                articulo, _ = Articulo.objects.get_or_create(
-                    nombre=p_val, defaults={'presentacion': 'Unidad', 'peso_kg': 1.0}
-                )
-                articulo_id = articulo.id
-            else:
-                articulo_id = p_val
+            if not p_val:
+                continue
 
-            if articulo_id:
-                OperacionDetalle.objects.create(
-                    operacion=operation,
-                    articulo_id=articulo_id,
-                    cantidad=prod.get('quantity', 0),
-                    precio_unitario=prod.get('unit_price', 0)
+            # Solo aceptar IDs numéricos
+            if isinstance(p_val, str) and not p_val.isdigit():
+                raise serializers.ValidationError(
+                    f"El producto '{p_val}' no es válido. Debe proporcionar un ID numérico de un artículo existente."
                 )
+            articulo_id = int(p_val)
+
+            # Verificar que el artículo exista
+            if not Articulo.objects.filter(id=articulo_id).exists():
+                raise serializers.ValidationError(
+                    f"Artículo con ID {articulo_id} no existe en el inventario."
+                )
+
+            cantidad = prod.get('quantity', 0)
+            if cantidad <= 0:
+                raise serializers.ValidationError(
+                    f"La cantidad del producto ID {articulo_id} debe ser mayor a cero."
+                )
+
+            OperacionDetalle.objects.create(
+                operacion=operation,
+                articulo_id=articulo_id,
+                cantidad=cantidad,
+                precio_unitario=prod.get('unit_price', 0)
+            )
