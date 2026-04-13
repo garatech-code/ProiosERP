@@ -1,11 +1,16 @@
 from django.db import models
 
 class Articulo(models.Model):
+    CATEGORIA_CHOICES = (
+        ('quimicos', 'Químicos'),
+        ('otros', 'Otros'),
+    )
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)
-    presentacion = models.CharField(max_length=100)  # ej: "Tambor 200L"
+    presentacion = models.CharField(max_length=100)
     peso_kg = models.DecimalField(max_digits=10, decimal_places=2)
     stock_actual = models.DecimalField(max_digits=15, decimal_places=4, default=0.0)
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='otros')
 
     def __str__(self):
         return f"{self.nombre} ({self.presentacion})"

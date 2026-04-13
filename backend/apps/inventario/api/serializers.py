@@ -4,8 +4,7 @@ from apps.inventario.models import Articulo, MovimientoStock
 class ArticuloSerializer(serializers.ModelSerializer):
     class Meta:
         model = Articulo
-        fields = ['id', 'nombre', 'descripcion', 'presentacion', 'peso_kg', 'stock_actual']
-        # Quitamos read_only_fields para permitir actualizaciones controladas
+        fields = ['id', 'nombre', 'descripcion', 'presentacion', 'peso_kg', 'stock_actual', 'categoria']
         read_only_fields = ['id']
 
 class MovimientoStockSerializer(serializers.ModelSerializer):
