@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import OperationForm from './OperationForm';
+import OperationFormProductos from './OperationFormProductos';
 import OperationFormWithIMO from './OperationFormWithIMO';
 
 export default function Dashboard() {
@@ -360,7 +360,7 @@ export default function Dashboard() {
 
       {/* Modales integrados al final del archivo */}
       {showNormalForm && (
-        <OperationForm onClose={closeForms} onSuccess={handleSuccess} />
+        <OperationFormProductos onClose={closeForms} onSuccess={handleSuccess} />
       )}
 
       {showIMOForm && (

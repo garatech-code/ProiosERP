@@ -17,9 +17,16 @@ export default function OperationDetail() {
   const [packingData, setPackingData] = useState(null);
   const [loadingPacking, setLoadingPacking] = useState(false);
   
-  // NUEVO: Estado para verificación de stock
   const [stockVerification, setStockVerification] = useState(null);
   const [checkingStock, setCheckingStock] = useState(false);
+
+  // NUEVO: Estado para Toast (alertas modernas)
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (message, type = 'info') => {
+    setToastMessage({ message, type });
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   useEffect(() => {
     fetchOperation();
@@ -66,7 +73,7 @@ export default function OperationDetail() {
       setShowPackingModal(true);
     } catch (err) {
       console.error(err);
-      alert('Error al cargar el packing list');
+      showToast('Error al cargar el packing list', 'error');
     } finally {
       setLoadingPacking(false);
     }
@@ -77,7 +84,7 @@ export default function OperationDetail() {
     if (action === 'confirm_operation') {
       // Verificar stock antes de confirmar
       if (!stockVerification?.todo_suficiente) {
-        alert('❌ No se puede confirmar la operación porque hay productos sin stock suficiente.\nVerifique la tabla de productos para más detalles.');
+        showToast('No se puede confirmar: Hay productos sin stock suficiente.', 'error');
         return;
       }
       if (confirmMessage && !window.confirm(confirmMessage)) return;
@@ -89,13 +96,13 @@ export default function OperationDetail() {
     try {
       const response = await axios.post(`/operaciones/operations/${id}/${action}/`);
       if (action === 'confirm_operation') {
-        alert('✅ Operación confirmada y stock consumido correctamente');
+        showToast('Operación confirmada y stock consumido correctamente', 'success');
       }
       fetchOperation();
     } catch (err) {
       console.error(err);
       const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Error al ejecutar la acción';
-      alert(`Error: ${errorMsg}`);
+      showToast(errorMsg, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -115,7 +122,7 @@ export default function OperationDetail() {
       fetchOperation();
     } catch (err) {
       console.error(err);
-      alert('Error al subir archivo');
+      showToast('Error al subir archivo', 'error');
     } finally {
       setUploading(false);
     }
@@ -183,13 +190,24 @@ export default function OperationDetail() {
       </nav>
 
       <div className="py-10">
+        {toastMessage && (
+          <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border border-opacity-50 flex items-center gap-3 animate-fadeIn ${
+            toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 
+            toastMessage.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' :
+            'bg-blue-50 text-blue-800 border-blue-200'
+          }`}>
+            <i className={`bi ${toastMessage.type === 'error' ? 'bi-x-circle-fill text-red-500' : toastMessage.type === 'success' ? 'bi-check-circle-fill text-green-500' : 'bi-info-circle-fill text-blue-500'} text-lg`}></i>
+            <span className="font-bold text-sm tracking-tight">{toastMessage.message}</span>
+          </div>
+        )}
+
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-4">
             <button
               onClick={() => navigate('/')}
-              className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-900"
+              className="inline-flex items-center text-sm font-bold text-indigo-600 hover:text-indigo-900 transition-colors"
             >
-              ← Volver al dashboard
+              <i className="bi bi-arrow-left mr-1"></i> Volver al dashboard
             </button>
           </div>
 
@@ -326,12 +344,12 @@ export default function OperationDetail() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                       {prod.stock_actual >= prod.quantity ? (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                          ✓ Disponible
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                          <i className="bi bi-check-circle-fill"></i> Disponible
                                         </span>
                                       ) : (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                          ⚠ Sin stock suficiente
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                          <i className="bi bi-exclamation-triangle-fill"></i> Sin stock
                                         </span>
                                       )}
                                     </td>
@@ -433,9 +451,9 @@ export default function OperationDetail() {
                     <button
                       onClick={fetchPackingData}
                       disabled={loadingPacking}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
                     >
-                      📄 Ver / Imprimir Packing List
+                      <i className="bi bi-file-earmark-text mr-2 text-indigo-500"></i> Ver / Imprimir Packing List
                     </button>
                   </div>
                 </div>
@@ -506,17 +524,14 @@ export default function OperationDetail() {
 
       {/* Modal de Packing List (sin cambios) */}
       {showPackingModal && packingData && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowPackingModal(false)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                      Packing List - Operación #{packingData.operation_id}
-                    </h3>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 shrink-0">
+               <h3 className="text-lg leading-6 font-bold text-gray-900" id="modal-title">
+                  Packing List - Operación #{packingData.operation_id}
+               </h3>
+            </div>
+            <div className="p-4 sm:p-6 overflow-y-auto w-full">
                     <div className="mt-2">
                       <div className="text-sm text-gray-500 mb-4">
                         <p><strong>Cliente:</strong> {packingData.client}</p>
@@ -560,24 +575,21 @@ export default function OperationDetail() {
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => window.print()}
-                >
-                  🖨️ Imprimir
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowPackingModal(false)}
-                >
-                  Cerrar
-                </button>
-              </div>
+            <div className="bg-slate-50 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
+              <button
+                type="button"
+                className="mt-3 w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                onClick={() => window.print()}
+              >
+                <i className="bi bi-printer mr-2"></i> Imprimir
+              </button>
+              <button
+                type="button"
+                className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                onClick={() => setShowPackingModal(false)}
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

@@ -1,31 +1,65 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import OperationForm from '../components/OperationForm';
+import OperationTypeSelector from '../components/OperationTypeSelector';
+import OperationFormProductos from '../components/OperationFormProductos';
+import OperationFormQuimicos from '../components/OperationFormQuimicos';
+import OperationFormServicios from '../components/OperationFormServicios';
+import InboxView from '../components/InboxView';
+
+// Calendar
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import format from 'date-fns/format';
+import parse from 'date-fns/parse';
+import startOfWeek from 'date-fns/startOfWeek';
+import getDay from 'date-fns/getDay';
+import es from 'date-fns/locale/es';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+const locales = {
+  'es': es,
+}
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
 
 export default function OwnerDashboard() {
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const [activeTab, setActiveTab] = useState('overview'); // overview, operations, calendar, inbox
     const [operations, setOperations] = useState([]);
     const [filteredOps, setFilteredOps] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [statusFilter, setStatusFilter] = useState('');
+    const [typeFilter, setTypeFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [metrics, setMetrics] = useState({ total: 0, en_proceso: 0, finalizadas: 0, usuarios_activos: 0 });
+    const [holidays, setHolidays] = useState([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+    const [calView, setCalView] = useState('week');
+    const [calDate, setCalDate] = useState(new Date());
 
-    // Control del Modal Único
-    const [showOperationForm, setShowOperationForm] = useState(false);
+    const [operationModalState, setOperationModalState] = useState({ isOpen: false, type: null, id: null });
 
     useEffect(() => {
-        fetchOperations();
+        fetchData();
     }, []);
 
     useEffect(() => {
         let filtered = operations;
         if (statusFilter) {
-            filtered = filtered.filter(op => op.status === statusFilter);
+            filtered = filtered.filter(op => op.status === statusFilter || op.estado === statusFilter);
+        }
+        if (typeFilter) {
+            filtered = filtered.filter(op => op.tipo_operacion === typeFilter);
         }
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
@@ -35,17 +69,25 @@ export default function OwnerDashboard() {
             );
         }
         setFilteredOps(filtered);
-    }, [operations, statusFilter, searchTerm]);
+    }, [operations, statusFilter, typeFilter, searchTerm]);
 
-    const fetchOperations = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('/operaciones/operations/');
-            setOperations(res.data);
+            const [opsRes, metricsRes, holRes] = await Promise.all([
+                axios.get('/operaciones/operations/'),
+                axios.get('/operaciones/operations/dashboard_metrics/').catch(() => ({ data: { total: 0, en_proceso: 0, finalizadas: 0 } })),
+                axios.get('/operaciones/operations/holidays_ar/').catch(() => ({ data: [] }))
+            ]);
+            setOperations(opsRes.data);
+            setMetrics(metricsRes.data);
+            if (Array.isArray(holRes.data)) {
+                 setHolidays(holRes.data);
+            }
             setError(null);
         } catch (err) {
             console.error(err);
-            setError('Error al cargar las operaciones. Por favor, intente nuevamente.');
+            setError('Error al cargar datos del dashboard.');
         } finally {
             setLoading(false);
         }
@@ -56,15 +98,12 @@ export default function OwnerDashboard() {
         if (!window.confirm('¿Está seguro de anular esta operación? Esta acción cambiará el estado a Cancelada.')) return;
         try {
             await axios.post(`/operaciones/operations/${id}/cancel_operation/`);
-            fetchOperations();
+            fetchData();
         } catch (err) {
             console.error(err);
             alert('Error al intentar anular la operación.');
         }
     };
-
-    // CORREGIDO: Eliminada función approveOperation (no existe en backend)
-    // Ahora las acciones se realizan desde el detalle de la operación
 
     const calculateTotal = (products) => {
         if (!products) return 0;
@@ -72,281 +111,471 @@ export default function OwnerDashboard() {
     };
 
     const getStatusBadge = (status) => {
-        // CORREGIDO: Mapeo de estados alineado con backend
         const maps = {
             pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Solicitada' },
+            solicitada: { color: 'bg-yellow-100 text-yellow-800', label: 'Solicitada' },
             draft: { color: 'bg-orange-100 text-orange-800', label: 'Borrador' },
             price_checked: { color: 'bg-blue-100 text-blue-800', label: 'Presupuestada' },
+            presupuestada: { color: 'bg-blue-100 text-blue-800', label: 'Presupuestada' },
             confirmed: { color: 'bg-green-100 text-green-800', label: 'Lista para envío' },
+            lista_para_envio: { color: 'bg-green-100 text-green-800', label: 'Lista para envío' },
             in_coordination: { color: 'bg-purple-100 text-purple-800', label: 'En producción' },
+            en_produccion: { color: 'bg-purple-100 text-purple-800', label: 'En producción' },
             delivered: { color: 'bg-indigo-100 text-indigo-800', label: 'Remitada' },
+            remitada: { color: 'bg-indigo-100 text-indigo-800', label: 'Remitada' },
             closed: { color: 'bg-gray-100 text-gray-800', label: 'Entregada' },
+            entregada: { color: 'bg-gray-100 text-gray-800', label: 'Entregada' },
             cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
+            cancelada: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
         };
         const mapped = maps[status] || { color: 'bg-gray-100 text-gray-800', label: status };
         return (
-            <span className={`px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${mapped.color}`}>
+            <span className={`px-2 py-1 inline-flex text-[10px] sm:text-xs leading-4 font-semibold rounded-full ${mapped.color}`}>
                 {mapped.label}
             </span>
         );
     };
 
-    /* =========================================================
-       SEMÁFORO DOCUMENTAL (sin cambios, funciona correctamente)
-    ========================================================= */
+    const getTypeIcon = (type) => {
+        if (type === 'quimicos') return <i title="Químicos" className="bi bi-flask-fill text-emerald-500 text-sm"></i>;
+        if (type === 'servicios') return <i title="Servicios" className="bi bi-tools text-amber-500 text-sm"></i>;
+        return <i title="Productos" className="bi bi-box-seam text-indigo-500 text-sm"></i>;
+    };
+
+    const getTypePrefix = (type) => {
+        if (type === 'quimicos') return '[QMC]';
+        if (type === 'servicios') return '[SRV]';
+        return '[PRD]';
+    };
+
     const renderDocSemaphore = (label, fileUrl, opStatus) => {
         let statusConfig = {};
-
         if (fileUrl) {
             statusConfig = { dot: 'bg-emerald-500', box: 'bg-emerald-50 border-emerald-200 text-emerald-700', title: 'Completado' };
         } else {
-            const inProgressStates = ['in_coordination', 'confirmed', 'delivered'];
+            const inProgressStates = ['in_coordination', 'en_produccion', 'confirmed', 'lista_para_envio', 'delivered', 'remitada'];
             if (inProgressStates.includes(opStatus)) {
-                statusConfig = { dot: 'bg-amber-400 animate-pulse', box: 'bg-amber-50 border-amber-200 text-amber-700', title: 'En Proceso / Pendiente' };
+                statusConfig = { dot: 'bg-amber-400 animate-pulse', box: 'bg-amber-50 border-amber-200 text-amber-700', title: 'En Proceso' };
             } else {
                 statusConfig = { dot: 'bg-red-500', box: 'bg-red-50 border-red-200 text-red-700', title: 'Faltante' };
             }
         }
-
         return (
-            <div
-                title={`${label}: ${statusConfig.title}`}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${statusConfig.box} text-[10px] font-bold uppercase tracking-wider cursor-help transition-colors`}
-            >
-                <div className={`w-2 h-2 rounded-full shadow-sm ${statusConfig.dot}`}></div>
+            <div title={`${label}: ${statusConfig.title}`} className={`flex items-center gap-1.5 px-2 py-1 rounded border ${statusConfig.box} text-[10px] font-bold uppercase tracking-wider`}>
+                <div className={`w-2 h-2 rounded-full ${statusConfig.dot}`}></div>
                 {label}
             </div>
         );
     };
 
-    const handleFormSuccess = (id) => {
-        setShowOperationForm(false);
-        fetchOperations();
+    const handleFormSuccess = () => {
+        setOperationModalState({ isOpen: false, type: null, id: null });
+        fetchData();
     };
 
-    // CORREGIDO: Opciones de filtro alineadas con los estados reales del backend
-    const statusFilterOptions = [
-        { value: '', label: 'Status: Todos' },
-        { value: 'pending', label: 'Solicitadas' },
-        { value: 'price_checked', label: 'Presupuestadas' },
-        { value: 'in_coordination', label: 'En producción' },
-        { value: 'confirmed', label: 'Listas para envío' },
-        { value: 'delivered', label: 'Remitadas' },
-        { value: 'closed', label: 'Entregadas' },
-        { value: 'cancelled', label: 'Canceladas' },
-    ];
+    // Preparar eventos para el calendario
+    const calendarEvents = useMemo(() => {
+        const evts = operations.filter(op => op.eta).map(op => ({
+            id: op.id,
+            title: `${getTypePrefix(op.tipo_operacion)} OP-${op.id} ${op.ship_name}`,
+            start: new Date(op.eta),
+            end: new Date(op.eta),
+            resource: op,
+            type: 'eta'
+        }));
+        
+        const holEvts = holidays.map((h, i) => ({
+            id: `hol-${i}`,
+            title: `[FERIADO] ${h.name}`,
+            start: new Date(`${h.date}T00:00:00`),
+            end: new Date(`${h.date}T23:59:59`),
+            allDay: true,
+            type: 'holiday'
+        }));
+        
+        return [...evts, ...holEvts];
+    }, [operations, holidays]);
 
-    return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-            {/* Header Sticky */}
-            <nav className="bg-white shadow-sm sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-indigo-600 text-white rounded flex items-center justify-center font-bold text-lg shadow-sm">
-                                P
-                            </div>
-                            <h1 className="text-xl font-bold text-gray-900 tracking-tight">ProIOS</h1>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                        <button
-                            onClick={() => navigate('/inventory')}
-                            className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-900"
-                        >
-                            📦 Inventario
-                        </button>
-                        <span className="text-sm text-gray-600">Hola, {user?.username}</span>
-                        <button onClick={logout} className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700">
-                            Cerrar sesión
-                        </button>
-                        </div>
-                    </div>
+    const eventStyleGetter = (event) => {
+        if (event.type === 'holiday') {
+            return { style: { backgroundColor: '#fecdd3', color: '#881337', fontWeight: 'bold', border: 'none', padding: '2px' } };
+        }
+        return { style: { backgroundColor: '#4f46e5', color: 'white', borderRadius: '4px', border: 'none' } };
+    };
+
+    // Renderizado de Contenidos
+    const renderOverview = () => (
+        <div className="space-y-6 animate-fadeIn">
+            <h2 className="text-2xl font-bold text-gray-800">Panorama (KPIs)</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">T. Operaciones</span>
+                    <span className="text-4xl sm:text-5xl font-black text-indigo-600">{metrics.total}</span>
                 </div>
-            </nav>
-
-            {/* Main Content */}
-            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
-
-                {/* Top Controls Area */}
-                <div className="flex flex-col gap-4 mb-6">
-                    <div className="flex justify-between items-end">
-                        <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Panel de Gerencia</h2>
-
-                        <button
-                            onClick={() => setShowOperationForm(true)}
-                            className="hidden sm:inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        >
-                            + Nueva Operación
-                        </button>
-                    </div>
-
-                    {/* Filtros */}
-                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible sm:flex-wrap hide-scrollbar">
-                        <div className="relative flex-shrink-0 w-64 sm:w-auto sm:flex-1">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Buscar cliente, buque..."
-                                className="pl-10 block w-full py-2.5 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm transition"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-
-                        <select
-                            className="flex-shrink-0 py-2.5 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm appearance-none font-medium"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                        >
-                            {statusFilterOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">En Proceso</span>
+                    <span className="text-4xl sm:text-5xl font-black text-amber-500">{metrics.en_proceso}</span>
                 </div>
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">Finalizadas</span>
+                    <span className="text-4xl sm:text-5xl font-black text-emerald-500">{metrics.finalizadas}</span>
+                </div>
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">User Activos</span>
+                    <span className="text-4xl sm:text-5xl font-black text-blue-500">{metrics.usuarios_activos || 0}</span>
+                </div>
+            </div>
+            {/* Próximamente gráficos */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 bg-indigo-50/50 mt-6">
+                <h3 className="text-lg font-bold text-indigo-900 mb-2 whitespace-nowrap overflow-hidden text-ellipsis">
+                    <i className="bi bi-lightbulb-fill text-amber-500 mr-2 text-xl"></i>
+                    Novedades del Sistema
+                </h3>
+                <p className="text-indigo-700 text-sm mt-1">Se está preparando la funcionalidad de bandejas de entrada integrada. Muy pronto verás los correos empresariales directamente aquí.</p>
+            </div>
+        </div>
+    );
 
-                {loading && (
-                    <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        <p className="text-gray-500 font-medium">Sincronizando operaciones...</p>
+    const renderCalendar = () => (
+        <div className="animate-fadeIn bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 h-[700px] flex flex-col">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Agenda y Arribos Estimados (ETA)</h2>
+            <div className="flex-1 min-h-0">
+                 <Calendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
+                    culture="es"
+                    views={['month', 'week', 'day', 'agenda']}
+                    view={calView}
+                    onView={setCalView}
+                    date={calDate}
+                    onNavigate={setCalDate}
+                    eventPropGetter={eventStyleGetter}
+                    onSelectEvent={(e) => {
+                        if (e.type !== 'holiday') navigate(`/operations/${e.id}`);
+                    }}
+                    messages={{
+                        next: "Sig",
+                        previous: "Ant",
+                        today: "Hoy",
+                        month: "Mes",
+                        week: "Semana",
+                        day: "Día",
+                        agenda: "Agenda",
+                    }}
+                 />
+            </div>
+        </div>
+    );
+
+    const renderOperationsList = () => (
+        <div className="animate-fadeIn">
+            <div className="flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
+                <h2 className="text-2xl font-bold text-gray-800 hidden sm:block">Listado de Operaciones</h2>
+                
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="bi bi-search text-gray-400"></i>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Buscar cliente, buque..."
+                            className="pl-9 block w-full py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
-                )}
+                    
+                    <select
+                        className="py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                    >
+                        <option value="">Todos los Tipos</option>
+                        <option value="productos">■ Productos</option>
+                        <option value="quimicos">■ Químicos</option>
+                        <option value="servicios">■ Servicios</option>
+                    </select>
 
-                {error && (
-                    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
-                        <p className="text-red-700 font-medium">{error}</p>
+                    <select
+                        className="py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="">Todos los Estados</option>
+                        <option value="solicitada">Solicitadas</option>
+                        <option value="presupuestada">Presupuestadas</option>
+                        <option value="en_produccion">En Producción</option>
+                        <option value="lista_para_envio">Listas Envío</option>
+                        <option value="remitada">Remitadas</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+                {filteredOps?.length === 0 ? (
+                    <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300">
+                        <p className="text-gray-500">No hay operaciones que coincidan con los filtros.</p>
                     </div>
-                )}
-
-                {!loading && !error && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {filteredOps?.length === 0 ? (
-                            <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300">
-                                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                                <h3 className="mt-2 text-sm font-medium text-gray-900">No hay operaciones</h3>
-                                <p className="mt-1 text-sm text-gray-500">Comience creando una nueva operación.</p>
-                            </div>
-                        ) : (
-                            filteredOps?.map((op) => (
-                                <div
-                                    key={op.id}
-                                    className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition-all flex flex-col group relative"
-                                >
-                                    <div className={`absolute top-0 left-0 w-1 h-full ${op.status === 'cancelled' ? 'bg-gray-300' : 'bg-indigo-500'}`}></div>
-
-                                    <div className="p-5 pl-6 flex-1 flex flex-col">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs font-bold text-gray-400">#OP-{String(op.id).padStart(4, '0')}</span>
-                                                    {getStatusBadge(op.status)}
-                                                </div>
-                                                <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-1">{op.ship_name || op.ship || 'Buque Desconocido'}</h3>
-                                                <p className="text-sm font-medium text-gray-600">{op.client_name || op.client || 'Cliente N/D'}</p>
-                                            </div>
+                ) : (
+                    filteredOps?.map((op) => (
+                        <div key={op.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all flex flex-col group relative">
+                            <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
+                            <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            {getTypeIcon(op.tipo_operacion)}
+                                            <span className="text-[10px] font-bold text-gray-400">#OP-{String(op.id).padStart(4, '0')}</span>
+                                            {getStatusBadge(op.status || op.estado)}
+                                            {op.aprobacion_requerida_owner && (
+                                                <span className="ml-1 bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded animate-pulse"><i className="bi bi-exclamation-triangle-fill mr-1"></i>ACCIÓN REQ</span>
+                                            )}
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-gray-600 mt-2 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                            <div>
-                                                <p className="text-xs text-gray-400 font-medium mb-0.5">Puerto</p>
-                                                <p className="font-semibold text-gray-800 line-clamp-1">{op.port_name || op.port || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-gray-400 font-medium mb-0.5">Método</p>
-                                                <p className="font-semibold text-gray-800 capitalize">{op.delivery_method || 'Muelle'}</p>
-                                            </div>
-                                            <div className="col-span-2 flex items-center gap-2 text-gray-500 text-xs">
-                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                                ETA: <span className="font-medium text-gray-700">{op.eta ? new Date(op.eta).toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Sin fecha'}</span>
-                                            </div>
-
-                                            {/* PANEL DE SEMÁFOROS DOCUMENTALES */}
-                                            <div className="col-span-2 mt-1 pt-3 border-t border-slate-200/60">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Estado Documental</p>
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    {renderDocSemaphore('Packing List', op.packing_list_file, op.status)}
-                                                    {renderDocSemaphore('Remito', op.remito_file, op.status)}
-                                                    {renderDocSemaphore('Rancho', op.rancho_file, op.status)}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs text-gray-400 font-medium">Valor Total</span>
-                                                <span className="text-sm font-bold text-gray-900">${calculateTotal(op.products).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                            </div>
-
-                                            <div className="flex gap-2 items-center">
-                                                {/* ELIMINADO: Botón "Autorizar" que no existe en backend */}
-
-                                                {op.status !== 'closed' && op.status !== 'cancelled' && (
-                                                    <button onClick={(e) => cancelOperation(op.id, e)} className="px-3 py-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 text-xs font-semibold rounded-lg transition-colors">
-                                                        Anular
-                                                    </button>
-                                                )}
-
-                                                {op.status === 'cancelled' && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (window.confirm('¿ELIMINAR DEFINITIVAMENTE esta operación? No se puede deshacer.')) {
-                                                                axios.delete(`/operaciones/operations/${op.id}/`)
-                                                                    .then(() => fetchOperations())
-                                                                    .catch(err => alert("Error al eliminar"));
-                                                            }
-                                                        }}
-                                                        className="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center gap-1"
-                                                    >
-                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                                        Eliminar
-                                                    </button>
-                                                )}
-
-                                                <button onClick={() => navigate(`/operations/${op.id}`)} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer">
-                                                    Detalles
-                                                </button>
-                                            </div>
-                                        </div>
-
+                                        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 truncate">{op.ship_name || 'Buque Desconocido'}</h3>
                                     </div>
                                 </div>
-                            ))
+                                
+                                <div className="text-xs sm:text-sm text-gray-600 mb-3 bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100 flex-1">
+                                    <p className="truncate"><strong>Cliente:</strong> {op.client_name}</p>
+                                    <p className="truncate"><strong>Puerto:</strong> {op.port_name}</p>
+                                    <p className="truncate text-indigo-700 font-medium"><strong>ETA:</strong> {op.eta ? format(new Date(op.eta), 'dd/MM/yy HH:mm') : 'N/A'}</p>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                    {renderDocSemaphore('PKG', op.packing_list_file, op.status || op.estado)}
+                                    {renderDocSemaphore('RMT', op.remito_file, op.status || op.estado)}
+                                    {renderDocSemaphore('RCH', op.rancho_file, op.status || op.estado)}
+                                </div>
+
+                                <div className="mt-auto pt-3 flex justify-between items-center border-t border-gray-100">
+                                    <div className="font-black text-slate-800 text-sm truncate max-w-[50%]">
+                                        $<span className="text-lg">{calculateTotal(op.products).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {op.estado !== 'entregada' && op.estado !== 'cancelada' && (
+                                            <button onClick={(e) => cancelOperation(op.id, e)} className="text-xs font-semibold text-gray-400 hover:text-red-600 px-2">Anular</button>
+                                        )}
+                                        <button onClick={() => navigate(`/operations/${op.id}`)} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold rounded-lg transition-colors">Ver</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+
+    const renderInbox = () => (
+        <InboxView />
+    );
+
+    return (
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
+            {/* Sidebar Desktop */}
+            <aside className={`relative bg-slate-900 text-white flex-col hidden md:flex h-screen sticky top-0 shadow-xl z-20 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20 items-center'}`}>
+                {/* Toggle Button */}
+                <button
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className="absolute -right-3 top-8 bg-indigo-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:bg-indigo-500 transition-colors z-30"
+                    title={isSidebarOpen ? 'Colapsar menú' : 'Expandir menú'}
+                >
+                    <i className={`bi ${isSidebarOpen ? 'bi-chevron-left' : 'bi-chevron-right'} text-[10px]`}></i>
+                </button>
+
+                <div className={`p-6 flex items-center border-b border-slate-800 ${isSidebarOpen ? 'gap-3' : 'justify-center'}`}>
+                    <div className="w-10 h-10 bg-indigo-500 rounded-xl flex shrink-0 items-center justify-center font-black text-xl shadow-lg">P</div>
+                    {isSidebarOpen && (
+                        <div className="animate-fadeIn">
+                            <h1 className="font-black text-xl tracking-tight leading-none text-white whitespace-nowrap">ProIOS</h1>
+                            <span className="text-[10px] uppercase text-indigo-300 font-bold tracking-widest block">Management</span>
+                        </div>
+                    )}
+                </div>
+                
+                <div className={`py-6 flex-1 space-y-1 ${isSidebarOpen ? 'px-4' : 'px-2 flex flex-col items-center'}`}>
+                    {isSidebarOpen && <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Principal</p>}
+                    
+                    <button title={!isSidebarOpen ? "Resumen KPIs" : ""} onClick={() => setActiveTab('overview')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-pie-chart-fill text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Resumen KPIs</span>}
+                    </button>
+                    <button title={!isSidebarOpen ? "Agenda ETAs" : ""} onClick={() => setActiveTab('calendar')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-calendar-event text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Agenda ETAs</span>}
+                    </button>
+                    <button title={!isSidebarOpen ? "Operaciones" : ""} onClick={() => setActiveTab('operations')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-list-check text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Operaciones</span>}
+                    </button>
+                    <button title={!isSidebarOpen ? "Bandeja de Entrada" : ""} onClick={() => setActiveTab('inbox')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <div className="flex items-center gap-3">
+                            <i className="bi bi-envelope-open text-lg shrink-0"></i>
+                            {isSidebarOpen && <span>Correo Central</span>}
+                        </div>
+                        {isSidebarOpen ? (
+                            <span className="bg-slate-700 text-slate-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Próx</span>
+                        ) : (
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-400 border-2 border-slate-900 rounded-full"></span>
+                        )}
+                    </button>
+
+                    {isSidebarOpen ? (
+                         <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-2">Sistema</p>
+                    ) : (
+                         <div className="w-full border-t border-slate-800 my-4"></div>
+                    )}
+
+                    <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => navigate('/inventory')} className={`flex items-center rounded-xl font-medium text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'}`}>
+                        <i className="bi bi-box-seam text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Inventario & Recetas</span>}
+                    </button>
+                </div>
+                
+                <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
+                    <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
+                        <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
+                            {user?.username?.[0]?.toUpperCase()}
+                        </div>
+                        {isSidebarOpen && (
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-white truncate">{user?.username}</p>
+                                <p className="text-xs text-slate-400 capitalize truncate">{user?.role?.toLowerCase()}</p>
+                            </div>
                         )}
                     </div>
-                )}
-            </main>
+                    <button title={!isSidebarOpen ? "Salir" : ""} onClick={logout} className={`flex justify-center items-center gap-2 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl text-sm font-semibold transition-colors ${isSidebarOpen ? 'w-full' : 'w-10 h-10'}`}>
+                        <i className="bi bi-box-arrow-right text-lg"></i>
+                        {isSidebarOpen && <span>Salir</span>}
+                    </button>
+                </div>
+            </aside>
 
-            {/* FAB Mobile */}
-            <div className="sm:hidden fixed bottom-6 right-6 z-40">
-                <button
-                    onClick={() => setShowOperationForm(true)}
-                    className="w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-xl hover:bg-indigo-700 active:scale-95 transition-all focus:outline-none focus:ring-4 focus:ring-indigo-300"
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+            {/* Navbar Mobile */}
+            <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
+                    <h1 className="font-black text-lg">ProIOS</h1>
+                </div>
+                <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded-lg text-white shadow-sm font-bold text-sm flex items-center gap-1">
+                    <i className="bi bi-plus-lg"></i>
+                    Añadir
                 </button>
             </div>
 
-            {/* Modal de Creación */}
-            {showOperationForm && (
-                <OperationForm
-                    onClose={() => setShowOperationForm(false)}
+            {/* Mobile Bottom Tabs */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 flex justify-around p-2 pb-safe">
+                <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center p-2 ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-pie-chart-fill text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Resumen</span>
+                </button>
+                <button onClick={() => setActiveTab('calendar')} className={`flex flex-col items-center p-2 ${activeTab === 'calendar' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-calendar-event text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Agenda</span>
+                </button>
+                <button onClick={() => setActiveTab('operations')} className={`flex flex-col items-center p-2 ${activeTab === 'operations' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-list-check text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Operaciones</span>
+                </button>
+                <button onClick={() => setActiveTab('inbox')} className={`flex flex-col items-center p-2 ${activeTab === 'inbox' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi relative bi-envelope-open text-xl">
+                        {activeTab !== 'inbox' && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></span>}
+                    </i>
+                    <span className="text-[10px] mt-1 font-semibold">Correo</span>
+                </button>
+            </div>
+
+            {/* Main Content Area */}
+            <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative pb-16 md:pb-0">
+                
+                {/* Header Solo Desktop */}
+                <header className="hidden md:flex bg-white px-8 py-4 items-center justify-between border-b border-gray-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 capitalize">
+                            {activeTab === 'overview' && 'Panorama Gerencial'}
+                            {activeTab === 'calendar' && 'Planificación & Agenda'}
+                            {activeTab === 'operations' && 'Gestión Operativa'}
+                            {activeTab === 'inbox' && 'Comunicaciones'}
+                        </h2>
+                        <p className="text-sm text-gray-500">Bienvenido de vuelta, mira lo que pasa en la compañía.</p>
+                    </div>
+                    <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                        <i className="bi bi-plus-lg text-lg"></i>
+                        Nueva Operación
+                    </button>
+                </header>
+
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
+                    {loading && (
+                        <div className="flex flex-col items-center justify-center py-20 space-y-4 h-full">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                            <p className="text-gray-500 font-medium tracking-wider animate-pulse">Sincronizando información...</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
+                            <p className="text-red-700 font-medium">{error}</p>
+                        </div>
+                    )}
+
+                    {!loading && !error && (
+                        <>
+                            {activeTab === 'overview' && renderOverview()}
+                            {activeTab === 'calendar' && renderCalendar()}
+                            {activeTab === 'operations' && renderOperationsList()}
+                            {activeTab === 'inbox' && renderInbox()}
+                        </>
+                    )}
+                </div>
+            </main>
+
+            {/* Modal de Creación / Selector */}
+            {operationModalState.isOpen && operationModalState.type === 'selector' && (
+                <OperationTypeSelector
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSelect={(type) => setOperationModalState({ isOpen: true, type, id: null })}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'productos' && (
+                <OperationFormProductos
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'quimicos' && (
+                <OperationFormQuimicos
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'servicios' && (
+                <OperationFormServicios
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
                     onSuccess={handleFormSuccess}
                 />
             )}
 
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}} />
+            <style dangerouslySetInnerHTML={{__html: `
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+                .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; border: 2px solid #f8fafc; }
+                .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+                /* Big Calendar Overrides */
+                .rbc-calendar { font-family: inherit; }
+                .rbc-toolbar button { border-radius: 8px; font-weight: 600; color: #4b5563; }
+                .rbc-toolbar button.rbc-active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+                .rbc-event { opacity: 0.9 !important; border-radius: 6px !important; }
+                .rbc-today { background-color: #f8fafc !important; }
+            `}} />
         </div>
     );
 }

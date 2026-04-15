@@ -45,7 +45,7 @@ export default function OperarioActionPanel({ products }) {
                   disabled={completed[idx]}
                   className={`mt-4 sm:mt-0 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all transform active:scale-95 ${completed[idx] ? 'bg-green-500 text-white cursor-default' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}
                 >
-                  {completed[idx] ? '✓ Listo' : 'Confirmar'}
+                  {completed[idx] ? <><i className="bi bi-check-lg mr-1"></i> Listo</> : 'Confirmar'}
                 </button>
               </div>
             </div>

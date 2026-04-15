@@ -36,9 +36,16 @@ export default function InventoryManagement() {
   const [selectedProducts, setSelectedProducts] = useState({}); // objeto { id: true/false }
   const [deletingMultiple, setDeletingMultiple] = useState(false);
   
-  // Carga Excel
   const [uploadingExcel, setUploadingExcel] = useState(false);
   const [excelFeedback, setExcelFeedback] = useState(null);
+
+  // NUEVO: Estado para Toast (alertas modernas)
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (message, type = 'info') => {
+    setToastMessage({ message, type });
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   // Obtener categorías únicas
   const categoriasUnicas = ['todos', ...new Set(products.map(p => p.categoria || 'otros'))];
@@ -175,9 +182,10 @@ export default function InventoryManagement() {
       setShowDeleteModal(false);
       setProductToDelete(null);
       fetchProducts();
+      showToast('Producto eliminado exitosamente', 'success');
     } catch (err) {
       console.error(err);
-      alert('Error al eliminar el producto. Es posible que tenga movimientos asociados.');
+      showToast('Error al eliminar el producto. Es posible que tenga movimientos asociados.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -213,7 +221,7 @@ export default function InventoryManagement() {
   const handleMultiDelete = async () => {
     const idsToDelete = Object.keys(selectedProducts).filter(id => selectedProducts[id]);
     if (idsToDelete.length === 0) {
-      alert('No has seleccionado ningún producto.');
+      showToast('No has seleccionado ningún producto.', 'error');
       return;
     }
     if (!window.confirm(`¿Eliminar permanentemente ${idsToDelete.length} producto(s)? Esta acción no se puede deshacer.`)) return;
@@ -233,7 +241,7 @@ export default function InventoryManagement() {
       else errorCount++;
     });
     
-    alert(`Eliminación completada: ${successCount} eliminados, ${errorCount} fallaron.`);
+    showToast(`Eliminación completada: ${successCount} eliminados, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
     setShowMultiDeleteModal(false);
     setSelectedProducts({});
     fetchProducts();
@@ -246,7 +254,7 @@ export default function InventoryManagement() {
     const file = event.target.files[0];
     if (!file) return;
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      alert('Por favor seleccione un archivo .xlsx o .xls');
+      showToast('Por favor seleccione un archivo .xlsx o .xls', 'error');
       return;
     }
     setUploadingExcel(true);
@@ -259,7 +267,7 @@ export default function InventoryManagement() {
       });
       setExcelFeedback({
         type: 'success',
-        message: `✅ Procesado: ${res.data.creados} creados, ${res.data.actualizados} actualizados.`,
+        message: `Procesado: ${res.data.creados} creados, ${res.data.actualizados} actualizados.`,
         errors: res.data.errores
       });
       fetchProducts();
@@ -287,6 +295,17 @@ export default function InventoryManagement() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {toastMessage && (
+        <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border border-opacity-50 flex items-center gap-3 animate-fadeIn ${
+          toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 
+          toastMessage.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' :
+          'bg-blue-50 text-blue-800 border-blue-200'
+        }`}>
+          <i className={`bi ${toastMessage.type === 'error' ? 'bi-x-circle-fill text-red-500' : toastMessage.type === 'success' ? 'bi-check-circle-fill text-green-500' : 'bi-info-circle-fill text-blue-500'} text-lg`}></i>
+          <span className="font-bold text-sm tracking-tight">{toastMessage.message}</span>
+        </div>
+      )}
+
       <nav className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -312,18 +331,18 @@ export default function InventoryManagement() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Productos en Stock</h2>
             <div className="flex gap-2 w-full sm:w-auto">
-              <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
-                {uploadingExcel ? 'Subiendo...' : '📂 Cargar desde Excel'}
+              <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                {uploadingExcel ? 'Subiendo...' : <><i className="bi bi-file-earmark-spreadsheet mr-1 text-green-600"></i> Cargar desde Excel</>}
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} disabled={uploadingExcel} />
               </label>
               {/* Botón de eliminación múltiple */}
               <button
                 onClick={openMultiDeleteModal}
-                className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md shadow-sm text-red-700 bg-white hover:bg-red-50"
+                className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-xl shadow-sm text-red-700 bg-white hover:bg-red-50"
               >
-                🗑️ Eliminar múltiples
+                <i className="bi bi-trash mr-1"></i> Eliminar múltiples
               </button>
-              <button onClick={openCreateModal} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+              <button onClick={openCreateModal} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
                 + Nuevo Producto
               </button>
             </div>
@@ -369,7 +388,7 @@ export default function InventoryManagement() {
               >
                 {categoriasUnicas.map(cat => (
                   <option key={cat} value={cat}>
-                    {cat === 'todos' ? '📋 Todas las categorías' : cat === 'quimicos' ? '🧪 Químicos' : cat === 'otros' ? '📦 Otros' : cat}
+                    {cat === 'todos' ? 'Todas las categorías' : cat === 'quimicos' ? 'Químicos' : cat === 'otros' ? 'Otros' : cat}
                   </option>
                 ))}
               </select>
@@ -403,10 +422,11 @@ export default function InventoryManagement() {
                         <h3 className="text-lg font-bold text-gray-900 truncate" title={product.nombre}>
                           {product.nombre}
                         </h3>
-                        <span className={`inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
                           product.categoria === 'quimicos' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
                         }`}>
-                          {product.categoria === 'quimicos' ? '🧪 Químico' : product.categoria || 'Otros'}
+                          <i className={`bi ${product.categoria === 'quimicos' ? 'bi-flask-fill' : 'bi-box-seam-fill'} mr-1`}></i>
+                          {product.categoria === 'quimicos' ? 'Químico' : product.categoria || 'Otros'}
                         </span>
                       </div>
                       <div className="flex gap-1">
@@ -454,16 +474,15 @@ export default function InventoryManagement() {
 
       {/* Modal de Creación/Edición (sin cambios) */}
       {showProductModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowProductModal(false)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <form onSubmit={handleProductSubmit}>
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[95vh] flex flex-col overflow-hidden my-auto">
+              <form onSubmit={handleProductSubmit} className="flex flex-col h-full overflow-hidden">
+                <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 shrink-0">
+                  <h3 className="text-lg leading-6 font-bold text-gray-900">
                     {editingProduct ? 'Editar producto' : 'Crear nuevo producto'}
                   </h3>
+                </div>
+                <div className="p-4 sm:p-6 overflow-y-auto w-full">
                   {validationError && (
                     <div className="mb-4 p-2 bg-red-100 text-red-700 text-sm rounded whitespace-pre-wrap">
                       {validationError}
@@ -534,37 +553,33 @@ export default function InventoryManagement() {
                     </div>
                   </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div className="bg-slate-50 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                    className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 transition-colors"
                   >
                     {submitting ? (editingProduct ? 'Actualizando...' : 'Creando...') : (editingProduct ? 'Actualizar' : 'Crear')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowProductModal(false)}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                   >
                     Cancelar
                   </button>
                 </div>
               </form>
-            </div>
           </div>
         </div>
       )}
 
       {/* Modal de eliminación individual */}
       {showDeleteModal && productToDelete && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowDeleteModal(false)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[95vh] flex flex-col overflow-hidden my-auto">
+            <div className="px-4 py-5 sm:p-6 overflow-y-auto w-full">
+              <div className="sm:flex sm:items-start">
                   <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
                     <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -581,37 +596,33 @@ export default function InventoryManagement() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-slate-50 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
                 <button
                   type="button"
                   onClick={handleDelete}
                   disabled={submitting}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                  className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-bold text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 transition-colors"
                 >
                   {submitting ? 'Eliminando...' : 'Eliminar'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                 >
                   Cancelar
                 </button>
               </div>
-            </div>
           </div>
         </div>
       )}
 
       {/* NUEVO MODAL: ELIMINACIÓN MÚLTIPLE */}
       {showMultiDeleteModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowMultiDeleteModal(false)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+            <div className="px-4 py-5 sm:p-6 overflow-y-auto w-full">
+              <div className="sm:flex sm:items-start">
                   <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
                     <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -668,24 +679,23 @@ export default function InventoryManagement() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-slate-50 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
                 <button
                   type="button"
                   onClick={handleMultiDelete}
                   disabled={deletingMultiple || selectedCount === 0}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                  className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-bold text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 transition-colors"
                 >
                   {deletingMultiple ? 'Eliminando...' : `Eliminar (${selectedCount})`}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowMultiDeleteModal(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                 >
                   Cancelar
                 </button>
               </div>
-            </div>
           </div>
         </div>
       )}

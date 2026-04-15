@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/usuarios/', include('apps.usuarios.api.urls')),
     path('api/inventario/', include('apps.inventario.api.urls')),
     path('api/operaciones/', include('apps.operaciones.api.urls')),
+    path('api/correos/', include('apps.correos.urls')),
     
     # Aquí agregarás en el futuro:
     # path('api/produccion/', include('apps.produccion.api.urls')),

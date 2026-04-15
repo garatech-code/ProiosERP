@@ -17,6 +17,15 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
 
+from celery.schedules import crontab
+
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     print(f'Request: {self.request!r}')
+
+app.conf.beat_schedule = {
+    'sync-outlook-inbox-every-5-minutes': {
+        'task': 'apps.correos.tasks.sync_outlook_inbox',
+        'schedule': crontab(minute='*/5'),
+    },
+}

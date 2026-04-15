@@ -17,8 +17,8 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
     // Asegurar que enviamos el ID numérico, no el nombre
     let productValue = item?.id ? Number(item.id) : '';
     onUpdate(index, 'product', productValue);
-    onUpdate(index, 'weight_kg', item?.weight_kg || null);
-    onUpdate(index, 'presentation', item?.presentation || '');
+    onUpdate(index, 'weight_kg', item?.peso_kg || item?.weight_kg || null);
+    onUpdate(index, 'presentation', item?.presentacion || item?.presentation || '');
     onUpdate(index, 'stock_actual', item?.stock_actual || 0);
   };
 
@@ -33,13 +33,15 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       <div className="sm:col-span-4">
         <AutocompleteCreate
           label="Producto *"
-          endpoint="/inventario/products/"
+          endpoint="/inventario/products/?categoria=otros"
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
-            { name: 'presentation', label: 'Presentación', required: true },
-            { name: 'weight_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
+            { name: 'presentacion', label: 'Presentación', required: true },
+            { name: 'peso_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
           ]}
+          extraCreateData={{ categoria: 'otros' }}
+          nameField="nombre"
           placeholder="Buscar o crear..."
         />
       </div>
@@ -106,7 +108,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 /* =========================
    MAIN COMPONENT
 ========================= */
-export default function OperationForm({ id, onClose, onSuccess }) {
+export default function OperationFormProductos({ id, onClose, onSuccess }) {
   const { user: currentUser } = useAuth();
 
   const [availableUsers, setAvailableUsers] = useState([]);
@@ -126,12 +128,13 @@ export default function OperationForm({ id, onClose, onSuccess }) {
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
-  const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState({
     client: '',
     ship: '',
     port: '',
     agency: '',
     eta: '',
+    tipo_operacion: 'productos',
     delivery_method: 'muelle',
     notes: '',
     products: [],
@@ -176,6 +179,7 @@ export default function OperationForm({ id, onClose, onSuccess }) {
             port: op.port || '',
             agency: op.agency || '',
             eta: formatToDatetimeLocal(op.eta),
+            tipo_operacion: op.tipo_operacion || 'productos',
             delivery_method: op.delivery_method || 'muelle',
             notes: op.notes || '',
             products: productsWithStock,
@@ -405,10 +409,10 @@ export default function OperationForm({ id, onClose, onSuccess }) {
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-full flex flex-col overflow-hidden my-auto">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
 
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50 shrink-0">
           <h2 className="text-xl font-bold text-gray-800">
             {id ? `Editar Operación #${id}` : 'Nueva Operación'}
           </h2>
@@ -506,6 +510,20 @@ export default function OperationForm({ id, onClose, onSuccess }) {
                     required
                     className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Tipo de Operación *</label>
+                  <select
+                    name="tipo_operacion"
+                    value={formData.tipo_operacion}
+                    onChange={handleChange}
+                    required
+                    className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="productos">Insumos y Repuestos</option>
+                    <option value="quimicos">Productos Químicos</option>
+                    <option value="servicios">Servicios y Certificados</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Método de Entrega</label>

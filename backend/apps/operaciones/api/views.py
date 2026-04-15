@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from django.db import transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.operaciones.models import Operacion, Client, Ship, Port, Agency
 from apps.usuarios.models import User
@@ -50,6 +51,42 @@ class OperacionViewSet(viewsets.ModelViewSet):
             Q(operarios_asignados=user) |
             Q(contables_asignados=user)
         ).distinct()
+
+    @action(detail=False, methods=['get'])
+    def dashboard_metrics(self, request):
+        user = request.user
+        if user.role not in [User.Role.OWNER, User.Role.CONTABLE]:
+            return Response({'error': 'No autorizado'}, status=403)
+            
+        today = timezone.now().date()
+        qs = Operacion.objects.all()
+        
+        # Básicos
+        total = qs.count()
+        en_proceso = qs.exclude(estado__in=[
+            Operacion.ESTADO_ENTREGADA,
+            Operacion.ESTADO_CANCELADA
+        ]).count()
+        finalizadas = qs.filter(estado=Operacion.ESTADO_ENTREGADA).count()
+        usuarios_activos = User.objects.filter(is_active=True).count()
+        
+        return Response({
+            'total': total,
+            'en_proceso': en_proceso,
+            'finalizadas': finalizadas,
+            'usuarios_activos': usuarios_activos
+        })
+
+    @action(detail=False, methods=['get'])
+    def holidays_ar(self, request):
+        try:
+            import holidays
+            year = timezone.now().year
+            ar_holidays = holidays.AR(years=[year, year+1])
+            data = [{"date": str(date), "name": name} for date, name in ar_holidays.items()]
+            return Response(data)
+        except ImportError:
+            return Response({'error': 'Librería holidays no instalada'}, status=500)
 
     @action(detail=True, methods=['post'])
     def cancel_operation(self, request, pk=None):

@@ -10,6 +10,7 @@ export default function AutocompleteCreate({
   createFields = [],
   extraCreateData = {},
   placeholder = 'Buscar o seleccionar...',
+  nameField = 'name',
 }) {
   const [options, setOptions] = useState([]);
   const [filteredOptions, setFilteredOptions] = useState([]);
@@ -35,7 +36,7 @@ export default function AutocompleteCreate({
       const match = options.find((opt) => String(opt.id) === String(value));
       if (match) {
         setSelectedItem(match);
-        setSearchTerm(match.name || match.contact_person || match.flag || match.country || match.imo || match.presentation || `Ref: ${match.id}`);
+        setSearchTerm(match[nameField] || match.nombre || match.name || match.contact_person || match.flag || match.country || match.imo || match.presentation || `Ref: ${match.id}`);
       }
     } else if (!value) {
       setSelectedItem(null);
@@ -65,7 +66,7 @@ export default function AutocompleteCreate({
     
     // Filtrar opciones (buscando por varios campos posibles para ser flexible)
     const filtered = options.filter(opt => {
-      const displayVal = (opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || String(opt.id)).toLowerCase();
+      const displayVal = (opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || String(opt.id)).toLowerCase();
       return displayVal.includes(text.toLowerCase());
     });
     setFilteredOptions(filtered);
@@ -77,7 +78,7 @@ export default function AutocompleteCreate({
     } else {
       // Si hay match exacto, lo marcamos
       const exactMatch = options.find(opt => {
-        const displayVal = (opt.name || opt.contact_person || opt.country || opt.imo || String(opt.id)).toLowerCase();
+        const displayVal = (opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.country || opt.imo || String(opt.id)).toLowerCase();
         return displayVal === text.toLowerCase();
       });
       if (exactMatch) {
@@ -86,21 +87,21 @@ export default function AutocompleteCreate({
       } else {
         setSelectedItem(null);
         // Si no, emitimos el string instantáneamente
-        onSelect({ id: text, name: text });
+        onSelect({ id: text, [nameField]: text });
       }
     }
   };
 
   const handleOptionClick = (opt) => {
     setSelectedItem(opt);
-    setSearchTerm(opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || String(opt.id));
+    setSearchTerm(opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || String(opt.id));
     setIsOpen(false);
     onSelect(opt);
   };
 
   const handleOpenCreate = () => {
     setIsOpen(false);
-    setCreateData({ name: searchTerm, ...extraCreateData }); // Sugerir el valor ingresado como 'name'
+    setCreateData({ [nameField]: searchTerm, ...extraCreateData });
     setIsCreating(true);
   };
 
@@ -133,7 +134,7 @@ export default function AutocompleteCreate({
         setIsOpen(false);
         // Si no se seleccionó nada válido y había escrito algo suelto, no tocamos onSelect porque ya se emitió on change
         if (selectedItem) {
-            setSearchTerm(selectedItem.name || selectedItem.contact_person || selectedItem.flag || selectedItem.country || selectedItem.imo || selectedItem.presentation || String(selectedItem.id));
+            setSearchTerm(selectedItem[nameField] || selectedItem.nombre || selectedItem.name || selectedItem.contact_person || selectedItem.flag || selectedItem.country || selectedItem.imo || selectedItem.presentation || String(selectedItem.id));
         }
       }
     }
@@ -170,7 +171,7 @@ export default function AutocompleteCreate({
               onClick={() => handleOptionClick(opt)}
             >
               <span className="block truncate">
-                {opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || `Ref: ${opt.id}`}
+                {opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || `Ref: ${opt.id}`}
               </span>
             </div>
           ))}
@@ -202,14 +203,14 @@ export default function AutocompleteCreate({
                     </h3>
                     <div className="mt-4 space-y-4">
                       {/* Campo default Name/Texto principal, sólo si la lista de campos no lo incluye explícitamente */}
-                      {!createFields.some(f => f.name === 'name') && (
+                      {!createFields.some(f => f.name === nameField) && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Nombre / Identificador</label>
                           <input
                             type="text"
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                            value={createData.name || ''}
-                            onChange={(e) => setCreateData({ ...createData, name: e.target.value })}
+                            value={createData[nameField] || ''}
+                            onChange={(e) => setCreateData({ ...createData, [nameField]: e.target.value })}
                             required
                           />
                         </div>

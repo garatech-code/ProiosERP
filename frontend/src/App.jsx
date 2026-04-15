@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import DashboardRouter from './components/DashboardRouter';
-import OperationForm from './components/OperationForm';
+import OperationFormProductos from './components/OperationFormProductos';
 import OperationDetail from './components/OperationDetail';
 import InventoryManagement from './components/InventoryManagement';
 
@@ -21,8 +21,8 @@ const AppRoutes = () => {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
-      <Route path="/operations/new" element={<ProtectedRoute><OperationForm /></ProtectedRoute>} />
-      <Route path="/operations/:id/edit" element={<ProtectedRoute><OperationForm /></ProtectedRoute>} />
+      <Route path="/operations/new" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
+      <Route path="/operations/:id/edit" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id" element={<ProtectedRoute><OperationDetail /></ProtectedRoute>} />
       <Route path="/inventory" element={<InventoryManagement />} />
     </Routes>

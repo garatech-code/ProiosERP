@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.inventario",
     "apps.produccion",
     "apps.documentos",
+    "apps.correos",
 ]
 
 MIDDLEWARE = [

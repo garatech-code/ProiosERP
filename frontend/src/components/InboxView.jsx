@@ -1,0 +1,224 @@
+import { useState, useEffect } from 'react';
+import axios from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import ComposeEmailModal from './ComposeEmailModal';
+
+export default function InboxView() {
+  const { user } = useAuth();
+  const [emails, setEmails] = useState([]);
+  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('inbound'); // inbound, outbound, unread
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+
+  const fetchEmails = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('/correos/inbox/');
+      setEmails(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmails();
+    // Pooling cada silencioso 60 segundos por si entran nuevos
+    const interval = setInterval(() => {
+      axios.get('/correos/inbox/').then((res) => setEmails(res.data)).catch(console.error);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSelectEmail = async (email) => {
+    setSelectedEmail(email);
+    if (!email.is_read && email.direction === 'inbound') {
+      try {
+        await axios.post(`/correos/inbox/${email.id}/mark_as_read/`);
+        setEmails((prev) => prev.map((e) => (e.id === email.id ? { ...e, is_read: true } : e)));
+      } catch (err) {
+        console.error("Error marking as read", err);
+      }
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    setSyncMessage('');
+    try {
+      await axios.post('/correos/inbox/sync_now/');
+      await fetchEmails();
+      setSyncMessage('Actualizado');
+    } catch (err) {
+      console.error("Error syncing", err);
+      setSyncMessage('Hubo un error');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncMessage(''), 3000);
+    }
+  };
+
+  const handleReply = () => {
+    if (!selectedEmail) return;
+    setReplyTo(selectedEmail);
+    setIsComposeOpen(true);
+  };
+
+  const handleCompose = () => {
+    setReplyTo(null);
+    setIsComposeOpen(true);
+  };
+
+  const filteredEmails = emails.filter((e) => {
+    if (filter === 'unread') return !e.is_read && e.direction === 'inbound';
+    return e.direction === filter;
+  });
+
+  return (
+    <div className="h-[calc(100vh-180px)] md:h-[calc(100vh-140px)] flex bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      
+      {/* Left Sidebar - Email List */}
+      <div className={`w-full md:w-1/3 flex-col border-r border-gray-200 bg-gray-50 ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
+        <div className="p-4 border-b border-gray-200 bg-white flex justify-between items-center">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setFilter('inbound')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'inbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              Recibidos
+            </button>
+            <button 
+              onClick={() => setFilter('outbound')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'outbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              Enviados
+            </button>
+            <button 
+              onClick={handleSyncNow} 
+              disabled={isSyncing}
+              className="px-2 py-1 text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1"
+              title="Sincronizar ahora"
+            >
+              <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} style={isSyncing ? { animationDirection: 'reverse' } : {}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              {syncMessage && <span className="text-[10px] font-bold text-indigo-600 animate-fadeIn">{syncMessage}</span>}
+            </button>
+          </div>
+          <button onClick={handleCompose} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-2 transition-colors" title="Redactar">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          {loading && emails.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+              Cargando...
+            </div>
+          ) : filteredEmails.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 text-sm">
+              No hay correos en esta bandeja.
+            </div>
+          ) : (
+            filteredEmails.map(email => (
+              <div 
+                key={email.id} 
+                onClick={() => handleSelectEmail(email)}
+                className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${selectedEmail?.id === email.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'hover:bg-gray-100 border-l-4 border-transparent'} ${!email.is_read && email.direction === 'inbound' ? 'font-bold' : ''}`}
+              >
+                <div className="flex justify-between items-baseline mb-1">
+                  <span className="text-sm truncate pr-2 text-gray-900">
+                    {email.direction === 'inbound' ? (email.sender_name || email.sender_address) : email.recipient_address}
+                  </span>
+                  <span className="text-xs text-gray-500 shrink-0">
+                    {new Date(email.date_received).toLocaleDateString([], { month: 'short', day: 'numeric'})}
+                  </span>
+                </div>
+                <h4 className="text-sm text-gray-800 truncate">{email.subject || '(Sin Asunto)'}</h4>
+                <p className="text-xs text-gray-500 truncate mt-1">{email.body_text?.substring(0, 50) || 'Contenido HTML...'}</p>
+                {email.operacion && (
+                  <span className="inline-block mt-2 px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-bold rounded">
+                    OP-{email.operacion}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Right Content - Email Reader */}
+      <div className={`w-full md:w-2/3 flex-col bg-white ${!selectedEmail ? 'hidden md:flex' : 'flex'}`}>
+        {selectedEmail ? (
+          <>
+            <div className="p-4 md:p-6 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-4">
+                <button onClick={() => setSelectedEmail(null)} className="md:hidden p-2 -ml-2 text-gray-500 hover:text-indigo-600 rounded-lg transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <h2 className="text-lg md:text-xl font-bold text-gray-900 truncate flex-1">{selectedEmail.subject || '(Sin Asunto)'}</h2>
+                <button onClick={handleReply} className="px-3 md:px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0">
+                  <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                  Responder
+                </button>
+              </div>
+              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{selectedEmail.sender_name || selectedEmail.sender_address}</p>
+                  <p className="text-xs text-gray-500">Para: {selectedEmail.recipient_address}</p>
+                </div>
+                <div className="text-xs text-gray-400 font-medium">
+                  {new Date(selectedEmail.date_received).toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 prose prose-sm max-w-none text-gray-800">
+              {selectedEmail.body_html ? (
+                <div dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }} />
+              ) : (
+                <div className="whitespace-pre-wrap font-sans">{selectedEmail.body_text}</div>
+              )}
+            </div>
+            {selectedEmail.adjuntos?.length > 0 && (
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-2 overflow-x-auto">
+                <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                  Adjuntos:
+                </span>
+                {selectedEmail.adjuntos.map(adj => (
+                  <span key={adj.id} className="px-2 py-1 bg-white border border-gray-200 rounded text-xs text-indigo-600 font-medium whitespace-nowrap">
+                    {adj.filename}
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+            <svg className="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            <p className="font-medium text-lg text-gray-500">Bandeja de Entrada</p>
+            <p className="text-sm">Selecciona un correo para leerlo o redacta uno nuevo.</p>
+          </div>
+        )}
+      </div>
+
+      {isComposeOpen && (
+        <ComposeEmailModal 
+          onClose={() => setIsComposeOpen(false)} 
+          onSuccess={() => {
+            setIsComposeOpen(false);
+            fetchEmails();
+          }}
+          replyTo={replyTo}
+          user={user}
+        />
+      )}
+    </div>
+  );
+}

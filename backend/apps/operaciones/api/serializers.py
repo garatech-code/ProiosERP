@@ -78,7 +78,7 @@ class OperacionSerializer(serializers.ModelSerializer):
     can_coordinate = serializers.SerializerMethodField()
     can_deliver = serializers.SerializerMethodField()
 
-    detalles = OperacionDetalleSerializer(many=True, read_only=True, source='detalles')
+    detalles = OperacionDetalleSerializer(many=True, read_only=True)
 
     operadores_id = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(),
@@ -104,7 +104,8 @@ class OperacionSerializer(serializers.ModelSerializer):
             'packing_list_file', 'remito_file', 'rancho_file',
             'operadores_id', 'operarios_id', 'contables_id',
             'can_confirm', 'can_coordinate', 'can_deliver',
-            'stock_consumido'
+            'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
+            'detalle_servicio', 'forma_cotizacion_servicio'
         ]
         extra_kwargs = {
             'cliente': {'required': False},

@@ -84,6 +84,29 @@ class Operacion(models.Model):
     delivery_date = models.DateTimeField(null=True, blank=True)
     closed_date = models.DateTimeField(null=True, blank=True)
 
+    TIPO_PRODUCTOS = 'productos'
+    TIPO_QUIMICOS = 'quimicos'
+    TIPO_SERVICIOS = 'servicios'
+    TIPO_CHOICES = (
+        (TIPO_PRODUCTOS, 'Productos'),
+        (TIPO_QUIMICOS, 'Químicos'),
+        (TIPO_SERVICIOS, 'Servicios'),
+    )
+    tipo_operacion = models.CharField(max_length=20, choices=TIPO_CHOICES, default=TIPO_PRODUCTOS)
+    aprobacion_requerida_owner = models.BooleanField(default=False)
+
+    # CAMPOS ESPECÍFICOS DE SERVICIOS
+    TIPO_COTIZACION_HORA_HOMBRE = 'hora_hombre'
+    TIPO_COTIZACION_DIAS = 'dias'
+    TIPO_COTIZACION_LUMPSUM = 'lumpsum'
+    COTIZACION_CHOICES = (
+        (TIPO_COTIZACION_HORA_HOMBRE, 'Hora Hombre'),
+        (TIPO_COTIZACION_DIAS, 'Días'),
+        (TIPO_COTIZACION_LUMPSUM, 'Lumpsum (Suma Global)'),
+    )
+    detalle_servicio = models.TextField(blank=True, null=True, help_text="Descripción detallada para operaciones de tipo Servicio.")
+    forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
+
     # ARCHIVOS
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)

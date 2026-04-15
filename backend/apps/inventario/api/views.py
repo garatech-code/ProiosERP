@@ -11,8 +11,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Articulo.objects.all()
     serializer_class = ArticuloSerializer
+
+    def get_queryset(self):
+        queryset = Articulo.objects.all()
+        categoria = self.request.query_params.get('categoria')
+        if categoria:
+            queryset = queryset.filter(categoria=categoria)
+        return queryset
 
     @action(detail=False, methods=['post'])
     def movimiento(self, request):
