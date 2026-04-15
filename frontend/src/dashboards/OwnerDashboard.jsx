@@ -7,6 +7,7 @@ import OperationFormProductos from '../components/OperationFormProductos';
 import OperationFormQuimicos from '../components/OperationFormQuimicos';
 import OperationFormServicios from '../components/OperationFormServicios';
 import InboxView from '../components/InboxView';
+import InventoryManagement from '../components/InventoryManagement';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -429,7 +430,7 @@ export default function OwnerDashboard() {
                          <div className="w-full border-t border-slate-800 my-4"></div>
                     )}
 
-                    <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => navigate('/inventory')} className={`flex items-center rounded-xl font-medium text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'}`}>
+                    <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => setActiveTab('inventory')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-box-seam text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Inventario & Recetas</span>}
                     </button>
@@ -499,13 +500,18 @@ export default function OwnerDashboard() {
                             {activeTab === 'calendar' && 'Planificación & Agenda'}
                             {activeTab === 'operations' && 'Gestión Operativa'}
                             {activeTab === 'inbox' && 'Comunicaciones'}
+                            {activeTab === 'inventory' && 'Inventario y Fórmulas'}
                         </h2>
-                        <p className="text-sm text-gray-500">Bienvenido de vuelta, mira lo que pasa en la compañía.</p>
+                        <p className="text-sm text-gray-500">
+                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                        </p>
                     </div>
-                    <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
-                        <i className="bi bi-plus-lg text-lg"></i>
-                        Nueva Operación
-                    </button>
+                    {activeTab !== 'inventory' && (
+                        <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                            <i className="bi bi-plus-lg text-lg"></i>
+                            Nueva Operación
+                        </button>
+                    )}
                 </header>
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
@@ -528,6 +534,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'calendar' && renderCalendar()}
                             {activeTab === 'operations' && renderOperationsList()}
                             {activeTab === 'inbox' && renderInbox()}
+                            {activeTab === 'inventory' && <InventoryManagement />}
                         </>
                     )}
                 </div>

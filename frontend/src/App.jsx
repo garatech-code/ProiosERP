@@ -4,7 +4,6 @@ import Login from './components/Login';
 import DashboardRouter from './components/DashboardRouter';
 import OperationFormProductos from './components/OperationFormProductos';
 import OperationDetail from './components/OperationDetail';
-import InventoryManagement from './components/InventoryManagement';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -24,7 +23,6 @@ const AppRoutes = () => {
       <Route path="/operations/new" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id/edit" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id" element={<ProtectedRoute><OperationDetail /></ProtectedRoute>} />
-      <Route path="/inventory" element={<InventoryManagement />} />
     </Routes>
   );
 };

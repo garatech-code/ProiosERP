@@ -23,6 +23,6 @@ urlpatterns = [
     path('api/correos/', include('apps.correos.urls')),
     
     # Aquí agregarás en el futuro:
-    # path('api/produccion/', include('apps.produccion.api.urls')),
+    path('api/produccion/', include('apps.produccion.api.urls')),
     # path('api/documentos/', include('apps.documentos.api.urls')),
 ]
