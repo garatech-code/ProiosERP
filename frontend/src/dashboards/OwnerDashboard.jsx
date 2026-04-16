@@ -8,6 +8,7 @@ import OperationFormQuimicos from '../components/OperationFormQuimicos';
 import OperationFormServicios from '../components/OperationFormServicios';
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
+import DebugFeedback from '../components/DebugFeedback'; // <-- IMPORT DEL NUEVO COMPONENTE
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -19,14 +20,14 @@ import es from 'date-fns/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const locales = {
-  'es': es,
+    'es': es,
 }
 const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
-  getDay,
-  locales,
+    format,
+    parse,
+    startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+    getDay,
+    locales,
 });
 
 export default function OwnerDashboard() {
@@ -49,6 +50,9 @@ export default function OwnerDashboard() {
     const [calDate, setCalDate] = useState(new Date());
 
     const [operationModalState, setOperationModalState] = useState({ isOpen: false, type: null, id: null });
+
+    // NUEVO: Estado para controlar el modal de Debug/Sugerencias
+    const [showDebugForm, setShowDebugForm] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -83,7 +87,7 @@ export default function OwnerDashboard() {
             setOperations(opsRes.data);
             setMetrics(metricsRes.data);
             if (Array.isArray(holRes.data)) {
-                 setHolidays(holRes.data);
+                setHolidays(holRes.data);
             }
             setError(null);
         } catch (err) {
@@ -184,7 +188,7 @@ export default function OwnerDashboard() {
             resource: op,
             type: 'eta'
         }));
-        
+
         const holEvts = holidays.map((h, i) => ({
             id: `hol-${i}`,
             title: `[FERIADO] ${h.name}`,
@@ -193,7 +197,7 @@ export default function OwnerDashboard() {
             allDay: true,
             type: 'holiday'
         }));
-        
+
         return [...evts, ...holEvts];
     }, [operations, holidays]);
 
@@ -241,7 +245,7 @@ export default function OwnerDashboard() {
         <div className="animate-fadeIn bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 h-[700px] flex flex-col">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Agenda y Arribos Estimados (ETA)</h2>
             <div className="flex-1 min-h-0">
-                 <Calendar
+                <Calendar
                     localizer={localizer}
                     events={calendarEvents}
                     startAccessor="start"
@@ -265,7 +269,7 @@ export default function OwnerDashboard() {
                         day: "Día",
                         agenda: "Agenda",
                     }}
-                 />
+                />
             </div>
         </div>
     );
@@ -274,7 +278,7 @@ export default function OwnerDashboard() {
         <div className="animate-fadeIn">
             <div className="flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 hidden sm:block">Listado de Operaciones</h2>
-                
+
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-64">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -288,7 +292,7 @@ export default function OwnerDashboard() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    
+
                     <select
                         className="py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                         value={typeFilter}
@@ -338,7 +342,7 @@ export default function OwnerDashboard() {
                                         <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 truncate">{op.ship_name || 'Buque Desconocido'}</h3>
                                     </div>
                                 </div>
-                                
+
                                 <div className="text-xs sm:text-sm text-gray-600 mb-3 bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100 flex-1">
                                     <p className="truncate"><strong>Cliente:</strong> {op.client_name}</p>
                                     <p className="truncate"><strong>Puerto:</strong> {op.port_name}</p>
@@ -396,10 +400,10 @@ export default function OwnerDashboard() {
                         </div>
                     )}
                 </div>
-                
+
                 <div className={`py-6 flex-1 space-y-1 ${isSidebarOpen ? 'px-4' : 'px-2 flex flex-col items-center'}`}>
                     {isSidebarOpen && <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Principal</p>}
-                    
+
                     <button title={!isSidebarOpen ? "Resumen KPIs" : ""} onClick={() => setActiveTab('overview')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-pie-chart-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Resumen KPIs</span>}
@@ -425,9 +429,9 @@ export default function OwnerDashboard() {
                     </button>
 
                     {isSidebarOpen ? (
-                         <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-2">Sistema</p>
+                        <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-2">Sistema</p>
                     ) : (
-                         <div className="w-full border-t border-slate-800 my-4"></div>
+                        <div className="w-full border-t border-slate-800 my-4"></div>
                     )}
 
                     <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => setActiveTab('inventory')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
@@ -435,8 +439,18 @@ export default function OwnerDashboard() {
                         {isSidebarOpen && <span>Inventario & Recetas</span>}
                     </button>
                 </div>
-                
+
                 <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
+                    {/* BOTÓN DEBUG EN SIDEBAR DESKTOP */}
+                    <button
+                        title={!isSidebarOpen ? "Reportar Error" : ""}
+                        onClick={() => setShowDebugForm(true)}
+                        className={`mb-3 flex justify-center items-center gap-2 py-2 bg-indigo-900/50 text-indigo-300 hover:bg-indigo-600 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-bold transition-colors ${isSidebarOpen ? 'w-full' : 'w-10 h-10'}`}
+                    >
+                        <i className="bi bi-bug-fill text-base"></i>
+                        {isSidebarOpen && <span>Testing & Debug</span>}
+                    </button>
+
                     <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
                         <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
                             {user?.username?.[0]?.toUpperCase()}
@@ -461,10 +475,21 @@ export default function OwnerDashboard() {
                     <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
                     <h1 className="font-black text-lg">ProIOS</h1>
                 </div>
-                <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded-lg text-white shadow-sm font-bold text-sm flex items-center gap-1">
-                    <i className="bi bi-plus-lg"></i>
-                    Añadir
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* BOTÓN DEBUG EN MOBILE */}
+                    <button
+                        onClick={() => setShowDebugForm(true)}
+                        className="bg-indigo-900/80 text-indigo-300 hover:bg-indigo-600 hover:text-white p-2 rounded-lg font-bold text-sm transition-colors border border-indigo-500/50"
+                        title="Reportar Error"
+                    >
+                        <i className="bi bi-bug-fill"></i>
+                    </button>
+
+                    <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded-lg text-white shadow-sm font-bold text-sm flex items-center gap-1">
+                        <i className="bi bi-plus-lg"></i>
+                        Añadir
+                    </button>
+                </div>
             </div>
 
             {/* Mobile Bottom Tabs */}
@@ -491,7 +516,7 @@ export default function OwnerDashboard() {
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative pb-16 md:pb-0">
-                
+
                 {/* Header Solo Desktop */}
                 <header className="hidden md:flex bg-white px-8 py-4 items-center justify-between border-b border-gray-200">
                     <div>
@@ -569,7 +594,13 @@ export default function OwnerDashboard() {
                 />
             )}
 
-            <style dangerouslySetInnerHTML={{__html: `
+            {/* MODAL DE DEBUG & SUGERENCIAS */}
+            {showDebugForm && (
+                <DebugFeedback onClose={() => setShowDebugForm(false)} />
+            )}
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
                 .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
                 .custom-scrollbar::-webkit-scrollbar { width: 8px; }
