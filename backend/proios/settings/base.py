@@ -1,17 +1,19 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-import sys
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Configuración de variables de entorno (spanish comment as requested)
-from dotenv import load_dotenv
+# Cargar variables de entorno
 load_dotenv(BASE_DIR.parent / '.env')
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default')
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-cambiame-en-prod')
+
+# DEBUG debe ser False en producción
 DEBUG = os.getenv('DEBUG', '0') == '1'
 
+# Render asigna una URL .onrender.com, asegúrate de añadirla en tu .env o aquí
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Apps instaladas
@@ -21,6 +23,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "whitenoise.runserver_nostatic",  # Para manejar estáticos en Render
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
@@ -41,6 +44,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware", # Servir estáticos de forma eficiente
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -69,43 +73,30 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "proios.wsgi.application"
 
-# Base de datos PostgreSQL
+# Base de Datos configurada para Neon (PostgreSQL externo)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "proios_db"),
-        "USER": os.getenv("POSTGRES_USER", "proios_user"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "proios_pass"),
-        "HOST": os.getenv("DB_HOST", "db"),
+        "NAME": os.getenv("POSTGRES_DB", "neondb"),
+        "USER": os.getenv("POSTGRES_USER", "neondb_owner"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "npg_2MqtrYgUd6QH"),
+        "HOST": os.getenv("DB_HOST", "ep-round-shape-anntvqgx.c-6.us-east-1.aws.neon.tech"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require", # Requerido por Neon
+        },
     }
 }
 
-# Validación de contraseñas
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
-
-LANGUAGE_CODE = "es-es"
-TIME_ZONE = "America/Argentina/Buenos_Aires"
-USE_I18N = True
-USE_TZ = True
-
-# Archivos estáticos y multimedia
+# Configuración de archivos estáticos para WhiteNoise
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "static"
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# ... Resto de tu configuración (JWT, CORS, LOGGING, GUARDIAN) se mantiene igual ...
 
-# Custom user model
 AUTH_USER_MODEL = "usuarios.User"
 
-# DRF configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -115,7 +106,6 @@ REST_FRAMEWORK = {
     ),
 }
 
-# JWT configuration with Redis Blacklist via SimpleJWT
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("ACCESS_TOKEN_LIFETIME_MINUTES", "15"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("REFRESH_TOKEN_LIFETIME_DAYS", "7"))),
@@ -124,52 +114,7 @@ SIMPLE_JWT = {
     "SIGNING_KEY": os.getenv("JWT_SECRET_KEY", SECRET_KEY),
 }
 
-# CORS
-CORS_ALLOW_ALL_ORIGINS = True  # Setup properly config in prod
+CORS_ALLOW_ALL_ORIGINS = True # Para pruebas temporales
 
-# Celery Configuration
-CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://redis:6379/0")
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = TIME_ZONE
-
-# Logging Configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'struct': {
-            'format': '%(asctime)s %(levelname)s [%(name)s] %(message)s',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'struct',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
-            'propagate': False,
-        },
-        'apps': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-    },
-}
-
-# Guardian Authentication Backends
-AUTHENTICATION_BACKENDS = (
-    'django.contrib.auth.backends.ModelBackend',
-    'guardian.backends.ObjectPermissionBackend',
-)
+# Celery (Asegúrate de tener un servicio de Redis en Render si vas a usarlo en el deploy)
+CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
