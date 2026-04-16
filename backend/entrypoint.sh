@@ -5,7 +5,7 @@ set -e
 
 # Wait for postgres to be ready
 echo "Waiting for postgres..."
-while ! nc -z $DB_HOST 5432; do
+while ! nc -z $DB_HOST $DB_PORT; do
   sleep 0.1
 done
 echo "PostgreSQL started"
@@ -14,7 +14,7 @@ echo "PostgreSQL started"
 echo "Applying database migrations..."
 python manage.py migrate
 
-# CREACIÓN AUTOMÁTICA DEL SUPERUSUARIO (Idempotente)
+# Check/Create Superuser
 echo "Checking/Creating Superuser..."
 python manage.py shell -c "
 import os
@@ -26,7 +26,6 @@ admin_email = os.getenv('DJANGO_SUPERUSER_EMAIL', 'admin@proios.com')
 admin_password = os.getenv('DJANGO_SUPERUSER_PASSWORD', 'admin123')
 
 if not User.objects.filter(username=admin_username).exists():
-    # Usamos create_superuser para que aplique los hash de contraseña correctos
     User.objects.create_superuser(
         username=admin_username,
         email=admin_email,
@@ -42,5 +41,14 @@ else:
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Run commands passed to the script (e.g., gunicorn)
+# ==========================================
+# INICIO DEL HACK 2x1 PARA RENDER FREE TIER
+# ==========================================
+
+# Arrancamos el trabajador de Celery en segundo plano (el símbolo & al final es clave)
+echo "Iniciando Celery Worker en segundo plano..."
+celery -A proios worker --loglevel=info &
+
+# Finalmente, arrancamos Gunicorn en el primer plano
+echo "Iniciando servidor web Gunicorn..."
 exec "$@"
