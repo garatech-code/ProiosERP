@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // baseURL for API: en Docker Compose mapeamos todo bajo /api/ a Django
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api' || 'https://proioserp.onrender.com/api',
 });
 
 // Request interceptor: attach token
