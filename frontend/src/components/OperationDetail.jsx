@@ -207,8 +207,8 @@ export default function OperationDetail() {
       <div className="py-8">
         {toastMessage && (
           <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' :
-              toastMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                'bg-blue-50 text-blue-800 border-blue-200'
+            toastMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+              'bg-blue-50 text-blue-800 border-blue-200'
             }`}>
             <i className={`bi text-lg ${toastMessage.type === 'error' ? 'bi-x-circle-fill text-red-500' : toastMessage.type === 'success' ? 'bi-check-circle-fill text-emerald-500' : 'bi-info-circle-fill text-blue-500'}`}></i>
             <span className="font-bold text-sm tracking-tight">{toastMessage.message}</span>
@@ -462,8 +462,8 @@ export default function OperationDetail() {
                       onClick={() => handleAction('confirm_operation', '¿Aprobar y Confirmar la operación? Esto consumirá el stock del inventario.')}
                       disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
                       className={`px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all ${(stockVerification && !stockVerification.todo_suficiente)
-                          ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                          : 'bg-emerald-500 text-white hover:bg-emerald-400 hover:shadow-emerald-500/30'
+                        ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                        : 'bg-emerald-500 text-white hover:bg-emerald-400 hover:shadow-emerald-500/30'
                         }`}
                     >
                       {actionLoading ? 'Procesando...' : <><i className="bi bi-check-circle-fill mr-1"></i> Aprobar & Producir</>}
@@ -485,7 +485,7 @@ export default function OperationDetail() {
             </div>
 
             {/* COLUMNA DERECHA (Tracker) */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 sticky top-24 self-start">
               <OperationTracker currentState={operation.status || operation.estado} />
             </div>
 
