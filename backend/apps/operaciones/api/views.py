@@ -5,6 +5,12 @@ from django.db import transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
+import io
+import logging
 
 from apps.operaciones.models import Operacion, Client, Ship, Port, Agency
 from apps.usuarios.models import User
@@ -14,6 +20,8 @@ from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
     PortSerializer, AgencySerializer, OperacionDetalleSerializer
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ClientViewSet(viewsets.ModelViewSet):
@@ -57,11 +65,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         user = request.user
         if user.role not in [User.Role.OWNER, User.Role.CONTABLE]:
             return Response({'error': 'No autorizado'}, status=403)
-            
-        today = timezone.now().date()
+
         qs = Operacion.objects.all()
-        
-        # Básicos
+
         total = qs.count()
         en_proceso = qs.exclude(estado__in=[
             Operacion.ESTADO_ENTREGADA,
@@ -69,7 +75,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         ]).count()
         finalizadas = qs.filter(estado=Operacion.ESTADO_ENTREGADA).count()
         usuarios_activos = User.objects.filter(is_active=True).count()
-        
+
         return Response({
             'total': total,
             'en_proceso': en_proceso,
@@ -137,7 +143,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
             'message': 'Operación confirmada y stock consumido correctamente'
         })
 
-    # ========== NUEVAS ACCIONES PARA TRANSICIONES FALTANTES ==========
     @action(detail=True, methods=['post'])
     def start_coordination(self, request, pk=None):
         op = self.get_object()
@@ -168,7 +173,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
         except ValidationError as e:
             return Response({'error': str(e)}, status=400)
 
-    # ========== ACCIONES PARA SUBIR ARCHIVOS ==========
     @action(detail=True, methods=['post'], url_path='upload_packing')
     def upload_packing(self, request, pk=None):
         op = self.get_object()
@@ -196,7 +200,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
         op.save()
         return Response({'status': 'ok'})
 
-    # ========== ENDPOINT PARA PACKING LIST JSON ==========
     @action(detail=True, methods=['get'], url_path='packing_list_json')
     def packing_list_json(self, request, pk=None):
         op = self.get_object()
@@ -311,3 +314,138 @@ class OperacionViewSet(viewsets.ModelViewSet):
             "port_id": port_id,
             "port_name": port_name,
         })
+
+    @action(detail=True, methods=['get'], url_path='packing_list_excel')
+    def packing_list_excel(self, request, pk=None):
+        """
+        Genera un archivo Excel con el formato de Packing List solicitado.
+        """
+        try:
+            op = self.get_object()
+            from apps.inventario.models import Articulo
+
+            productos = []
+            total_price = 0.0
+            total_weight_neto = 0.0
+            total_weight_bruto = 0.0
+            total_qty = 0
+
+            for detalle in op.detalles.all():
+                try:
+                    articulo = Articulo.objects.get(id=detalle.articulo_id)
+                    cantidad = detalle.cantidad
+                    precio = float(detalle.precio_unitario) if detalle.precio_unitario else 0.0
+                    subtotal = cantidad * precio
+                    total_price += subtotal
+                    total_qty += cantidad
+                    peso_neto = float(articulo.peso_kg) if articulo.peso_kg is not None else 0.0
+                    # Peso bruto = peso neto + 10% de embalaje (ajustable)
+                    peso_bruto = peso_neto * 1.1
+                    total_weight_neto += cantidad * peso_neto
+                    total_weight_bruto += cantidad * peso_bruto
+                    productos.append({
+                        'descripcion': articulo.nombre,
+                        'qty': cantidad,
+                        'peso_neto': peso_neto,
+                        'peso_bruto': peso_bruto,
+                        'un_vta': articulo.presentacion or 'Kg',
+                        'fob_unitario': precio,
+                        'fob_total': subtotal,
+                    })
+                except Articulo.DoesNotExist:
+                    logger.warning(f"Artículo {detalle.articulo_id} no existe en operación {op.id}")
+                    continue
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "PACKING LIST"
+
+            # Estilos
+            header_font = Font(bold=True, name='Arial')
+            center_align = Alignment(horizontal='center', vertical='center')
+            thin_border = Border(
+                left=Side(style='thin'), right=Side(style='thin'),
+                top=Side(style='thin'), bottom=Side(style='thin')
+            )
+            green_fill = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+            orange_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+            gray_header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+
+            # Encabezado
+            encabezados = [
+                ("PROVEEDOR:", ""),
+                ("CUIT:", ""),
+                ("PAÍS DE DESTINO DE LA FACTURA:", ""),
+                ("BANDERA:", ""),
+                ("EMPRESA A FACTURAR:", op.cliente.name if op.cliente else ""),
+                ("BUQUE:", op.ship.name if op.ship else "")
+            ]
+            row = 1
+            for label, value in encabezados:
+                ws.cell(row=row, column=1, value=label).font = header_font
+                ws.cell(row=row, column=2, value=value)
+                row += 1
+
+            # Fila "ITEMS" verde
+            row += 1
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+            items_cell = ws.cell(row=row, column=1, value="ITEMS")
+            items_cell.font = Font(bold=True, size=12)
+            items_cell.alignment = center_align
+            items_cell.fill = green_fill
+
+            # Encabezados de tabla
+            headers = ["DESCRIPCION", "QTY", "PESO NETO", "PESO BRUTO", "UN. VTA", "FOB UNITARIO", "FOB TOTAL"]
+            row += 1
+            for col, header in enumerate(headers, start=1):
+                cell = ws.cell(row=row, column=col, value=header)
+                cell.font = header_font
+                cell.alignment = center_align
+                cell.fill = gray_header_fill
+
+            # Datos
+            for prod in productos:
+                row += 1
+                ws.cell(row=row, column=1, value=prod['descripcion'])
+                ws.cell(row=row, column=2, value=prod['qty'])
+                ws.cell(row=row, column=3, value=round(prod['peso_neto'], 2))
+                ws.cell(row=row, column=4, value=round(prod['peso_bruto'], 2))
+                ws.cell(row=row, column=5, value=prod['un_vta'])
+                ws.cell(row=row, column=6, value=round(prod['fob_unitario'], 2))
+                ws.cell(row=row, column=7, value=round(prod['fob_total'], 2))
+
+            # Fila de totales naranja
+            row += 1
+            ws.cell(row=row, column=1, value="TOTALES").font = Font(bold=True)
+            ws.cell(row=row, column=2, value=total_qty)
+            ws.cell(row=row, column=3, value=round(total_weight_neto, 2))
+            ws.cell(row=row, column=4, value=round(total_weight_bruto, 2))
+            ws.cell(row=row, column=5, value="")
+            ws.cell(row=row, column=6, value=f"USD {round(total_price, 2)}")
+            ws.cell(row=row, column=7, value=f"USD {round(total_price, 2)}")
+
+            for col in range(1, 8):
+                ws.cell(row=row, column=col).fill = orange_fill
+                ws.cell(row=row, column=col).alignment = center_align
+
+            # Bordes
+            for r in range(1, row+1):
+                for c in range(1, 8):
+                    ws.cell(row=r, column=c).border = thin_border
+
+            # Anchos de columna
+            column_widths = [40, 8, 12, 12, 10, 15, 15]
+            for i, width in enumerate(column_widths, start=1):
+                ws.column_dimensions[get_column_letter(i)].width = width
+
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+
+            response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="packing_list_{op.id}.xlsx"'
+            return response
+
+        except Exception as e:
+            logger.exception("Error generando packing list Excel")
+            return Response({"error": str(e)}, status=500)
