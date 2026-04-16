@@ -4,7 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import OperarioActionPanel from './OperarioActionPanel';
-import OperationTracker from './OperationTracker'; // <-- IMPORTANTE: Nuestro nuevo componente
+import OperationTracker from './OperationTracker';
+import * as XLSX from 'xlsx';
 
 export default function OperationDetail() {
   const { id } = useParams();
@@ -18,11 +19,12 @@ export default function OperationDetail() {
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingData, setPackingData] = useState(null);
   const [loadingPacking, setLoadingPacking] = useState(false);
-
   const [stockVerification, setStockVerification] = useState(null);
   const [checkingStock, setCheckingStock] = useState(false);
-
   const [toastMessage, setToastMessage] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [excelPreviewHtml, setExcelPreviewHtml] = useState(null);
+  const [showExcelModal, setShowExcelModal] = useState(false);
 
   const showToast = (message, type = 'info') => {
     setToastMessage({ message, type });
@@ -34,7 +36,6 @@ export default function OperationDetail() {
   }, [id]);
 
   useEffect(() => {
-    // Usamos op.estado o op.status (dependiendo de cómo lo manda tu backend)
     if (operation && (operation.status === 'pending' || operation.estado === 'solicitada')) {
       checkStock();
     }
@@ -92,7 +93,7 @@ export default function OperationDetail() {
 
     setActionLoading(true);
     try {
-      const response = await axios.post(`/operaciones/operations/${id}/${action}/`);
+      await axios.post(`/operaciones/operations/${id}/${action}/`);
       if (action === 'confirm_operation') {
         showToast('Operación confirmada y stock consumido correctamente', 'success');
       }
@@ -123,6 +124,53 @@ export default function OperationDetail() {
       showToast('Error al subir archivo', 'error');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const openPreview = (url) => {
+    if (!url) return;
+    let type = 'pdf';
+    if (url.match(/\.(jpe?g|png|gif|bmp|webp)$/i)) type = 'image';
+    else if (url.match(/\.pdf$/i)) type = 'pdf';
+    else if (url.match(/\.xlsx?$/i)) type = 'excel';
+    else type = 'unknown';
+    setPreviewFile({ url, type });
+  };
+
+  const downloadPackingListExcel = async () => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/packing_list_excel/`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `packing_list_${id}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Descargando Packing List...', 'success');
+    } catch (error) {
+      console.error(error);
+      showToast('Error al descargar el archivo', 'error');
+    }
+  };
+
+  const previewPackingListExcel = async () => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/packing_list_excel/`, {
+        responseType: 'blob',
+      });
+      const data = await response.data.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const html = XLSX.utils.sheet_to_html(firstSheet, { editable: false });
+      setExcelPreviewHtml(html);
+      setShowExcelModal(true);
+    } catch (error) {
+      console.error(error);
+      showToast('Error al previsualizar el archivo', 'error');
     }
   };
 
@@ -217,10 +265,8 @@ export default function OperationDetail() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* LEYOUT DE PANTALLA DIVIDIDA: Grid 3 columnas (2 para detalles, 1 para Tracker) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-            {/* COLUMNA IZQUIERDA (Info Principal) */}
             <div className="lg:col-span-2 space-y-6">
 
               <div className="bg-white shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200">
@@ -285,7 +331,6 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              {/* PRODUCTOS */}
               <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
                 {!isOperario ? (
                   <>
@@ -367,7 +412,6 @@ export default function OperationDetail() {
                 )}
               </div>
 
-              {/* DOCUMENTOS */}
               <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
                 <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
                   <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
@@ -375,20 +419,31 @@ export default function OperationDetail() {
                   </h3>
                 </div>
                 <div className="p-4 sm:p-6 space-y-3">
-                  {/* Fila Documento */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">Packing List</h4>
                       <p className="text-xs text-slate-500 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                       {operation.packing_list_file && (
-                        <a href={operation.packing_list_file} target="_blank" rel="noopener noreferrer" className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                        <button
+                          onClick={() => openPreview(operation.packing_list_file)}
+                          className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                        >
                           <i className="bi bi-eye-fill"></i> Ver Documento
-                        </a>
+                        </button>
                       )}
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={fetchPackingData} disabled={loadingPacking} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
-                        <i className="bi bi-printer"></i> Imprimir
+                      <button
+                        onClick={previewPackingListExcel}
+                        className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <i className="bi bi-eye-fill"></i> Vista Previa
+                      </button>
+                      <button
+                        onClick={downloadPackingListExcel}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <i className="bi bi-file-earmark-spreadsheet"></i> Exportar Excel
                       </button>
                       <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
                         <i className="bi bi-cloud-arrow-up-fill"></i> Subir
@@ -397,15 +452,17 @@ export default function OperationDetail() {
                     </div>
                   </div>
 
-                  {/* Fila Documento */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">Remito Firmado</h4>
                       <p className="text-xs text-slate-500 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
                       {operation.remito_file && (
-                        <a href={operation.remito_file} target="_blank" rel="noopener noreferrer" className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                        <button
+                          onClick={() => openPreview(operation.remito_file)}
+                          className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                        >
                           <i className="bi bi-eye-fill"></i> Ver Documento
-                        </a>
+                        </button>
                       )}
                     </div>
                     <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -414,15 +471,17 @@ export default function OperationDetail() {
                     </label>
                   </div>
 
-                  {/* Fila Documento */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">Rancho / Permiso Aduanero</h4>
                       <p className="text-xs text-slate-500 mt-0.5">Autorización oficial de embarque de provisiones.</p>
                       {operation.rancho_file && (
-                        <a href={operation.rancho_file} target="_blank" rel="noopener noreferrer" className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                        <button
+                          onClick={() => openPreview(operation.rancho_file)}
+                          className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                        >
                           <i className="bi bi-eye-fill"></i> Ver Documento
-                        </a>
+                        </button>
                       )}
                     </div>
                     <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -433,7 +492,6 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              {/* PANEL DE ACCIONES INFERIOR */}
               <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 mt-8 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-white w-full sm:w-auto">
                   <h4 className="font-black text-lg">Controles Operativos</h4>
@@ -456,7 +514,6 @@ export default function OperationDetail() {
                     </button>
                   )}
 
-                  {/* Botones de flujo */}
                   {operation.can_confirm && !isOperario && (
                     <button
                       onClick={() => handleAction('confirm_operation', '¿Aprobar y Confirmar la operación? Esto consumirá el stock del inventario.')}
@@ -481,19 +538,16 @@ export default function OperationDetail() {
                   )}
                 </div>
               </div>
-
             </div>
 
-            {/* COLUMNA DERECHA (Tracker) */}
             <div className="lg:col-span-1 sticky top-24 self-start">
               <OperationTracker currentState={operation.status || operation.estado} />
             </div>
-
           </div>
         </div>
       </div>
 
-      {/* Modal de Packing List (Mantenido intacto) */}
+      {/* Modal de Packing List (vista previa HTML) */}
       {showPackingModal && packingData && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200">
@@ -557,6 +611,116 @@ export default function OperationDetail() {
         </div>
       )}
 
+      {/* Modal para vista previa de Excel */}
+      {showExcelModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i>
+                Vista previa del Packing List (Excel)
+              </h3>
+              <button
+                onClick={() => setShowExcelModal(false)}
+                className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-white p-4">
+              <div dangerouslySetInnerHTML={{ __html: excelPreviewHtml }} className="excel-preview" />
+            </div>
+            <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
+              <button
+                onClick={() => setShowExcelModal(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para vista previa de PDF / Imagen / Otros */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <i className="bi bi-file-earmark-text-fill text-indigo-500"></i>
+                Vista previa del documento
+              </h3>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-100 p-2 flex justify-center items-center">
+              {previewFile.type === 'pdf' && (
+                <iframe
+                  src={previewFile.url}
+                  className="w-full h-full min-h-[80vh] border-0 rounded-lg"
+                  title="Vista previa PDF"
+                />
+              )}
+              {previewFile.type === 'image' && (
+                <img
+                  src={previewFile.url}
+                  alt="Vista previa"
+                  className="max-w-full max-h-[85vh] object-contain shadow-lg rounded-lg"
+                />
+              )}
+              {previewFile.type === 'excel' && (
+                <div className="text-center p-8 bg-white rounded-xl shadow-md">
+                  <i className="bi bi-file-earmark-spreadsheet text-5xl text-emerald-500 mb-3 block"></i>
+                  <p className="text-slate-600">Para ver el contenido del Excel, usa el botón "Vista Previa" específico.</p>
+                  <a
+                    href={previewFile.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-block bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold"
+                  >
+                    Descargar archivo
+                  </a>
+                </div>
+              )}
+              {previewFile.type === 'unknown' && (
+                <div className="text-center p-8 bg-white rounded-xl shadow-md">
+                  <i className="bi bi-file-earmark-excel text-5xl text-amber-500 mb-3 block"></i>
+                  <p className="text-slate-600">No se puede previsualizar este tipo de archivo.</p>
+                  <a
+                    href={previewFile.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold"
+                  >
+                    Descargar archivo
+                  </a>
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
+              <a
+                href={previewFile.url}
+                download
+                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-100 font-medium text-sm"
+              >
+                <i className="bi bi-download me-1"></i> Descargar
+              </a>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{
         __html: `
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -564,7 +728,11 @@ export default function OperationDetail() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
-      `}} />
+        .excel-preview table { border-collapse: collapse; width: 100%; }
+        .excel-preview th, .excel-preview td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .excel-preview th { background-color: #f2f2f2; font-weight: bold; }
+        `,
+      }} />
     </div>
   );
 }

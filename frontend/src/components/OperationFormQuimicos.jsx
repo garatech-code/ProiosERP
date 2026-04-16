@@ -480,7 +480,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
                 />
                 <div>
                   <AutocompleteCreate
-                    key={`ship-${formData.ship}`}
                     label="Buque *"
                     endpoint="/operaciones/ships/"
                     value={formData.ship}
@@ -493,7 +492,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
                   {autoCompleteFlag && <p className="text-xs text-gray-500 mt-1 font-medium">Bandera: {autoCompleteFlag}</p>}
                 </div>
                 <AutocompleteCreate
-                  key={`port-${formData.port}`}
                   label="Puerto *"
                   endpoint="/operaciones/ports/"
                   value={formData.port}
