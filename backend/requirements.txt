@@ -17,3 +17,4 @@ beautifulsoup4==4.12.3
 pandas==2.2.0
 openpyxl==3.1.2
 holidays==0.45
+whitenoise==6.6.0

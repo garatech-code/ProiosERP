@@ -41,3 +41,6 @@ backend/media/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Archivos binarios generados
+backend/celerybeat-schedule
