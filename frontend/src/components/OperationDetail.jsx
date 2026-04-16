@@ -1,8 +1,10 @@
+// src/components/OperationDetail.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import OperarioActionPanel from './OperarioActionPanel';
+import OperationTracker from './OperationTracker'; // <-- IMPORTANTE: Nuestro nuevo componente
 
 export default function OperationDetail() {
   const { id } = useParams();
@@ -16,11 +18,10 @@ export default function OperationDetail() {
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingData, setPackingData] = useState(null);
   const [loadingPacking, setLoadingPacking] = useState(false);
-  
+
   const [stockVerification, setStockVerification] = useState(null);
   const [checkingStock, setCheckingStock] = useState(false);
 
-  // NUEVO: Estado para Toast (alertas modernas)
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'info') => {
@@ -32,9 +33,9 @@ export default function OperationDetail() {
     fetchOperation();
   }, [id]);
 
-  // NUEVO: Verificar stock automáticamente al cargar la operación
   useEffect(() => {
-    if (operation && operation.status === 'pending') {
+    // Usamos op.estado o op.status (dependiendo de cómo lo manda tu backend)
+    if (operation && (operation.status === 'pending' || operation.estado === 'solicitada')) {
       checkStock();
     }
   }, [operation]);
@@ -52,7 +53,6 @@ export default function OperationDetail() {
     }
   };
 
-  // NUEVO: Función para verificar stock
   const checkStock = async () => {
     setCheckingStock(true);
     try {
@@ -79,10 +79,8 @@ export default function OperationDetail() {
     }
   };
 
-  // MODIFICADO: handleAction para confirmar con verificación de stock
   const handleAction = async (action, confirmMessage) => {
     if (action === 'confirm_operation') {
-      // Verificar stock antes de confirmar
       if (!stockVerification?.todo_suficiente) {
         showToast('No se puede confirmar: Hay productos sin stock suficiente.', 'error');
         return;
@@ -91,7 +89,7 @@ export default function OperationDetail() {
     } else {
       if (confirmMessage && !window.confirm(confirmMessage)) return;
     }
-    
+
     setActionLoading(true);
     try {
       const response = await axios.post(`/operaciones/operations/${id}/${action}/`);
@@ -131,24 +129,38 @@ export default function OperationDetail() {
   const statusBadge = (status) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800',
+      solicitada: 'bg-yellow-100 text-yellow-800',
       price_checked: 'bg-blue-100 text-blue-800',
+      presupuestada: 'bg-blue-100 text-blue-800',
       confirmed: 'bg-green-100 text-green-800',
+      lista_para_envio: 'bg-green-100 text-green-800',
       in_coordination: 'bg-purple-100 text-purple-800',
+      en_produccion: 'bg-purple-100 text-purple-800',
       delivered: 'bg-indigo-100 text-indigo-800',
+      remitada: 'bg-indigo-100 text-indigo-800',
       closed: 'bg-gray-100 text-gray-800',
+      entregada: 'bg-gray-100 text-gray-800',
       cancelled: 'bg-red-100 text-red-800',
+      cancelada: 'bg-red-100 text-red-800',
     };
     const labels = {
-      pending: 'Pendiente',
-      price_checked: 'Precio verificado',
-      confirmed: 'Confirmada',
-      in_coordination: 'En coordinación',
-      delivered: 'Entregada',
-      closed: 'Cerrada',
+      pending: 'Solicitada',
+      solicitada: 'Solicitada',
+      price_checked: 'Presupuestada',
+      presupuestada: 'Presupuestada',
+      confirmed: 'Lista para Envío',
+      lista_para_envio: 'Lista para Envío',
+      in_coordination: 'En Producción',
+      en_produccion: 'En Producción',
+      delivered: 'Remitada',
+      remitada: 'Remitada',
+      closed: 'Entregada',
+      entregada: 'Entregada',
       cancelled: 'Cancelada',
+      cancelada: 'Cancelada',
     };
     return (
-      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${colors[status]}`}>
+      <span className={`px-3 py-1.5 inline-flex text-xs leading-5 font-black uppercase tracking-wider rounded-lg ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
         {labels[status] || status}
       </span>
     );
@@ -168,432 +180,391 @@ export default function OperationDetail() {
   const isOwner = user?.role === 'OWNER';
 
   if (loading) return <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
-  if (error) return <div className="text-center text-red-600 mt-10">{error}</div>;
+  if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
   if (!operation) return <div className="text-center mt-10">No se encontró la operación</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
+    <div className="min-h-screen bg-slate-50">
+      <nav className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">ProIOS - Operación #{operation.id}</h1>
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate('/')} className="text-slate-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50">
+                <i className="bi bi-arrow-left text-xl"></i>
+              </button>
+              <h1 className="text-xl font-black text-slate-800 tracking-tight">OP-{String(operation.id).padStart(4, '0')}</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Hola, {user?.username}</span>
-              <button onClick={logout} className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700">
-                Cerrar sesión
+              <span className="text-sm font-semibold text-slate-600 hidden sm:block">Hola, {user?.username}</span>
+              <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" title="Cerrar sesión">
+                <i className="bi bi-box-arrow-right text-lg"></i>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="py-10">
+      <div className="py-8">
         {toastMessage && (
-          <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border border-opacity-50 flex items-center gap-3 animate-fadeIn ${
-            toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 
-            toastMessage.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' :
-            'bg-blue-50 text-blue-800 border-blue-200'
-          }`}>
-            <i className={`bi ${toastMessage.type === 'error' ? 'bi-x-circle-fill text-red-500' : toastMessage.type === 'success' ? 'bi-check-circle-fill text-green-500' : 'bi-info-circle-fill text-blue-500'} text-lg`}></i>
+          <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' :
+              toastMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                'bg-blue-50 text-blue-800 border-blue-200'
+            }`}>
+            <i className={`bi text-lg ${toastMessage.type === 'error' ? 'bi-x-circle-fill text-red-500' : toastMessage.type === 'success' ? 'bi-check-circle-fill text-emerald-500' : 'bi-info-circle-fill text-blue-500'}`}></i>
             <span className="font-bold text-sm tracking-tight">{toastMessage.message}</span>
           </div>
         )}
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-4">
-            <button
-              onClick={() => navigate('/')}
-              className="inline-flex items-center text-sm font-bold text-indigo-600 hover:text-indigo-900 transition-colors"
-            >
-              <i className="bi bi-arrow-left mr-1"></i> Volver al dashboard
-            </button>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Detalles de la operación</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">Información completa y documentos</p>
-              </div>
-              <div className="flex items-center gap-3">
-                {checkingStock && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
-                {statusBadge(operation.status)}
-              </div>
-            </div>
+          {/* LEYOUT DE PANTALLA DIVIDIDA: Grid 3 columnas (2 para detalles, 1 para Tracker) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-            <div className="border-t border-gray-200">
-              <dl className="divide-y divide-gray-200">
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Cliente</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{operation.client_name}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Buque</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{operation.ship_name}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Puerto</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{operation.port_name}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">ETA</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.eta)}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Método de entrega</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {operation.delivery_method === 'muelle' ? 'Muelle' : 'Lancha'}
-                  </dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Agencia</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{operation.agency_name || 'No especificada'}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Notas</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{operation.notes || '-'}</dd>
+            {/* COLUMNA IZQUIERDA (Info Principal) */}
+            <div className="lg:col-span-2 space-y-6">
+
+              <div className="bg-white shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200">
+                <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900">Resumen Operativo</h3>
+                    <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">Información logística y de tiempos</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {checkingStock && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
+                    {statusBadge(operation.status || operation.estado)}
+                  </div>
                 </div>
 
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Pedido recibido</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.order_received_date)}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Confirmación del cliente</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.client_confirmed_date)}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Fecha de entrega</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.delivery_date)}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Fecha de cierre</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(operation.closed_date)}</dd>
-                </div>
-                
-                {isOwner && (
-                  <div className="bg-white px-4 py-4 sm:px-6 border-t border-gray-100 italic">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2 text-center tracking-widest">Personal de Misión Asignado</p>
-                    <div className="flex justify-around text-xs">
-                      <span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100 font-bold">Operadores: {operation.operadores_id?.length || 0}</span>
-                      <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 font-bold">Operarios: {operation.operarios_id?.length || 0}</span>
+                <div>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2">
+                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 bg-slate-50/50">
+                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Cliente</dt>
+                      <dd className="text-sm font-semibold text-slate-900">{operation.client_name}</dd>
                     </div>
-                  </div>
-                )}
-              </dl>
-            </div>
+                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100">
+                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Buque</dt>
+                      <dd className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <i className="bi bi-geo-alt-fill text-indigo-400"></i> {operation.ship_name}
+                      </dd>
+                    </div>
+                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100">
+                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Puerto</dt>
+                      <dd className="text-sm font-semibold text-slate-900">{operation.port_name}</dd>
+                    </div>
+                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 bg-indigo-50/30">
+                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ETA (Arribo)</dt>
+                      <dd className="text-sm font-black text-indigo-700">{formatDate(operation.eta)}</dd>
+                    </div>
+                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 bg-slate-50/50">
+                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Agencia / Entrega</dt>
+                      <dd className="text-sm font-semibold text-slate-900">
+                        {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
+                      </dd>
+                    </div>
+                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100">
+                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Notas</dt>
+                      <dd className="text-sm font-medium text-slate-600 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
+                    </div>
+                  </dl>
 
-            {/* MODIFICADO: Tabla de productos con indicador visual de stock */}
-            <div className="border-t border-gray-200">
-              {!isOperario ? (
-                <div className="px-4 py-5 sm:px-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 tracking-tight">Detalle de Productos</h3>
-                    {operation.status === 'pending' && (
-                      <button
-                        onClick={checkStock}
-                        disabled={checkingStock}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                      >
-                        {checkingStock ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                        )}
-                        Verificar stock
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-4 flex flex-col">
-                    <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                      <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                        <div className="shadow-sm overflow-hidden border border-gray-200 rounded-xl">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead>
-                              <tr className="bg-slate-50 uppercase tracking-wider text-[10px] font-black text-slate-500">
-                                <th className="px-6 py-4 text-left">Producto</th>
-                                <th className="px-6 py-4 text-left">Cantidad</th>
-                                <th className="px-6 py-4 text-left">Stock disponible</th>
-                                <th className="px-6 py-4 text-left">Estado</th>
-                                <th className="px-6 py-4 text-left">Precio unitario</th>
-                                <th className="px-6 py-4 text-left text-indigo-600">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {operation.products?.map((prod, idx) => {
-                                const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
-                                return (
-                                  <tr key={idx} className={`hover:bg-slate-50/50 transition ${!isSuficiente ? 'bg-red-50' : ''}`}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                                      {prod.product_name}
-                                      {!isSuficiente && (
-                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                          Sin stock
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{prod.quantity}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                      <span className={prod.stock_actual < prod.quantity ? 'text-red-600 font-bold' : 'text-gray-600'}>
-                                        {prod.stock_actual?.toFixed(2) || '0'}
-                                      </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      {prod.stock_actual >= prod.quantity ? (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                          <i className="bi bi-check-circle-fill"></i> Disponible
-                                        </span>
-                                      ) : (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                          <i className="bi bi-exclamation-triangle-fill"></i> Sin stock
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${prod.unit_price}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-indigo-600">
-                                      ${(prod.quantity * prod.unit_price).toFixed(2)}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              <tr className="bg-indigo-50/30">
-                                <td colSpan="5" className="px-6 py-6 text-right text-sm font-black text-indigo-900 uppercase tracking-widest">Total general</td>
-                                <td className="px-6 py-6 whitespace-nowrap text-xl font-black text-indigo-700 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                               </tr>
-                            </tbody>
-                          </table>
-                        </div>
+                  {isOwner && (
+                    <div className="bg-slate-800 px-4 py-4 sm:px-6 text-white">
+                      <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
+                        <i className="bi bi-people-fill"></i> Personal de Misión Asignado
+                      </p>
+                      <div className="flex gap-4 text-xs">
+                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                          Operadores (Oficina): {operation.operadores_id?.length || 0}
+                        </span>
+                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                          Operarios (Planta): {operation.operarios_id?.length || 0}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* NUEVO: Resumen de stock si hay problemas */}
-                  {stockVerification && !stockVerification.todo_suficiente && operation.status === 'pending' && (
-                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
+                  )}
+                </div>
+              </div>
+
+              {/* PRODUCTOS */}
+              <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
+                {!isOperario ? (
+                  <>
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+                          <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
+                        </h3>
+                        {(operation.status === 'pending' || operation.estado === 'solicitada') && (
+                          <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white">
+                            {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
+                            Verificar Stock
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-slate-200">
+                        <thead>
+                          <tr className="bg-white uppercase tracking-wider text-[10px] font-black text-slate-400">
+                            <th className="px-6 py-4 text-left">Producto</th>
+                            <th className="px-6 py-4 text-center">Cant.</th>
+                            <th className="px-6 py-4 text-center">Disponibilidad</th>
+                            <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-slate-100">
+                          {operation.products?.map((prod, idx) => {
+                            const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
+                            return (
+                              <tr key={idx} className={`hover:bg-slate-50 transition-colors ${!isSuficiente ? 'bg-red-50/50' : ''}`}>
+                                <td className="px-6 py-4">
+                                  <p className="text-sm font-bold text-slate-800">{prod.product_name}</p>
+                                  <p className="text-xs text-slate-500 font-medium">${prod.unit_price} / unidad</p>
+                                </td>
+                                <td className="px-6 py-4 text-center text-sm text-slate-700 font-black">{prod.quantity}</td>
+                                <td className="px-6 py-4 text-center">
+                                  {prod.stock_actual >= prod.quantity ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
+                                      <i className="bi bi-check-circle-fill"></i> OK ({prod.stock_actual?.toFixed(0)})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase">
+                                      <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
+                                  ${(prod.quantity * prod.unit_price).toFixed(2)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-indigo-50/30">
+                            <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
+                            <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada') && (
+                      <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                        <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
                         <div>
-                          <h4 className="text-sm font-medium text-red-800">Stock insuficiente para confirmar</h4>
-                          <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
+                          <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
+                          <ul className="mt-2 text-xs font-medium text-red-700 space-y-1">
                             {stockVerification.errores?.map((err, idx) => (
-                              <li key={idx}>
-                                {err.nombre || `Artículo ID ${err.articulo_id}`}: 
-                                requiere {err.necesario}, disponible {err.disponible}
-                              </li>
+                              <li key={idx}>• {err.nombre}: Piden {err.necesario}, pero hay {err.disponible}.</li>
                             ))}
                           </ul>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <OperarioActionPanel products={operation.products} />
-              )}
-            </div>
+                    )}
+                  </>
+                ) : (
+                  <OperarioActionPanel products={operation.products} />
+                )}
+              </div>
 
-            {/* Documentos */}
-            <div className="border-t border-gray-200">
-              <div className="px-4 py-5 sm:px-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Documentos</h3>
-                <div className="mt-4 space-y-4">
-                  <div className="flex items-center justify-between">
+              {/* DOCUMENTOS */}
+              <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+                    <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
+                  </h3>
+                </div>
+                <div className="p-4 sm:p-6 space-y-3">
+                  {/* Fila Documento */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Packing List</span>
+                      <h4 className="text-sm font-bold text-slate-800">Packing List</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                       {operation.packing_list_file && (
-                        <a href={operation.packing_list_file} target="_blank" rel="noopener noreferrer" className="ml-2 text-indigo-600 hover:text-indigo-900 text-sm">
-                          Ver archivo
+                        <a href={operation.packing_list_file} target="_blank" rel="noopener noreferrer" className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                          <i className="bi bi-eye-fill"></i> Ver Documento
                         </a>
                       )}
                     </div>
-                    <label className={`cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      Subir nuevo
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading} />
-                    </label>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={fetchPackingData} disabled={loadingPacking} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                        <i className="bi bi-printer"></i> Imprimir
+                      </button>
+                      <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading} />
+                      </label>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
+
+                  {/* Fila Documento */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Remito firmado</span>
+                      <h4 className="text-sm font-bold text-slate-800">Remito Firmado</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
                       {operation.remito_file && (
-                        <a href={operation.remito_file} target="_blank" rel="noopener noreferrer" className="ml-2 text-indigo-600 hover:text-indigo-900 text-sm">
-                          Ver archivo
+                        <a href={operation.remito_file} target="_blank" rel="noopener noreferrer" className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                          <i className="bi bi-eye-fill"></i> Ver Documento
                         </a>
                       )}
                     </div>
-                    <label className={`cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      Subir remito
+                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading} />
                     </label>
                   </div>
-                  <div className="flex items-center justify-between">
+
+                  {/* Fila Documento */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Rancho (Documentación Aduanera)</span>
+                      <h4 className="text-sm font-bold text-slate-800">Rancho / Permiso Aduanero</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">Autorización oficial de embarque de provisiones.</p>
                       {operation.rancho_file && (
-                        <a href={operation.rancho_file} target="_blank" rel="noopener noreferrer" className="ml-2 text-indigo-600 hover:text-indigo-900 text-sm">
-                          Ver archivo
+                        <a href={operation.rancho_file} target="_blank" rel="noopener noreferrer" className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                          <i className="bi bi-eye-fill"></i> Ver Documento
                         </a>
                       )}
                     </div>
-                    <label className={`cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      Subir rancho
+                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading} />
                     </label>
                   </div>
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={fetchPackingData}
-                      disabled={loadingPacking}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                    >
-                      <i className="bi bi-file-earmark-text mr-2 text-indigo-500"></i> Ver / Imprimir Packing List
-                    </button>
-                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Acciones */}
-            <div className="border-t border-gray-200 px-4 py-5 sm:px-6 bg-slate-50">
-              <div className="flex flex-wrap gap-4 justify-between items-center">
-                <div className="flex gap-2">
+              {/* PANEL DE ACCIONES INFERIOR */}
+              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 mt-8 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-white w-full sm:w-auto">
+                  <h4 className="font-black text-lg">Controles Operativos</h4>
+                  <p className="text-xs text-slate-400 font-medium">Avanza la operación a la siguiente fase.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-end">
+                  {isOwner && operation.status !== 'closed' && operation.estado !== 'entregada' && operation.status !== 'cancelled' && operation.estado !== 'cancelada' && (
+                    <button
+                      onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock retenido (si lo hay) no regresará automáticamente en esta versión beta.')}
+                      disabled={actionLoading}
+                      className="px-4 py-2 border-2 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-sm font-bold rounded-xl transition-colors"
+                    >
+                      <i className="bi bi-x-octagon-fill mr-1"></i> Anular
+                    </button>
+                  )}
+                  {isOwner && (
+                    <button onClick={() => navigate(`/operations/${id}/edit`)} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors">
+                      <i className="bi bi-pencil-fill mr-1"></i> Editar Info
+                    </button>
+                  )}
+
+                  {/* Botones de flujo */}
                   {operation.can_confirm && !isOperario && (
                     <button
-                      onClick={() => handleAction('confirm_operation', '¿Confirmar la operación? Esto consumirá el stock automáticamente.')}
+                      onClick={() => handleAction('confirm_operation', '¿Aprobar y Confirmar la operación? Esto consumirá el stock del inventario.')}
                       disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
-                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white 
-                        ${(stockVerification && !stockVerification.todo_suficiente) 
-                          ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-green-600 hover:bg-green-700'}`}
+                      className={`px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all ${(stockVerification && !stockVerification.todo_suficiente)
+                          ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                          : 'bg-emerald-500 text-white hover:bg-emerald-400 hover:shadow-emerald-500/30'
+                        }`}
                     >
-                      {actionLoading ? 'Procesando...' : 'Confirmar operación'}
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-check-circle-fill mr-1"></i> Aprobar & Producir</>}
                     </button>
                   )}
                   {operation.can_coordinate && !isOperario && (
-                    <button
-                      onClick={() => handleAction('start_coordination', '¿Iniciar coordinación? Esto marca que se contactará a la agencia.')}
-                      disabled={actionLoading}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                      {actionLoading ? 'Procesando...' : 'Iniciar coordinación'}
+                    <button onClick={() => handleAction('start_coordination', '¿Notificar logística?')} disabled={actionLoading} className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-black rounded-xl shadow-lg shadow-indigo-500/30 transition-all">
+                      {actionLoading ? 'Procesando...' : 'Coordinar Entrega'}
                     </button>
                   )}
                   {operation.can_deliver && !isOperario && (
-                    <button
-                      onClick={() => handleAction('mark_delivered', '¿Marcar como entregada? Asegúrate de tener el remito firmado.')}
-                      disabled={actionLoading}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      {actionLoading ? 'Procesando...' : 'Marcar como entregada'}
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  {isOwner && (
-                    <button
-                      onClick={() => navigate(`/operations/${id}/edit`)}
-                      className="inline-flex items-center px-4 py-2 border-2 border-slate-200 text-sm font-bold rounded-xl shadow-sm text-slate-700 bg-white hover:bg-slate-50"
-                    >
-                      Configurar / Editar
-                    </button>
-                  )}
-
-                  {isOwner && operation.status !== 'closed' && operation.status !== 'cancelled' && (
-                    <button
-                      onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y no se podrá continuar.')}
-                      disabled={actionLoading}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-red-500 hover:bg-red-600"
-                    >
-                      Cancelar
+                    <button onClick={() => handleAction('mark_delivered', '¿Finalizar operación?')} disabled={actionLoading} className="px-5 py-2.5 bg-purple-500 hover:bg-purple-400 text-white text-sm font-black rounded-xl shadow-lg shadow-purple-500/30 transition-all">
+                      {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
                     </button>
                   )}
                 </div>
               </div>
+
             </div>
+
+            {/* COLUMNA DERECHA (Tracker) */}
+            <div className="lg:col-span-1">
+              <OperationTracker currentState={operation.status || operation.estado} />
+            </div>
+
           </div>
         </div>
       </div>
 
-      {/* Modal de Packing List (sin cambios) */}
+      {/* Modal de Packing List (Mantenido intacto) */}
       {showPackingModal && packingData && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
-            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 shrink-0">
-               <h3 className="text-lg leading-6 font-bold text-gray-900" id="modal-title">
-                  Packing List - Operación #{packingData.operation_id}
-               </h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="text-lg leading-6 font-black text-slate-800 flex items-center gap-2">
+                <i className="bi bi-file-earmark-text-fill text-indigo-500"></i> Packing List - #{packingData.operation_id}
+              </h3>
+              <button onClick={() => setShowPackingModal(false)} className="text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm"><i className="bi bi-x-lg"></i></button>
             </div>
-            <div className="p-4 sm:p-6 overflow-y-auto w-full">
-                    <div className="mt-2">
-                      <div className="text-sm text-gray-500 mb-4">
-                        <p><strong>Cliente:</strong> {packingData.client}</p>
-                        <p><strong>Buque:</strong> {packingData.ship}</p>
-                        <p><strong>Puerto:</strong> {packingData.port}</p>
-                        <p><strong>ETA:</strong> {new Date(packingData.eta).toLocaleString()}</p>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Presentación</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peso unitario (kg)</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peso total (kg)</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio unitario</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {packingData.products.map((prod, idx) => (
-                              <tr key={idx}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.quantity}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.presentation}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.unit_weight}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{prod.total_weight}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${prod.unit_price}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${prod.subtotal}</td>
-                              </tr>
-                            ))}
-                            <tr className="bg-gray-50">
-                              <td colSpan="4" className="px-6 py-4 text-right text-sm font-medium text-gray-900">Totales</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{packingData.total_weight} kg</td>
-                              <td></td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${packingData.total_price.toFixed(2)}</td>
-                            </tr>
-                          </tbody>
-                         </table>
-                      </div>
-                    </div>
-                  </div>
-            <div className="bg-slate-50 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
-              <button
-                type="button"
-                className="mt-3 w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                onClick={() => window.print()}
-              >
-                <i className="bi bi-printer mr-2"></i> Imprimir
+            <div className="p-4 sm:p-6 overflow-y-auto w-full custom-scrollbar bg-white">
+              <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.client}</p></div>
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Buque</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.ship}</p></div>
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Puerto</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.port}</p></div>
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ETA</p><p className="text-sm font-semibold text-indigo-600">{new Date(packingData.eta).toLocaleString()}</p></div>
+              </div>
+              <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr className="uppercase tracking-wider text-[10px] font-black text-slate-500">
+                      <th className="px-4 py-3 text-left">Producto</th>
+                      <th className="px-4 py-3 text-center">Cant.</th>
+                      <th className="px-4 py-3 text-left">Pres.</th>
+                      <th className="px-4 py-3 text-right">Peso Unit.</th>
+                      <th className="px-4 py-3 text-right">Peso Total</th>
+                      <th className="px-4 py-3 text-right">Precio Unit.</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-slate-100">
+                    {packingData.products.map((prod, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm font-bold text-slate-800">{prod.name}</td>
+                        <td className="px-4 py-3 text-sm text-center font-bold text-slate-600">{prod.quantity}</td>
+                        <td className="px-4 py-3 text-xs font-medium text-slate-500">{prod.presentation}</td>
+                        <td className="px-4 py-3 text-sm text-right text-slate-600">{prod.unit_weight} kg</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-slate-800">{prod.total_weight} kg</td>
+                        <td className="px-4 py-3 text-sm text-right text-slate-500">${prod.unit_price}</td>
+                        <td className="px-4 py-3 text-sm text-right font-black text-indigo-700">${prod.subtotal}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-indigo-50/50">
+                      <td colSpan="4" className="px-4 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Totales de Carga</td>
+                      <td className="px-4 py-4 text-right text-sm font-black text-indigo-800">{packingData.total_weight} kg</td>
+                      <td></td>
+                      <td className="px-4 py-4 text-right text-lg font-black text-indigo-700">${packingData.total_price.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-slate-50 px-4 py-4 border-t border-slate-200 sm:px-6 sm:flex sm:flex-row-reverse shrink-0 gap-2">
+              <button type="button" className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors shadow-sm flex justify-center items-center gap-2" onClick={() => window.print()}>
+                <i className="bi bi-printer-fill"></i> Imprimir Documento
               </button>
-              <button
-                type="button"
-                className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                onClick={() => setShowPackingModal(false)}
-              >
+              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white text-slate-700 font-bold text-sm border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPackingModal(false)}>
                 Cerrar
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+      `}} />
     </div>
   );
 }

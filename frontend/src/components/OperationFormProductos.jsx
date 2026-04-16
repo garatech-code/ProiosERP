@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
+// NUEVO: Importamos hooks de React Router
+import { useParams, useNavigate } from 'react-router-dom';
 
 /* =========================
    PRODUCT ROW (con verificación de stock)
@@ -27,13 +29,13 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   const isStockInsufficient = cantidad > stockActual;
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${
-      isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
-    }`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
+      }`}>
       <div className="sm:col-span-4">
         <AutocompleteCreate
           label="Producto *"
-          endpoint="/inventario/products/?categoria=otros"
+          // CORRECCIÓN RUTAS: Quitamos la barra inicial
+          endpoint="inventario/products/?categoria=otros"
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
@@ -63,9 +65,8 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           min="1"
           value={cantidad}
           onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${
-            isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
-          }`}
+          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
         />
         {isStockInsufficient && (
           <p className="text-xs text-red-600 mt-1">
@@ -108,8 +109,16 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 /* =========================
    MAIN COMPONENT
 ========================= */
-export default function OperationFormProductos({ id, onClose, onSuccess }) {
+// NUEVO: Renombramos prop id a propId para evitar conflictos
+export default function OperationFormProductos({ id: propId, onClose, onSuccess }) {
   const { user: currentUser } = useAuth();
+
+  // NUEVO: Hooks de Router
+  const { id: routeId } = useParams();
+  const navigate = useNavigate();
+
+  // NUEVO: Prioridad: primero el prop (si es modal), luego URL (si es página)
+  const id = propId || routeId;
 
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -128,7 +137,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
-    const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     client: '',
     ship: '',
     port: '',
@@ -146,17 +155,26 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
     operarios_id: [],
   });
 
+  // NUEVA FUNCIÓN: Manejo inteligente de cierre
+  const handleCloseModal = () => {
+    if (onClose) {
+      onClose(); // Ejecutar cierre del modal
+    } else {
+      navigate(-1); // Volver a la ruta anterior (Operation Detail)
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
         if (currentUser?.role === 'OWNER') {
-          const res = await axios.get('/usuarios/users/');
+          const res = await axios.get('usuarios/users/');
           const fetchedUsers = res.data?.results || res.data;
           if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
         }
 
         if (id) {
-          const res = await axios.get(`/operaciones/operations/${id}/`);
+          const res = await axios.get(`operaciones/operations/${id}/`);
           const op = res.data;
 
           const formatToDatetimeLocal = (isoString) => {
@@ -199,7 +217,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
 
           if (op.ship) {
             try {
-              const shipRes = await axios.get(`/operaciones/ships/${op.ship}/`);
+              const shipRes = await axios.get(`operaciones/ships/${op.ship}/`);
               if (shipRes.data.imo) setImoNumber(shipRes.data.imo);
               if (shipRes.data.flag) setAutoCompleteFlag(shipRes.data.flag);
             } catch (err) { console.error(err); }
@@ -240,9 +258,8 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
     }));
   };
 
-  // Verificar si algún producto tiene stock insuficiente o falta ID
   const hasStockIssues = () => {
-    return formData.products.some(p => 
+    return formData.products.some(p =>
       !p.product || (p.quantity || 0) > (p.stock_actual || 0)
     );
   };
@@ -259,7 +276,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
     setImoSuccess(false);
 
     try {
-      const res = await axios.get('/operaciones/operations/auto_complete_imo/', { params: { imo: imoNumber } });
+      const res = await axios.get('operaciones/operations/auto_complete_imo/', { params: { imo: imoNumber } });
       const data = res.data;
 
       const formatToDatetimeLocal = (isoString) => {
@@ -288,7 +305,6 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
     }
   };
 
-  // CORREGIDO: usar PATCH al detalle de la operación para subir archivos
   const handleFileUpload = async (event, fieldName) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -297,10 +313,10 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
     formDataFile.append(fieldName, file);
 
     try {
-      await axios.patch(`/operaciones/operations/${id}/`, formDataFile, {
+      await axios.patch(`operaciones/operations/${id}/`, formDataFile, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const res = await axios.get(`/operaciones/operations/${id}/`);
+      const res = await axios.get(`operaciones/operations/${id}/`);
       setExistingFiles({
         packing_list_file: res.data.packing_list_file,
         remito_file: res.data.remito_file,
@@ -319,26 +335,25 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
 
-    // Validación de productos: todos deben tener ID y cantidad positiva
     for (let i = 0; i < formData.products.length; i++) {
       const p = formData.products[i];
       if (!p.product) {
-        setError(`Fila ${i+1}: debe seleccionar un producto.`);
+        setError(`Fila ${i + 1}: debe seleccionar un producto.`);
         setLoading(false);
         return;
       }
       if (p.quantity <= 0) {
-        setError(`Fila ${i+1}: la cantidad debe ser mayor a cero.`);
+        setError(`Fila ${i + 1}: la cantidad debe ser mayor a cero.`);
         setLoading(false);
         return;
       }
       if (p.unit_price < 0) {
-        setError(`Fila ${i+1}: el precio unitario no puede ser negativo.`);
+        setError(`Fila ${i + 1}: el precio unitario no puede ser negativo.`);
         setLoading(false);
         return;
       }
       if (p.quantity > (p.stock_actual || 0)) {
-        setError(`Fila ${i+1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
+        setError(`Fila ${i + 1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
         setLoading(false);
         return;
       }
@@ -358,7 +373,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
       const payload = {
         ...formData,
         products: validProducts.map(p => ({
-          product: Number(p.product), // Asegurar número
+          product: Number(p.product),
           quantity: p.quantity,
           unit_price: p.unit_price,
         })),
@@ -371,13 +386,15 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
 
       let res;
       if (id) {
-        res = await axios.put(`/operaciones/operations/${id}/`, payload);
+        res = await axios.put(`operaciones/operations/${id}/`, payload);
       } else {
-        res = await axios.post('/operaciones/operations/', payload);
+        res = await axios.post('operaciones/operations/', payload);
       }
 
       if (onSuccess) onSuccess(res.data.id);
-      if (onClose) onClose();
+
+      // NUEVO: Cerramos el modal usando la función inteligente
+      handleCloseModal();
 
     } catch (err) {
       console.error("Error en submit:", err);
@@ -409,14 +426,22 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
   );
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+    // NUEVO: Agregamos el onClick al fondo para cerrar el modal
+    <div
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4"
+      onMouseDown={handleCloseModal}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto"
+        onMouseDown={(e) => e.stopPropagation()} // Evita que se cierre al hacer click dentro del formulario
+      >
 
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50 shrink-0">
           <h2 className="text-xl font-bold text-gray-800">
             {id ? `Editar Operación #${id}` : 'Nueva Operación'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors">
+          {/* NUEVO: El botón de cerrar usa la función universal */}
+          <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -466,7 +491,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <AutocompleteCreate
                   label="Cliente *"
-                  endpoint="/operaciones/clients/"
+                  endpoint="operaciones/clients/"
                   value={formData.client}
                   onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
                   extraCreateData={{ email: 'default@email.com' }}
@@ -474,7 +499,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
                 />
                 <AutocompleteCreate
                   label="Agencia"
-                  endpoint="/operaciones/agencies/"
+                  endpoint="operaciones/agencies/"
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
                 />
@@ -482,7 +507,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
                   <AutocompleteCreate
                     key={`ship-${formData.ship}`}
                     label="Buque *"
-                    endpoint="/operaciones/ships/"
+                    endpoint="operaciones/ships/"
                     value={formData.ship}
                     onSelect={(i) => {
                       setFormData(p => ({ ...p, ship: i?.id || '' }));
@@ -495,7 +520,7 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
                 <AutocompleteCreate
                   key={`port-${formData.port}`}
                   label="Puerto *"
-                  endpoint="/operaciones/ports/"
+                  endpoint="operaciones/ports/"
                   value={formData.port}
                   onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
                   createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
@@ -688,10 +713,11 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
           </form>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl shrink-0">
+          {/* NUEVO: El botón cancelar usa la función universal */}
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 shadow-sm transition-colors"
           >
             Cancelar
@@ -700,9 +726,8 @@ export default function OperationFormProductos({ id, onClose, onSuccess }) {
             type="submit"
             form="operation-form"
             disabled={loading || hasStockIssues()}
-            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${
-              hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
+            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
             title={hasStockIssues() ? "Hay productos sin stock suficiente o sin seleccionar" : ""}
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
