@@ -27,9 +27,8 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   const isStockInsufficient = cantidad > stockActual;
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${
-      isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
-    }`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
+      }`}>
       <div className="sm:col-span-4">
         <AutocompleteCreate
           label="Producto *"
@@ -63,9 +62,8 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           min="1"
           value={cantidad}
           onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${
-            isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
-          }`}
+          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
         />
         {isStockInsufficient && (
           <p className="text-xs text-red-600 mt-1">
@@ -128,7 +126,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
-    const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     client: '',
     ship: '',
     port: '',
@@ -246,7 +244,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
 
   // Verificar si algún producto tiene stock insuficiente o falta ID
   const hasStockIssues = () => {
-    return formData.products.some(p => 
+    return formData.products.some(p =>
       !p.product || (p.quantity || 0) > (p.stock_actual || 0)
     );
   };
@@ -327,22 +325,22 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
     for (let i = 0; i < formData.products.length; i++) {
       const p = formData.products[i];
       if (!p.product) {
-        setError(`Fila ${i+1}: debe seleccionar un producto.`);
+        setError(`Fila ${i + 1}: debe seleccionar un producto.`);
         setLoading(false);
         return;
       }
       if (p.quantity <= 0) {
-        setError(`Fila ${i+1}: la cantidad debe ser mayor a cero.`);
+        setError(`Fila ${i + 1}: la cantidad debe ser mayor a cero.`);
         setLoading(false);
         return;
       }
       if (p.unit_price < 0) {
-        setError(`Fila ${i+1}: el precio unitario no puede ser negativo.`);
+        setError(`Fila ${i + 1}: el precio unitario no puede ser negativo.`);
         setLoading(false);
         return;
       }
       if (p.quantity > (p.stock_actual || 0)) {
-        setError(`Fila ${i+1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
+        setError(`Fila ${i + 1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
         setLoading(false);
         return;
       }
@@ -482,6 +480,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                   endpoint="/operaciones/agencies/"
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
+                  createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
                 />
                 <div>
                   <AutocompleteCreate
@@ -735,9 +734,8 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
             type="submit"
             form="operation-form"
             disabled={loading || hasStockIssues()}
-            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${
-              hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
+            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
             title={hasStockIssues() ? "Hay productos sin stock suficiente o sin seleccionar" : ""}
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}

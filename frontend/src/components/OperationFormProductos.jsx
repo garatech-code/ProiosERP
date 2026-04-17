@@ -502,6 +502,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                   endpoint="operaciones/agencies/"
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
+                  createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
                 />
                 <div>
                   <AutocompleteCreate
