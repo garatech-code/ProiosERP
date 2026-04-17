@@ -18,7 +18,7 @@ export default function AutocompleteCreate({
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  
+
   // Modal states for creation
   const [isCreating, setIsCreating] = useState(false);
   const [createData, setCreateData] = useState({});
@@ -26,29 +26,57 @@ export default function AutocompleteCreate({
 
   const wrapperRef = useRef(null);
 
+  // Helper limpio para obtener el nombre a mostrar
+  const getDisplayName = (opt) => {
+    if (!opt) return '';
+    return opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || `Ref: ${opt.id}`;
+  };
+
   useEffect(() => {
     fetchOptions();
   }, [endpoint]);
 
+  // CORRECCIÓN: Lógica robusta para pre-selección y paginación
   useEffect(() => {
-    // Cuando el `value` cambia desde afuera (e.g. edición de operación), pre-seleccionamos
-    if (value && options.length > 0) {
-      const match = options.find((opt) => String(opt.id) === String(value));
-      if (match) {
-        setSelectedItem(match);
-        setSearchTerm(match[nameField] || match.nombre || match.name || match.contact_person || match.flag || match.country || match.imo || match.presentation || `Ref: ${match.id}`);
-      }
-    } else if (!value) {
+    if (!value) {
       setSelectedItem(null);
       setSearchTerm('');
+      return;
     }
-  }, [value, options]);
+
+    // Intentamos encontrarlo en las opciones ya cargadas
+    const match = options.find((opt) => String(opt.id) === String(value));
+
+    if (match) {
+      setSelectedItem(match);
+      setSearchTerm(getDisplayName(match));
+    } else if (options.length > 0 && !loading) {
+      // Si ya cargó la lista y NO está (problema de paginación o recién creado por IMO)
+      // Evitamos loop infinito asegurando que no estemos ya mostrando este ID
+      if (String(selectedItem?.id) !== String(value)) {
+        const fetchSingleItem = async () => {
+          try {
+            const separator = endpoint.endsWith('/') ? '' : '/';
+            const res = await axios.get(`${endpoint}${separator}${value}/`);
+            const item = res.data;
+            setSelectedItem(item);
+            setSearchTerm(getDisplayName(item));
+            // Lo guardamos en las opciones locales para caché
+            setOptions(prev => [...prev, item]);
+          } catch (error) {
+            console.error(`Item ${value} no encontrado individualmente`, error);
+            setSearchTerm(`Ref: ${value}`); // Fallback visual
+          }
+        };
+        fetchSingleItem();
+      }
+    }
+  }, [value, options, loading, endpoint, nameField]);
 
   const fetchOptions = async () => {
     setLoading(true);
     try {
       const res = await axios.get(endpoint);
-      // Django REST framework suele devolver { count, next, previous, results: [] } o simplemente un array []
       const data = Array.isArray(res.data) ? res.data : res.data.results || [];
       setOptions(data);
       setFilteredOptions(data);
@@ -63,22 +91,19 @@ export default function AutocompleteCreate({
     const text = e.target.value;
     setSearchTerm(text);
     if (!isOpen) setIsOpen(true);
-    
-    // Filtrar opciones (buscando por varios campos posibles para ser flexible)
+
     const filtered = options.filter(opt => {
-      const displayVal = (opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || String(opt.id)).toLowerCase();
+      const displayVal = String(getDisplayName(opt)).toLowerCase();
       return displayVal.includes(text.toLowerCase());
     });
     setFilteredOptions(filtered);
 
-    // Si el usuario borra, quitamos la selección
     if (text === '') {
       setSelectedItem(null);
       onSelect(null);
     } else {
-      // Si hay match exacto, lo marcamos
       const exactMatch = options.find(opt => {
-        const displayVal = (opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.country || opt.imo || String(opt.id)).toLowerCase();
+        const displayVal = String(getDisplayName(opt)).toLowerCase();
         return displayVal === text.toLowerCase();
       });
       if (exactMatch) {
@@ -86,7 +111,6 @@ export default function AutocompleteCreate({
         onSelect(exactMatch);
       } else {
         setSelectedItem(null);
-        // Si no, emitimos el string instantáneamente
         onSelect({ id: text, [nameField]: text });
       }
     }
@@ -94,7 +118,7 @@ export default function AutocompleteCreate({
 
   const handleOptionClick = (opt) => {
     setSelectedItem(opt);
-    setSearchTerm(opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || String(opt.id));
+    setSearchTerm(getDisplayName(opt));
     setIsOpen(false);
     onSelect(opt);
   };
@@ -111,12 +135,11 @@ export default function AutocompleteCreate({
     try {
       const res = await axios.post(endpoint, createData);
       const newItem = res.data;
-      
-      // Actualizamos listado
+
       const newOptions = [...options, newItem];
       setOptions(newOptions);
       setFilteredOptions(newOptions);
-      
+
       handleOptionClick(newItem);
       setIsCreating(false);
     } catch (err) {
@@ -127,39 +150,36 @@ export default function AutocompleteCreate({
     }
   };
 
-  // Cerrar el dropdown al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
-        // Si no se seleccionó nada válido y había escrito algo suelto, no tocamos onSelect porque ya se emitió on change
         if (selectedItem) {
-            setSearchTerm(selectedItem[nameField] || selectedItem.nombre || selectedItem.name || selectedItem.contact_person || selectedItem.flag || selectedItem.country || selectedItem.imo || selectedItem.presentation || String(selectedItem.id));
+          setSearchTerm(getDisplayName(selectedItem));
         }
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [wrapperRef, selectedItem, searchTerm]);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [wrapperRef, selectedItem]);
 
   return (
     <div className="relative" ref={wrapperRef}>
       <label className="block text-sm font-medium text-gray-700">{label}</label>
       <input
         type="text"
+        autoComplete="off" // CORRECCIÓN: Evita el historial nativo del navegador
         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         value={searchTerm}
         onChange={handleSearchChange}
         onClick={() => setIsOpen(true)}
         placeholder={placeholder}
       />
-      
+
       {isOpen && (
         <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
           {loading && <div className="px-4 py-2 text-gray-500">Cargando...</div>}
-          
+
           {!loading && filteredOptions.length === 0 && (
             <div className="px-4 py-2 text-gray-500">No se encontraron resultados.</div>
           )}
@@ -171,13 +191,12 @@ export default function AutocompleteCreate({
               onClick={() => handleOptionClick(opt)}
             >
               <span className="block truncate">
-                {opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || `Ref: ${opt.id}`}
+                {getDisplayName(opt)}
               </span>
             </div>
           ))}
 
-          {/* Botón para crear uno nuevo */}
-          <div 
+          <div
             className="cursor-pointer select-none relative py-2 pl-3 pr-9 border-t border-gray-200 bg-gray-50 hover:bg-gray-100 text-indigo-600 font-medium"
             onClick={handleOpenCreate}
           >
@@ -186,7 +205,7 @@ export default function AutocompleteCreate({
         </div>
       )}
 
-      {/* Modal para crear nueva entidad */}
+      {/* El Modal de Creación se mantiene intacto... */}
       {isCreating && createPortal(
         <div className="fixed inset-0 z-[110] overflow-y-auto w-full">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -202,7 +221,6 @@ export default function AutocompleteCreate({
                       Crear {label.replace(' *', '')}
                     </h3>
                     <div className="mt-4 space-y-4">
-                      {/* Campo default Name/Texto principal, sólo si la lista de campos no lo incluye explícitamente */}
                       {!createFields.some(f => f.name === nameField) && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Nombre / Identificador</label>
@@ -215,7 +233,7 @@ export default function AutocompleteCreate({
                           />
                         </div>
                       )}
-                      
+
                       {createFields.map((field) => (
                         <div key={field.name}>
                           <label className="block text-sm font-medium text-gray-700">{field.label}</label>
