@@ -26,7 +26,6 @@ export default function AutocompleteCreate({
 
   const wrapperRef = useRef(null);
 
-  // Helper limpio para obtener el nombre a mostrar
   const getDisplayName = (opt) => {
     if (!opt) return '';
     return opt[nameField] || opt.nombre || opt.name || opt.contact_person || opt.flag || opt.country || opt.imo || opt.presentation || `Ref: ${opt.id}`;
@@ -36,7 +35,6 @@ export default function AutocompleteCreate({
     fetchOptions();
   }, [endpoint]);
 
-  // CORRECCIÓN: Lógica robusta para pre-selección y paginación
   useEffect(() => {
     if (!value) {
       setSelectedItem(null);
@@ -44,16 +42,16 @@ export default function AutocompleteCreate({
       return;
     }
 
-    // Intentamos encontrarlo en las opciones ya cargadas
     const match = options.find((opt) => String(opt.id) === String(value));
 
     if (match) {
       setSelectedItem(match);
       setSearchTerm(getDisplayName(match));
     } else if (options.length > 0 && !loading) {
-      // Si ya cargó la lista y NO está (problema de paginación o recién creado por IMO)
-      // Evitamos loop infinito asegurando que no estemos ya mostrando este ID
-      if (String(selectedItem?.id) !== String(value)) {
+      // CORRECCIÓN 1: Escudo protector. Solo buscamos si el value parece un ID numérico real.
+      const isNumericId = !isNaN(value) && !isNaN(parseFloat(value));
+
+      if (isNumericId && String(selectedItem?.id) !== String(value)) {
         const fetchSingleItem = async () => {
           try {
             const separator = endpoint.endsWith('/') ? '' : '/';
@@ -61,11 +59,10 @@ export default function AutocompleteCreate({
             const item = res.data;
             setSelectedItem(item);
             setSearchTerm(getDisplayName(item));
-            // Lo guardamos en las opciones locales para caché
             setOptions(prev => [...prev, item]);
           } catch (error) {
             console.error(`Item ${value} no encontrado individualmente`, error);
-            setSearchTerm(`Ref: ${value}`); // Fallback visual
+            setSearchTerm(`Ref: ${value}`);
           }
         };
         fetchSingleItem();
@@ -111,7 +108,9 @@ export default function AutocompleteCreate({
         onSelect(exactMatch);
       } else {
         setSelectedItem(null);
-        onSelect({ id: text, [nameField]: text });
+        // CORRECCIÓN 2: Mientras el usuario escribe libremente, NO le decimos al padre que es un ID. 
+        // Solo mandamos null hasta que seleccione una opción real o cree una nueva.
+        onSelect(null);
       }
     }
   };
@@ -168,7 +167,7 @@ export default function AutocompleteCreate({
       <label className="block text-sm font-medium text-gray-700">{label}</label>
       <input
         type="text"
-        autoComplete="off" // CORRECCIÓN: Evita el historial nativo del navegador
+        autoComplete="off"
         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         value={searchTerm}
         onChange={handleSearchChange}
@@ -187,7 +186,7 @@ export default function AutocompleteCreate({
           {!loading && filteredOptions.map((opt) => (
             <div
               key={opt.id}
-              className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white text-gray-900"
+              className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-orange-600 hover:text-white text-gray-900"
               onClick={() => handleOptionClick(opt)}
             >
               <span className="block truncate">
@@ -197,7 +196,7 @@ export default function AutocompleteCreate({
           ))}
 
           <div
-            className="cursor-pointer select-none relative py-2 pl-3 pr-9 border-t border-gray-200 bg-gray-50 hover:bg-gray-100 text-indigo-600 font-medium"
+            className="cursor-pointer select-none relative py-2 pl-3 pr-9 border-t border-gray-200 bg-gray-50 hover:bg-gray-100 text-orange-600 font-medium"
             onClick={handleOpenCreate}
           >
             + Crear nuevo {searchTerm ? `"${searchTerm}"` : ''}
@@ -205,7 +204,6 @@ export default function AutocompleteCreate({
         </div>
       )}
 
-      {/* El Modal de Creación se mantiene intacto... */}
       {isCreating && createPortal(
         <div className="fixed inset-0 z-[110] overflow-y-auto w-full">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
