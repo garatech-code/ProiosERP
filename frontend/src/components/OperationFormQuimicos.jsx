@@ -475,7 +475,12 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
                   endpoint="/operaciones/agencies/"
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
-                  createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
+                  createFields={[
+                    { name: 'contact_name', label: 'Nombre de Contacto', required: true },
+                    { name: 'email', label: 'Correo Electrónico', type: 'email', required: true },
+                    { name: 'phone', label: 'Teléfono', required: true }
+                  ]}
+                  nameField="name"
                 />
                 <div>
                   <AutocompleteCreate
