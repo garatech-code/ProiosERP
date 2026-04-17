@@ -93,10 +93,17 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# ... Resto de tu configuración (JWT, CORS, LOGGING, GUARDIAN) se mantiene igual ...
+# Configuración Regional (Importante para las fechas de los correos)
+LANGUAGE_CODE = "es-es"
+TIME_ZONE = "America/Argentina/Buenos_Aires"
+USE_I18N = True
+USE_TZ = True
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Custom user model
 AUTH_USER_MODEL = "usuarios.User"
 
+# DRF configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -106,6 +113,7 @@ REST_FRAMEWORK = {
     ),
 }
 
+# JWT configuration
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("ACCESS_TOKEN_LIFETIME_MINUTES", "15"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("REFRESH_TOKEN_LIFETIME_DAYS", "7"))),
@@ -114,11 +122,32 @@ SIMPLE_JWT = {
     "SIGNING_KEY": os.getenv("JWT_SECRET_KEY", SECRET_KEY),
 }
 
+# CORS
 CORS_ALLOW_ALL_ORIGINS = True # Para pruebas temporales
 
-# Celery (Asegúrate de tener un servicio de Redis en Render si vas a usarlo en el deploy)
+# Celery Configuration
 CELERY_BROKER_URL = os.getenv("REDIS_URL")
 CELERY_RESULT_BACKEND = os.getenv("REDIS_URL")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+
+# ¡LÍNEA MÁGICA PARA LA DEMO! 
+# Forza a Celery a procesar los correos en tiempo real sin necesitar el Worker de RAM pesada.
+CELERY_TASK_ALWAYS_EAGER = True 
+
+# ==========================================
+# CONFIGURACIÓN DE CORREOS (SMTP / IMAP)
+# ==========================================
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '') # Debe coincidir con EMAIL_IMAP_USER en Render
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '') # Debe coincidir con EMAIL_IMAP_PASS en Render
+
+IMAP_HOST = os.getenv('IMAP_HOST', 'imap.gmail.com')
+IMAP_PORT = int(os.getenv('IMAP_PORT', 993))
+IMAP_USER = EMAIL_HOST_USER
+IMAP_PASSWORD = EMAIL_HOST_PASSWORD

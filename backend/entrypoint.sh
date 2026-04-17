@@ -42,13 +42,9 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 # ==========================================
-# INICIO DEL HACK 2x1 PARA RENDER FREE TIER
+# INICIO DEL SERVIDOR WEB
 # ==========================================
 
-# Arrancamos el trabajador de Celery en segundo plano (el símbolo & al final es clave)
-echo "Iniciando Celery Worker en segundo plano..."
-celery -A proios worker --loglevel=info &
-
-# Finalmente, arrancamos Gunicorn en el primer plano
+# Arrancamos Gunicorn directamente (el único dueño de la memoria RAM)
 echo "Iniciando servidor web Gunicorn..."
 exec "$@"
