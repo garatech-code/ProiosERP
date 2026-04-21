@@ -26,6 +26,10 @@ export default function OperationDetail() {
   const [excelPreviewHtml, setExcelPreviewHtml] = useState(null);
   const [showExcelModal, setShowExcelModal] = useState(false);
 
+  // Nuevos estados para los desplegables del packing list
+  const [proveedor, setProveedor] = useState('PROIOS SA'); // opción por defecto
+  const [paisDestino, setPaisDestino] = useState('argentina'); // 'argentina' o 'bandera'
+
   const showToast = (message, type = 'info') => {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 4000);
@@ -139,17 +143,24 @@ export default function OperationDetail() {
 
   const downloadPackingListExcel = async () => {
     try {
-      const response = await axios.get(`/operaciones/operations/${id}/packing_list_excel/`, {
+      // Construir URL con parámetros
+      let url = `/operaciones/operations/${id}/packing_list_excel/`;
+      const params = new URLSearchParams();
+      params.append('proveedor', proveedor);
+      params.append('pais_destino', paisDestino);
+      url += `?${params.toString()}`;
+
+      const response = await axios.get(url, {
         responseType: 'blob',
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
-      link.href = url;
+      link.href = blobUrl;
       link.setAttribute('download', `packing_list_${id}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
       showToast('Descargando Packing List...', 'success');
     } catch (error) {
       console.error(error);
@@ -159,7 +170,13 @@ export default function OperationDetail() {
 
   const previewPackingListExcel = async () => {
     try {
-      const response = await axios.get(`/operaciones/operations/${id}/packing_list_excel/`, {
+      let url = `/operaciones/operations/${id}/packing_list_excel/`;
+      const params = new URLSearchParams();
+      params.append('proveedor', proveedor);
+      params.append('pais_destino', paisDestino);
+      url += `?${params.toString()}`;
+
+      const response = await axios.get(url, {
         responseType: 'blob',
       });
       const data = await response.data.arrayBuffer();
@@ -230,6 +247,10 @@ export default function OperationDetail() {
   if (loading) return <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
   if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
   if (!operation) return <div className="text-center mt-10">No se encontró la operación</div>;
+
+  // Obtener bandera del buque para mostrar en el select de país destino (si aplica)
+  const shipFlag = operation.ship_flag || (operation.ship ? operation.ship.flag : '');
+  const paisDestinoTexto = paisDestino === 'argentina' ? 'Argentina' : (shipFlag || 'Bandera del buque');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -410,6 +431,44 @@ export default function OperationDetail() {
                 ) : (
                   <OperarioActionPanel products={operation.products} />
                 )}
+              </div>
+
+              {/* NUEVO BLOQUE: Opciones para el Packing List */}
+              <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+                    <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
+                  </h3>
+                </div>
+                <div className="p-4 sm:p-6 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">PROVEEDOR</label>
+                      <select
+                        value={proveedor}
+                        onChange={(e) => setProveedor(e.target.value)}
+                        className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      >
+                        <option value="PROIOS SA">PROIOS SA (CUIT: 30-63661723-3)</option>
+                        <option value="PROIOS SALVAGE SA">PROIOS SALVAGE SA (CUIT: 33-71087653-9)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
+                      <select
+                        value={paisDestino}
+                        onChange={(e) => setPaisDestino(e.target.value)}
+                        className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      >
+                        <option value="argentina">Argentina (empresa argentina)</option>
+                        <option value="bandera">Bandera del buque (cliente extranjero)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {paisDestino === 'bandera' && shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Se usará Argentina'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">

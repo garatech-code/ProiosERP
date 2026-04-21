@@ -520,7 +520,17 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                     }}
                     createFields={[{ name: 'imo', label: 'IMO *', required: true }, { name: 'flag', label: 'Bandera *', required: true }]}
                   />
-                  {autoCompleteFlag && <p className="text-xs text-gray-500 mt-1 font-medium">Bandera: {autoCompleteFlag}</p>}
+                  {/* Mostrar la bandera del buque seleccionado */}
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-700">Bandera (autocompletada)</label>
+                    <input
+                      type="text"
+                      value={autoCompleteFlag}
+                      readOnly
+                      className="mt-1 block w-full py-1.5 px-3 border border-gray-300 rounded-md bg-gray-50 text-gray-700 text-sm"
+                      placeholder="Se autocompletará al seleccionar un buque o buscar por IMO"
+                    />
+                  </div>
                 </div>
                 <AutocompleteCreate
                   label="Puerto *"

@@ -2,13 +2,18 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
-from apps.inventario.models import Articulo, MovimientoStock
-from .serializers import ArticuloSerializer, MovimientoStockSerializer
+from apps.inventario.models import Articulo, MovimientoStock, Proveedor
+from .serializers import ArticuloSerializer, MovimientoStockSerializer, ProveedorSerializer
 import pandas as pd
 import re
 import logging
 
 logger = logging.getLogger(__name__)
+
+class ProveedorViewSet(viewsets.ModelViewSet):
+    queryset = Proveedor.objects.all()
+    serializer_class = ProveedorSerializer
+    filterset_fields = ['nombre', 'rubro']
 
 class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ArticuloSerializer
@@ -71,6 +76,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                     'nombre': articulo.nombre,
                     'presentacion': articulo.presentacion,
                     'stock_actual': articulo.stock_actual,
+                    'stock_minimo': articulo.stock_minimo,
                     'cantidad_necesaria': cantidad,
                     'disponible': disponible
                 })
@@ -85,20 +91,13 @@ class ProductViewSet(viewsets.ModelViewSet):
     # FUNCIÓN AUXILIAR PARA ESTIMAR PESO SEGÚN TIPO Y CALIBRE
     # ------------------------------------------------------------
     def _estimar_peso_cadena(self, tipo_producto, calibre):
-        """
-        Retorna peso unitario estimado en kg para cada tipo de componente de cadena.
-        Basado en valores típicos de la industria.
-        """
         calibre = float(calibre) if calibre else 0
         tipo = tipo_producto.lower()
         
-        # Pesos por calibre (kg por unidad)
         if 'cadena' in tipo:
-            # Cadena de eslabones: peso por metro (aprox)
             pesos_por_calibre = {89: 12.5, 78: 9.8, 42: 3.2, 38: 2.6, 25: 1.2, 127: 24.0, 112: 19.0, 98: 14.5, 92: 12.0}
             return pesos_por_calibre.get(calibre, 1.0)
         elif 'kenter' in tipo:
-            # Conectores Kenter: peso por unidad
             pesos_por_calibre = {89: 8.2, 78: 6.0, 42: 1.8, 38: 1.4, 25: 0.7}
             return pesos_por_calibre.get(calibre, 1.0)
         elif 'grillete giratorio' in tipo:
@@ -115,15 +114,6 @@ class ProductViewSet(viewsets.ModelViewSet):
     # ------------------------------------------------------------
     @action(detail=False, methods=['post'], url_path='upload_excel')
     def upload_excel(self, request):
-        """
-        Carga productos desde un archivo Excel.
-        Soporta dos formatos:
-        1. Formato químico: columnas A=Producto, B=Cantidad (con unidad)
-        2. Formato cadenas: columnas PRODUCTOS, CALIBRE, CANTIDAD, SET
-        Detecta automáticamente el formato.
-        Asigna categoría 'quimicos' si el nombre contiene 'quimicos', sino 'otros'.
-        Para cadenas, asigna nombre descriptivo y peso estimado.
-        """
         file = request.FILES.get('file')
         if not file:
             return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
@@ -141,7 +131,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             logger.error(f"Error al leer Excel: {e}")
             return Response({'error': f'Error al leer el archivo: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Detectar formato
         header_row_idx = None
         formato_cadenas = False
         for idx, row in df.iterrows():
@@ -162,7 +151,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         errores = []
 
         if formato_cadenas:
-            # ========== PROCESAMIENTO MEJORADO PARA CADENAS ==========
             data_start = header_row_idx + 1
             for idx, row in df.iloc[data_start:].iterrows():
                 producto_raw = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
@@ -173,19 +161,15 @@ class ProductViewSet(viewsets.ModelViewSet):
                 if not producto_raw or producto_raw.lower() in ['', 'nan', 'none']:
                     continue
 
-                # Normalizar nombre del producto
                 producto_limpio = producto_raw.strip()
                 calibre = calibre_raw if calibre_raw and calibre_raw not in ['nan', 'none'] else ''
 
-                # Construir nombre más descriptivo
                 if calibre:
-                    # Capitalizar primera letra de cada palabra
                     nombre_base = ' '.join([p.capitalize() for p in producto_limpio.split()])
                     nombre_producto = f"{nombre_base} Calibre {calibre}"
                 else:
                     nombre_producto = producto_limpio.capitalize()
 
-                # Extraer cantidad numérica
                 try:
                     cantidad = float(cantidad_str) if cantidad_str else 0.0
                 except ValueError:
@@ -195,7 +179,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 if cantidad <= 0:
                     continue
 
-                # Determinar presentación legible
                 if 'cadena' in producto_limpio.lower():
                     presentacion = f"Cadena calibre {calibre}" if calibre else "Cadena de acero"
                 elif 'kenter' in producto_limpio.lower():
@@ -207,10 +190,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 else:
                     presentacion = f"Componente calibre {calibre}" if calibre else "Componente"
 
-                # Estimar peso unitario
                 peso_estimado = self._estimar_peso_cadena(producto_limpio, calibre)
-
-                # Categoría: 'otros' (podría ser 'insumos' si agregas al modelo)
                 categoria = 'otros'
 
                 try:
@@ -220,6 +200,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'presentacion': presentacion,
                             'peso_kg': peso_estimado,
                             'stock_actual': cantidad,
+                            'stock_minimo': 0,
                             'descripcion': f'Importado desde Excel de cadenas. Calibre: {calibre}, SET: {set_str}, Cantidad original: {cantidad}',
                             'categoria': categoria,
                         }
@@ -231,7 +212,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 except Exception as e:
                     errores.append(f'Error guardando "{nombre_producto}": {str(e)}')
         else:
-            # ========== PROCESAMIENTO QUÍMICO O GENÉRICO (sin cambios) ==========
             if header_row_idx >= 0:
                 start_row = header_row_idx + 1
             else:
@@ -278,6 +258,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'presentacion': presentacion,
                             'peso_kg': 1.0,
                             'stock_actual': cantidad_num,
+                            'stock_minimo': 0,
                             'descripcion': f'Importado desde Excel. Unidad original: {cantidad_str}',
                             'categoria': categoria,
                         }

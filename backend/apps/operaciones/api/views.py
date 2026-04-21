@@ -319,10 +319,33 @@ class OperacionViewSet(viewsets.ModelViewSet):
     def packing_list_excel(self, request, pk=None):
         """
         Genera un archivo Excel con el formato de Packing List solicitado.
+        Acepta parámetros GET: ?proveedor=...&pais_destino=...
         """
         try:
             op = self.get_object()
             from apps.inventario.models import Articulo
+
+            # Leer parámetros de la solicitud
+            proveedor_seleccionado = request.query_params.get('proveedor', '')
+            pais_destino_seleccionado = request.query_params.get('pais_destino', 'argentina')  # 'argentina' o 'bandera'
+
+            # Determinar el país de destino
+            if pais_destino_seleccionado == 'argentina':
+                pais_destino_texto = 'Argentina'
+            else:
+                # Usar la bandera del buque si está disponible, sino 'Extranjero'
+                pais_destino_texto = op.ship.flag if op.ship and op.ship.flag else 'Extranjero'
+
+            # Determinar el proveedor y su CUIT
+            if proveedor_seleccionado == 'PROIOS SA':
+                proveedor_texto = 'PROIOS SA'
+                cuit_texto = '30-63661723-3'
+            elif proveedor_seleccionado == 'PROIOS SALVAGE SA':
+                proveedor_texto = 'PROIOS SALVAGE SA'
+                cuit_texto = '33-71087653-9'
+            else:
+                proveedor_texto = ''
+                cuit_texto = ''
 
             productos = []
             total_price = 0.0
@@ -339,8 +362,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     total_price += subtotal
                     total_qty += cantidad
                     peso_neto = float(articulo.peso_kg) if articulo.peso_kg is not None else 0.0
-                    # Peso bruto = peso neto + 10% de embalaje (ajustable)
-                    peso_bruto = peso_neto * 1.1
+                    peso_bruto = peso_neto * 1.1  # Ajustable
                     total_weight_neto += cantidad * peso_neto
                     total_weight_bruto += cantidad * peso_bruto
                     productos.append({
@@ -371,12 +393,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
             orange_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
             gray_header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
 
-            # Encabezado
+            # Encabezado (usando los valores seleccionados)
             encabezados = [
-                ("PROVEEDOR:", ""),
-                ("CUIT:", ""),
-                ("PAÍS DE DESTINO DE LA FACTURA:", ""),
-                ("BANDERA:", ""),
+                ("PROVEEDOR:", proveedor_texto),
+                ("CUIT:", cuit_texto),
+                ("PAÍS DE DESTINO DE LA FACTURA:", pais_destino_texto),
+                ("BANDERA:", op.ship.flag if op.ship else ""),
                 ("EMPRESA A FACTURAR:", op.cliente.name if op.cliente else ""),
                 ("BUQUE:", op.ship.name if op.ship else "")
             ]
