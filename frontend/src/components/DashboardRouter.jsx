@@ -9,17 +9,15 @@ const OperadorDashboard = lazy(() => import('../dashboards/OperadorDashboard'));
 const ContableDashboard = lazy(() => import('../dashboards/ContableDashboard'));
 const OperarioDashboard = lazy(() => import('../dashboards/OperarioDashboard'));
 
+const LoadingFallback = () => (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <p className="text-gray-500 font-medium tracking-wide">Cargando tu espacio de trabajo...</p>
+    </div>
+);
 
 export default function DashboardRouter() {
     const { user } = useAuth();
-
-    // Pantalla de carga mientras se descarga el chunk del componente correspondiente
-    const LoadingFallback = () => (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            <p className="text-gray-500 font-medium tracking-wide">Cargando tu espacio de trabajo...</p>
-        </div>
-    );
 
     // Si no hay usuario cargado aún (por seguridad o latencia)
     if (!user || !user.role) {

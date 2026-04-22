@@ -33,6 +33,7 @@ yarn-debug.log*
 yarn-error.log*
 # Archivos estáticos y multimedia generados
 backend/static/
+backend/staticfiles/
 static/
 media/
 backend/media/
@@ -44,3 +45,10 @@ __pycache__/
 
 # Archivos binarios generados
 backend/celerybeat-schedule
+
+# Carpetas de reportes y documentos PDF/Excel autogenerados
+export/
+remitos/
+ranchos/
+packing_list/
+packing_lists/

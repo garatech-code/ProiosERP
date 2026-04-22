@@ -83,7 +83,7 @@ DATABASES = {
         "HOST": os.getenv("DB_HOST", "ep-round-shape-anntvqgx.c-6.us-east-1.aws.neon.tech"),
         "PORT": os.getenv("DB_PORT", "5432"),
         "OPTIONS": {
-            "sslmode": "require", # Requerido por Neon
+            "sslmode": os.getenv("DB_SSLMODE", "require"),
         },
     }
 }
@@ -92,6 +92,7 @@ DATABASES = {
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_MANIFEST_STRICT = False
 
 # Configuración Regional (Importante para las fechas de los correos)
 LANGUAGE_CODE = "es-es"

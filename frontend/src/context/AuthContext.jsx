@@ -4,20 +4,33 @@ import api from '../api/axios';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
+    const [user, setUser] = useState(() => {
         const token = localStorage.getItem('access_token');
         if (token) {
-            // El interceptor ya pondrá el token en las peticiones, pero también lo guardamos en el estado
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
-                setUser({ username: payload.username, role: payload.role });
+                return { username: payload.username, role: payload.role };
             } catch (e) {
-                console.error('Error decoding token', e);
-                logout(); // Token inválido, limpiamos
+                return null;
             }
+        }
+        return null;
+    });
+    const [loading, setLoading] = useState(true);
+
+    const logout = () => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        setUser(null);
+    };
+
+    useEffect(() => {
+        // En un caso real podrías validar el token en el servidor aquí
+        const token = localStorage.getItem('access_token');
+        if (token && !user) {
+             // fallback si por alguna razon falló la init síncrona
+        } else if (!token && user) {
+            logout();
         }
         setLoading(false);
 
@@ -40,12 +53,6 @@ export const AuthProvider = ({ children }) => {
             console.error('Login error', error);
             throw error;
         }
-    };
-
-    const logout = () => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        setUser(null);
     };
 
     return (

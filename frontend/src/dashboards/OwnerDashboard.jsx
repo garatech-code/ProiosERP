@@ -274,7 +274,7 @@ export default function OwnerDashboard() {
         </div>
     );
 
-    const renderOperationsList = () => (
+    const renderOperationsList = (opsToRender) => (
         <div className="animate-fadeIn">
             <div className="flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 hidden sm:block">Listado de Operaciones</h2>
@@ -320,12 +320,12 @@ export default function OwnerDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
-                {filteredOps?.length === 0 ? (
+                {opsToRender?.length === 0 ? (
                     <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300">
-                        <p className="text-gray-500">No hay operaciones que coincidan con los filtros.</p>
+                        <p className="text-gray-500">No hay operaciones en esta vista.</p>
                     </div>
                 ) : (
-                    filteredOps?.map((op) => (
+                    opsToRender?.map((op) => (
                         <div key={op.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all flex flex-col group relative">
                             <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
                             <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
@@ -335,8 +335,8 @@ export default function OwnerDashboard() {
                                             {getTypeIcon(op.tipo_operacion)}
                                             <span className="text-[10px] font-bold text-gray-400">#OP-{String(op.id).padStart(4, '0')}</span>
                                             {getStatusBadge(op.status || op.estado)}
-                                            {op.aprobacion_requerida_owner && (
-                                                <span className="ml-1 bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded animate-pulse"><i className="bi bi-exclamation-triangle-fill mr-1"></i>ACCIÓN REQ</span>
+                                            {op.estado_revision === 'pending' && (
+                                                <span className="ml-1 bg-amber-100 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded animate-pulse" title="Requiere ser revisada"><i className="bi bi-shield-exclamation mr-1"></i>REVISAR</span>
                                             )}
                                         </div>
                                         <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 truncate">{op.ship_name || 'Buque Desconocido'}</h3>
@@ -428,6 +428,18 @@ export default function OwnerDashboard() {
                         )}
                     </button>
 
+                    <button title={!isSidebarOpen ? "Revisiones Pendientes" : ""} onClick={() => setActiveTab('approvals')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'approvals' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <div className="flex items-center gap-3">
+                            <i className="bi bi-shield-check text-lg shrink-0"></i>
+                            {isSidebarOpen && <span>Revisiones</span>}
+                        </div>
+                        {isSidebarOpen ? (
+                            operations.some(op => op.estado_revision === 'pending') && <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase animate-pulse">Req</span>
+                        ) : (
+                            operations.some(op => op.estado_revision === 'pending') && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-slate-900 rounded-full animate-bounce"></span>
+                        )}
+                    </button>
+
                     {isSidebarOpen ? (
                         <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-2">Sistema</p>
                     ) : (
@@ -510,7 +522,12 @@ export default function OwnerDashboard() {
                     <i className="bi relative bi-envelope-open text-xl">
                         {activeTab !== 'inbox' && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></span>}
                     </i>
-                    <span className="text-[10px] mt-1 font-semibold">Correo</span>
+                </button>
+                <button onClick={() => setActiveTab('approvals')} className={`flex flex-col items-center p-2 ${activeTab === 'approvals' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi relative bi-shield-check text-xl">
+                        {operations.some(op => op.estado_revision === 'pending') && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-full"></span>}
+                    </i>
+                    <span className="text-[10px] mt-1 font-semibold">Revisar</span>
                 </button>
             </div>
 
@@ -525,10 +542,11 @@ export default function OwnerDashboard() {
                             {activeTab === 'calendar' && 'Planificación & Agenda'}
                             {activeTab === 'operations' && 'Gestión Operativa'}
                             {activeTab === 'inbox' && 'Comunicaciones'}
+                            {activeTab === 'approvals' && 'Revisiones de Operaciones'}
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
                         </h2>
                         <p className="text-sm text-gray-500">
-                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
                     {activeTab !== 'inventory' && (
@@ -557,7 +575,8 @@ export default function OwnerDashboard() {
                         <>
                             {activeTab === 'overview' && renderOverview()}
                             {activeTab === 'calendar' && renderCalendar()}
-                            {activeTab === 'operations' && renderOperationsList()}
+                            {activeTab === 'operations' && renderOperationsList(filteredOps)}
+                            {activeTab === 'approvals' && renderOperationsList(operations.filter(op => op.estado_revision === 'pending'))}
                             {activeTab === 'inbox' && renderInbox()}
                             {activeTab === 'inventory' && <InventoryManagement />}
                         </>

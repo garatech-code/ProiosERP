@@ -69,12 +69,14 @@ class OperacionDetalleSerializer(serializers.ModelSerializer):
 class OperacionSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='cliente.name', read_only=True)
     ship_name = serializers.CharField(source='ship.name', read_only=True)
+    ship_flag = serializers.CharField(source='ship.flag', read_only=True)
     port_name = serializers.CharField(source='port.name', read_only=True)
     agency_name = serializers.CharField(source='agency.name', read_only=True)
     status = serializers.SerializerMethodField(read_only=True)
     products = serializers.JSONField(required=False)
 
     can_confirm = serializers.SerializerMethodField()
+    can_send_to_customs = serializers.SerializerMethodField()
     can_coordinate = serializers.SerializerMethodField()
     can_deliver = serializers.SerializerMethodField()
 
@@ -96,16 +98,17 @@ class OperacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Operacion
         fields = [
-            'id', 'client_name', 'ship_name', 'port_name', 'agency_name', 'eta',
+            'id', 'client_name', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'eta',
             'delivery_method', 'status', 'products', 'detalles',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
             'packing_list_file', 'remito_file', 'rancho_file',
             'operadores_id', 'operarios_id', 'contables_id',
-            'can_confirm', 'can_coordinate', 'can_deliver',
+            'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
-            'detalle_servicio', 'forma_cotizacion_servicio'
+            'detalle_servicio', 'forma_cotizacion_servicio',
+            'estado_revision', 'mensaje_revision', 'texto_pedido'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -118,12 +121,16 @@ class OperacionSerializer(serializers.ModelSerializer):
             'delivery_date': {'required': False, 'allow_null': True},
             'closed_date': {'required': False, 'allow_null': True},
         }
+        read_only_fields = ['estado_revision', 'mensaje_revision']
 
     def get_can_confirm(self, obj):
         return obj.estado == Operacion.ESTADO_SOLICITADA
 
+    def get_can_send_to_customs(self, obj):
+        return obj.estado == Operacion.ESTADO_ARMADO_PACKING
+
     def get_can_coordinate(self, obj):
-        return obj.estado == Operacion.ESTADO_PRESUPUESTADA
+        return obj.estado == Operacion.ESTADO_EN_ADUANA
 
     def get_can_deliver(self, obj):
         return obj.estado == Operacion.ESTADO_LISTA_PARA_ENVIO
@@ -165,16 +172,15 @@ class OperacionSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         mapper = {
-            Operacion.ESTADO_SOLICITADA: 'pending',
-            Operacion.ESTADO_PENDIENTE_APROBACION: 'draft',
-            Operacion.ESTADO_PRESUPUESTADA: 'price_checked',
-            Operacion.ESTADO_EN_PRODUCCION: 'in_coordination',
-            Operacion.ESTADO_LISTA_PARA_ENVIO: 'confirmed',
-            Operacion.ESTADO_REMITADA: 'delivered',
-            Operacion.ESTADO_ENTREGADA: 'closed',
-            Operacion.ESTADO_CANCELADA: 'cancelled'
+            Operacion.ESTADO_SOLICITADA: 'solicitada',
+            Operacion.ESTADO_ARMADO_PACKING: 'armado_packing',
+            Operacion.ESTADO_EN_ADUANA: 'en_aduana',
+            Operacion.ESTADO_LISTA_PARA_ENVIO: 'lista_para_envio',
+            Operacion.ESTADO_REMITADA: 'remitada',
+            Operacion.ESTADO_ENTREGADA: 'entregada',
+            Operacion.ESTADO_CANCELADA: 'cancelada'
         }
-        return mapper.get(obj.estado, 'pending')
+        return mapper.get(obj.estado, obj.estado)
 
     def _resolve_nested(self, data_dict, field, model_class, defaults):
         """Resuelve campos anidados (solo para Client, Port, Agency) pero NO para Ship"""

@@ -9,7 +9,6 @@ export default function InventoryManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('productos'); // 'productos', 'quimicos', 'proveedores', 'abastecimiento'
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   
   // ================= ESTADOS PARA PROVEEDORES =================
   const [proveedores, setProveedores] = useState([]);
@@ -33,7 +32,6 @@ export default function InventoryManagement() {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [budgetText, setBudgetText] = useState('');
   const [currentProveedor, setCurrentProveedor] = useState(null);
-  const [currentProductos, setCurrentProductos] = useState([]);
 
   // Modal de creación/edición de producto
   const [showProductModal, setShowProductModal] = useState(false);
@@ -83,10 +81,9 @@ export default function InventoryManagement() {
       if (activeTab === 'quimicos') {
          await fetchFormulas();
       }
-      setError(null);
     } catch (err) {
       console.error(err);
-      setError('Error al cargar datos del inventario.');
+      showToast('Error al cargar datos del inventario.', 'error');
     } finally {
       setLoading(false);
     }
@@ -246,7 +243,7 @@ export default function InventoryManagement() {
       await axios.delete(`/inventario/proveedores/${id}/`);
       showToast('Proveedor eliminado', 'success');
       fetchProveedores();
-    } catch (err) {
+    } catch {
       showToast('Error: tiene productos asociados', 'error');
     }
   };
@@ -316,7 +313,6 @@ export default function InventoryManagement() {
       `\n\nPor favor, enviar presupuesto a: [tu email]`;
     setBudgetText(texto);
     setCurrentProveedor(proveedor);
-    setCurrentProductos(productos);
     setShowBudgetModal(true);
   };
 
@@ -332,7 +328,6 @@ export default function InventoryManagement() {
       `\n\nPor favor, enviar presupuesto a: [tu email]`;
     setBudgetText(texto);
     setCurrentProveedor(proveedor);
-    setCurrentProductos([{ ...product, cantidad: 1 }]);
     setShowBudgetModal(true);
   };
 
@@ -404,7 +399,7 @@ export default function InventoryManagement() {
       }
       setShowProductModal(false);
       fetchProducts();
-    } catch (err) {
+    } catch {
       setValidationError('Error de red o de validación del servidor.');
     } finally {
       setSubmitting(false);

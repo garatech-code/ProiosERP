@@ -1,10 +1,11 @@
 // src/components/OperationDetail.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import OperarioActionPanel from './OperarioActionPanel';
 import OperationTracker from './OperationTracker';
+import ProductSearchCards from './ProductSearchCards'; // NUEVO COMPONENTE
 import * as XLSX from 'xlsx';
 
 export default function OperationDetail() {
@@ -17,14 +18,20 @@ export default function OperationDetail() {
   const [uploading, setUploading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showPackingModal, setShowPackingModal] = useState(false);
-  const [packingData, setPackingData] = useState(null);
-  const [loadingPacking, setLoadingPacking] = useState(false);
   const [stockVerification, setStockVerification] = useState(null);
   const [checkingStock, setCheckingStock] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const [excelPreviewHtml, setExcelPreviewHtml] = useState(null);
   const [showExcelModal, setShowExcelModal] = useState(false);
+  const [packingData, setPackingData] = useState({
+    operation_id: '', client: '', ship: '', port: '', eta: '', products: [], total_weight: 0, total_price: 0
+  }); // Evitamos undefined
+
+  // Estados del workflow de revisión Operador <-> Owner
+  const [mensajeRevision, setMensajeRevision] = useState('');
+  const [revisionActionLoading, setRevisionActionLoading] = useState(false);
+  const isOperador = user?.role === 'OPERADOR';
 
   // Nuevos estados para los desplegables del packing list
   const [proveedor, setProveedor] = useState('PROIOS SA'); // opción por defecto
@@ -35,12 +42,86 @@ export default function OperationDetail() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Parser con Regex para auto-detectar productos en texto libre
+  const detectedProducts = useMemo(() => {
+    if (!operation?.texto_pedido) return [];
+    
+    const lines = operation.texto_pedido.split('\n');
+    let parsedProducts = [];
+    let idCounter = 1;
+
+    // Diferentes "modelos" o patrones de heurística Regex para procesar el texto plano
+    const patterns = [
+      // Modelo 1: Producto - Cantidad: X [Unidad]
+      // Ej: Botas de seguridad - Cantidad: 10 pares | Chalecos - Cant: 5
+      {
+        regex: /(.+?)[–\-:]\s*(?:Cant(?:idad|\.)?)\s*(?::)?\s*(\d+)\s*(.*)/i,
+        extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
+      },
+      // Modelo 2: X [Unidad] de Producto
+      // Ej: 10 pares de botas de seguridad | 25 unidades de raciones
+      {
+        regex: /^(\d+)\s+([a-zA-Z]+)?\s*(?:de|del)?\s+(.+)$/i,
+        extract: (m) => ({ nombre: m[3], cantidad: m[1], unidad: m[2] })
+      },
+      // Modelo 3: Producto x X [Unidad]
+      // Ej: Linternas recargables x 15 unidades | Guantes x5
+      {
+        regex: /(.+?)\s+x\s*(\d+)\s*(.*)/i,
+        extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
+      },
+      // Modelo 4: Producto (X [Unidad])
+      // Ej: Raciones de comida marítima (100 unidades)
+      {
+        regex: /(.+?)\s*\((\d+)\s*([a-zA-Z]+)?\)/i,
+        extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
+      },
+      // Modelo 5: QTY: X - Producto
+      // Ej: Qty: 20 - Botas de Trabajo
+      {
+        regex: /(?:Qty|Cantidad)(?::)?\s*(\d+)\s*([a-zA-Z]+)?\s*[\-\|]\s*(.+)/i,
+        extract: (m) => ({ nombre: m[3], cantidad: m[1], unidad: m[2] })
+      }
+    ];
+
+    lines.forEach(line => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || trimmedLine.length < 3) return; // Ignorar líneas muy cortas o vacías
+
+      let matched = false;
+
+      // Evaluar cada line en orden secuencial según el banco de patrones
+      for (const pattern of patterns) {
+        const match = trimmedLine.match(pattern.regex);
+        if (match) {
+          const { nombre, cantidad, unidad } = pattern.extract(match);
+          
+          // Prevenir falsos positivos filtrando nombres inusualmente largos o vacíos
+          const safeName = nombre ? nombre.trim().replace(/^[\-\:]|[\-\:]$/g, '').trim() : '';
+          
+          if (safeName && safeName.length > 2 && safeName.length < 80) {
+            parsedProducts.push({
+              id: `auto_${idCounter++}`,
+              nombre: safeName,
+              cantidad: parseInt(cantidad, 10) || 1,
+              unidad: unidad ? unidad.trim() : 'unidades'
+            });
+            matched = true;
+            break; // Si un modelo procesó la línea con éxito, no evalúa más modelos para esta línea
+          }
+        }
+      }
+    });
+
+    return parsedProducts;
+  }, [operation?.texto_pedido]);
+
   useEffect(() => {
     fetchOperation();
   }, [id]);
 
   useEffect(() => {
-    if (operation && (operation.status === 'pending' || operation.estado === 'solicitada')) {
+    if (operation && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing')) {
       checkStock();
     }
   }, [operation]);
@@ -70,22 +151,8 @@ export default function OperationDetail() {
     }
   };
 
-  const fetchPackingData = async () => {
-    setLoadingPacking(true);
-    try {
-      const res = await axios.get(`/operaciones/operations/${id}/packing_list_json/`);
-      setPackingData(res.data);
-      setShowPackingModal(true);
-    } catch (err) {
-      console.error(err);
-      showToast('Error al cargar el packing list', 'error');
-    } finally {
-      setLoadingPacking(false);
-    }
-  };
-
   const handleAction = async (action, confirmMessage) => {
-    if (action === 'confirm_operation') {
+    if (action === 'start_coordination') {
       if (!stockVerification?.todo_suficiente) {
         showToast('No se puede confirmar: Hay productos sin stock suficiente.', 'error');
         return;
@@ -108,6 +175,42 @@ export default function OperationDetail() {
       showToast(errorMsg, 'error');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleRequestReview = async () => {
+    setRevisionActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/request_review/`, {
+        mensaje_revision: mensajeRevision
+      });
+      showToast('Revisión solicitada exitosamente', 'success');
+      setMensajeRevision('');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al solicitar revisión', 'error');
+    } finally {
+      setRevisionActionLoading(false);
+    }
+  };
+
+  const handleResolveReview = async (actionStr) => {
+    if (!window.confirm(`¿Desea ${actionStr === 'approve' ? 'APROBAR' : 'RECHAZAR'} esta etapa?`)) return;
+    setRevisionActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/resolve_review/`, {
+        action: actionStr,
+        mensaje_revision: mensajeRevision
+      });
+      showToast(`Revisión ${actionStr === 'approve' ? 'Aprobada' : 'Rechazada'}`, 'success');
+      setMensajeRevision('');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al resolver revisión', 'error');
+    } finally {
+      setRevisionActionLoading(false);
     }
   };
 
@@ -193,35 +296,21 @@ export default function OperationDetail() {
 
   const statusBadge = (status) => {
     const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
       solicitada: 'bg-yellow-100 text-yellow-800',
-      price_checked: 'bg-blue-100 text-blue-800',
-      presupuestada: 'bg-blue-100 text-blue-800',
-      confirmed: 'bg-green-100 text-green-800',
+      armado_packing: 'bg-blue-100 text-blue-800',
+      en_aduana: 'bg-orange-100 text-orange-800',
       lista_para_envio: 'bg-green-100 text-green-800',
-      in_coordination: 'bg-purple-100 text-purple-800',
-      en_produccion: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-indigo-100 text-indigo-800',
       remitada: 'bg-indigo-100 text-indigo-800',
-      closed: 'bg-gray-100 text-gray-800',
       entregada: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
       cancelada: 'bg-red-100 text-red-800',
     };
     const labels = {
-      pending: 'Solicitada',
-      solicitada: 'Solicitada',
-      price_checked: 'Presupuestada',
-      presupuestada: 'Presupuestada',
-      confirmed: 'Lista para Envío',
-      lista_para_envio: 'Lista para Envío',
-      in_coordination: 'En Producción',
-      en_produccion: 'En Producción',
-      delivered: 'Remitada',
-      remitada: 'Remitada',
-      closed: 'Entregada',
+      solicitada: 'Delivery Note',
+      armado_packing: 'Suministros',
+      en_aduana: 'Aduanas',
+      lista_para_envio: 'Logística',
+      remitada: 'Remito Enviado',
       entregada: 'Entregada',
-      cancelled: 'Cancelada',
       cancelada: 'Cancelada',
     };
     return (
@@ -250,7 +339,6 @@ export default function OperationDetail() {
 
   // Obtener bandera del buque para mostrar en el select de país destino (si aplica)
   const shipFlag = operation.ship_flag || (operation.ship ? operation.ship.flag : '');
-  const paisDestinoTexto = paisDestino === 'argentina' ? 'Argentina' : (shipFlag || 'Bandera del buque');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -285,6 +373,52 @@ export default function OperationDetail() {
         )}
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* BANNER DE REVISIÓN */}
+          {operation.estado_revision === 'pending' && (
+            <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
+              <i className="bi bi-clock-history text-amber-500 text-xl mt-0.5"></i>
+              <div>
+                <h4 className="text-amber-800 font-bold">Esta operación está en Revisión</h4>
+                <p className="text-amber-700 text-sm">{isOwner ? 'El Operador ha solicitado revisión. Por favor verifica antes de continuar.' : 'Has solicitado una revisión. Funciones bloqueadas temporalmente.'}</p>
+                {operation.mensaje_revision && (
+                  <div className="mt-2 p-2 bg-white/60 rounded text-amber-900 text-xs shadow-sm italic">
+                    "{operation.mensaje_revision}"
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {operation.estado_revision === 'rejected' && isOperador && (
+            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
+              <i className="bi bi-exclamation-octagon-fill text-red-500 text-xl mt-0.5"></i>
+              <div>
+                <h4 className="text-red-800 font-bold">Se requieren correcciones</h4>
+                <p className="text-red-700 text-sm">El administrador ha rechazado tu solicitud previa.</p>
+                {operation.mensaje_revision && (
+                  <div className="mt-2 p-2 bg-white/60 rounded text-red-900 text-xs shadow-sm italic">
+                    "{operation.mensaje_revision}"
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {operation.estado_revision === 'approved' && isOperador && (
+            <div className="mb-6 bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
+              <i className="bi bi-shield-check text-emerald-500 text-xl mt-0.5"></i>
+              <div>
+                <h4 className="text-emerald-800 font-bold">Revisión Aprobada</h4>
+                <p className="text-emerald-700 text-sm">El administrador dio el OK. Ahora puedes continuar la operación al siguiente nivel.</p>
+                {operation.mensaje_revision && (
+                  <div className="mt-2 p-2 bg-white/60 rounded text-emerald-900 text-xs shadow-sm italic">
+                    "{operation.mensaje_revision}"
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
@@ -360,7 +494,7 @@ export default function OperationDetail() {
                         <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
                           <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
                         </h3>
-                        {(operation.status === 'pending' || operation.estado === 'solicitada') && (
+                        {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
                           <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white">
                             {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
                             Verificar Stock
@@ -414,7 +548,7 @@ export default function OperationDetail() {
                       </table>
                     </div>
 
-                    {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada') && (
+                    {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
                       <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
                         <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
                         <div>
@@ -432,6 +566,26 @@ export default function OperationDetail() {
                   <OperarioActionPanel products={operation.products} />
                 )}
               </div>
+
+              {operation.texto_pedido && (
+                <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
+                    <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+                      <i className="bi bi-chat-left-text-fill text-indigo-500"></i> Delivery Note Original
+                    </h3>
+                  </div>
+                  <div className="p-4 sm:p-6 text-sm text-slate-700 whitespace-pre-wrap font-mono bg-slate-50 border-t border-slate-100 overflow-x-auto">
+                    {operation.texto_pedido}
+                  </div>
+                  
+                  {/* COMPONENTE DE TARJETAS DE BUSQUEDA INYECTADO AQUÍ */}
+                  {(!isOperario) && (
+                    <div className="px-4 py-4 sm:px-6 border-t border-slate-200 bg-white">
+                      <ProductSearchCards initialProducts={detectedProducts} />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* NUEVO BLOQUE: Opciones para el Packing List */}
               <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
@@ -464,7 +618,7 @@ export default function OperationDetail() {
                         <option value="bandera">Bandera del buque (cliente extranjero)</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        {paisDestino === 'bandera' && shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Se usará Argentina'}
+                        {paisDestino === 'argentina' ? 'Se usará Argentina' : (shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Bandera no especificada en el buque')}
                       </p>
                     </div>
                   </div>
@@ -504,9 +658,9 @@ export default function OperationDetail() {
                       >
                         <i className="bi bi-file-earmark-spreadsheet"></i> Exportar Excel
                       </button>
-                      <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
                         <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading} />
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
                       </label>
                     </div>
                   </div>
@@ -524,9 +678,9 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
                       <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading} />
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
                     </label>
                   </div>
 
@@ -543,9 +697,9 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
                       <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading} />
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
                     </label>
                   </div>
                 </div>
@@ -573,25 +727,89 @@ export default function OperationDetail() {
                     </button>
                   )}
 
-                  {operation.can_confirm && !isOperario && (
+                  {/* BLOQUE DE FLUJO DE REVISIONES Y CORTES CONDICIONALES PARA OPERADORES */}
+                  {isOperador && operation.estado_revision !== 'approved' && operation.estado_revision !== 'pending' && operation.estado !== 'entregada' && operation.estado !== 'cancelada' && (
+                    <div className="w-full bg-slate-700/50 p-4 rounded-xl border border-slate-600 mt-2 sm:mt-0 max-w-sm ml-auto">
+                      <h5 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2"><i className="bi bi-shield-check"></i> Solicitar Revisión</h5>
+                      <textarea 
+                        value={mensajeRevision}
+                        onChange={(e) => setMensajeRevision(e.target.value)}
+                        placeholder="Nota o reporte para el administrador..." 
+                        className="w-full text-sm bg-slate-800 text-white border-slate-600 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2"
+                        rows="2"
+                      />
+                      <button 
+                        onClick={handleRequestReview}
+                        disabled={revisionActionLoading}
+                        className="w-full px-5 py-2.5 text-sm font-black rounded-lg shadow-lg bg-indigo-500 text-white hover:bg-indigo-400 transition-all font-bold"
+                      >
+                        {revisionActionLoading ? 'Enviando...' : 'Enviar a Revisión'}
+                      </button>
+                    </div>
+                  )}
+
+                  {isOwner && operation.estado_revision === 'pending' && (
+                    <div className="w-full bg-amber-900/30 p-4 rounded-xl border border-amber-500/30 mt-2 sm:mt-0 max-w-sm ml-auto text-amber-100">
+                      <h5 className="text-xs font-bold uppercase tracking-widest mb-2"><i className="bi bi-check-all"></i> Responder a Revisión</h5>
+                      <textarea 
+                        value={mensajeRevision}
+                        onChange={(e) => setMensajeRevision(e.target.value)}
+                        placeholder="Escribe tu feedback de aprobación/rechazo..." 
+                        className="w-full text-sm bg-slate-800 text-white border-slate-600 rounded-lg p-2 focus:ring-amber-500 focus:border-amber-500 mb-2 placeholder-slate-400"
+                        rows="2"
+                      />
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleResolveReview('reject')}
+                          disabled={revisionActionLoading}
+                          className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-all"
+                        >
+                          Rechazar
+                        </button>
+                        <button 
+                          onClick={() => handleResolveReview('approve')}
+                          disabled={revisionActionLoading}
+                          className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all"
+                        >
+                          Aprobar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_confirm && !isOperario && (
                     <button
-                      onClick={() => handleAction('confirm_operation', '¿Aprobar y Confirmar la operación? Esto consumirá el stock del inventario.')}
+                      onClick={() => handleAction('confirm_operation', '¿Declarar Delivery Note ingresado y pasar al estado de Armado de Packing List?')}
+                      disabled={actionLoading}
+                      className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all"
+                    >
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam mr-1"></i> Armar Packing List</>}
+                    </button>
+                  )}
+                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_send_to_customs && !isOperario && (
+                    <button
+                      onClick={() => handleAction('start_coordination', '¿Enviar Packing List a Aduanas? Esto consumirá el stock del inventario.')}
                       disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
                       className={`px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all ${(stockVerification && !stockVerification.todo_suficiente)
                         ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                        : 'bg-emerald-500 text-white hover:bg-emerald-400 hover:shadow-emerald-500/30'
+                        : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
                         }`}
                     >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-check-circle-fill mr-1"></i> Aprobar & Producir</>}
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-building-check mr-1"></i> Enviar a Aduanas</>}
                     </button>
                   )}
-                  {operation.can_coordinate && !isOperario && (
-                    <button onClick={() => handleAction('start_coordination', '¿Notificar logística?')} disabled={actionLoading} className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-black rounded-xl shadow-lg shadow-indigo-500/30 transition-all">
-                      {actionLoading ? 'Procesando...' : 'Coordinar Entrega'}
+                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_coordinate && !isOperario && (
+                    <button onClick={() => handleAction('finalize_production', '¿Aduana dio el Rancho? Pasar a logística.')} disabled={actionLoading} className="px-5 py-2.5 bg-purple-500 hover:bg-purple-400 text-white text-sm font-black rounded-xl shadow-lg shadow-purple-500/30 transition-all">
+                      {actionLoading ? 'Procesando...' : 'Autorizar Logística'}
                     </button>
                   )}
-                  {operation.can_deliver && !isOperario && (
-                    <button onClick={() => handleAction('mark_delivered', '¿Finalizar operación?')} disabled={actionLoading} className="px-5 py-2.5 bg-purple-500 hover:bg-purple-400 text-white text-sm font-black rounded-xl shadow-lg shadow-purple-500/30 transition-all">
+                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_deliver && !isOperario && (
+                    <button onClick={() => handleAction('mark_delivered', '¿Emitir el remito de entrega final?')} disabled={actionLoading} className="px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-sm font-black rounded-xl shadow-lg shadow-blue-500/30 transition-all">
+                      {actionLoading ? 'Procesando...' : 'Emitir Remito'}
+                    </button>
+                  )}
+                  {(!isOperador || operation.estado_revision === 'approved') && operation.estado === 'remitada' && !isOperario && (
+                    <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all">
                       {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
                     </button>
                   )}
@@ -607,7 +825,7 @@ export default function OperationDetail() {
       </div>
 
       {/* Modal de Packing List (vista previa HTML) */}
-      {showPackingModal && packingData && (
+      {showPackingModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200">
             <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">

@@ -107,31 +107,21 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def confirm_operation(self, request, pk=None):
         """
-        Confirmar operación: verifica stock y consume automáticamente
+        Pasa de Delivery Note Generado a Armado de Packing List.
         """
         operacion = self.get_object()
 
         if operacion.estado != Operacion.ESTADO_SOLICITADA:
             return Response(
-                {'error': f'La operación no está en estado SOLICITADA. Estado actual: {operacion.estado}'},
+                {'error': f'La operación no está en estado inicial. Estado actual: {operacion.estado}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        ok, errores = operacion.verificar_stock()
-        if not ok:
-            return Response({
-                'error': 'Stock insuficiente para confirmar la operación',
-                'detalles': errores
-            }, status=status.HTTP_400_BAD_REQUEST)
-
         with transaction.atomic():
             try:
-                operacion.confirm()
+                operacion.start_packing()
                 operacion.save()
-                operacion.consumir_stock()
             except ValidationError as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            except ValueError as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
                 return Response({'error': f'Error inesperado: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -145,13 +135,40 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def start_coordination(self, request, pk=None):
+        """
+        Envía a aduanas y pasa a estado EN_ADUANA.
+        """
         op = self.get_object()
-        try:
-            op.start_coordination()
-            op.save()
-            return Response({'status': 'coordination_started'})
-        except ValidationError as e:
-            return Response({'error': str(e)}, status=400)
+        # Verificar que se haya subido un packing list
+        if not op.packing_list_file:
+            return Response({'error': 'Debe subir el Packing List estructurado antes de enviar a Aduanas'}, status=400)
+
+        with transaction.atomic():
+            try:
+                op.send_to_customs()
+                op.save()
+                return Response({'status': 'in_customs'})
+            except ValidationError as e:
+                return Response({'error': str(e)}, status=400)
+            except Exception as e:
+                return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def finalize_production(self, request, pk=None):
+        """
+        Aduana completada (Rancho fue subido). Pasa a LISTA_PARA_ENVIO.
+        """
+        op = self.get_object()
+        if not op.rancho_file:
+            return Response({'error': 'Debe subir el Documento Rancho antes de aprobar aduanas'}, status=400)
+            
+        with transaction.atomic():
+            try:
+                op.finalize_customs()
+                op.save()
+                return Response({'status': 'ready_for_delivery'})
+            except ValidationError as e:
+                return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['post'])
     def mark_delivered(self, request, pk=None):
@@ -471,3 +488,41 @@ class OperacionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.exception("Error generando packing list Excel")
             return Response({"error": str(e)}, status=500)
+
+    @action(detail=True, methods=['post'])
+    def request_review(self, request, pk=None):
+        op = self.get_object()
+        mensaje = request.data.get('mensaje_revision', '')
+        
+        op.estado_revision = Operacion.ESTADO_REVISION_PENDING
+        op.aprobacion_requerida_owner = True
+        if mensaje:
+            op.mensaje_revision = mensaje
+        op.save()
+        return Response({'status': 'review_requested'})
+
+    @action(detail=True, methods=['post'])
+    def resolve_review(self, request, pk=None):
+        op = self.get_object()
+        user = request.user
+        
+        if user.role != User.Role.OWNER:
+            return Response({'error': 'Solo el Owner puede resolver revisiones'}, status=403)
+            
+        action = request.data.get('action') # 'approve' or 'reject'
+        mensaje = request.data.get('mensaje_revision', '')
+        
+        if action == 'approve':
+            op.estado_revision = Operacion.ESTADO_REVISION_APPROVED
+            op.aprobacion_requerida_owner = False
+        elif action == 'reject':
+            op.estado_revision = Operacion.ESTADO_REVISION_REJECTED
+            op.aprobacion_requerida_owner = False
+        else:
+            return Response({'error': 'Acción inválida'}, status=400)
+            
+        if mensaje:
+            op.mensaje_revision = mensaje
+            
+        op.save()
+        return Response({'status': 'review_resolved', 'action': action})

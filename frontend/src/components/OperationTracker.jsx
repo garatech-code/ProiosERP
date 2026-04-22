@@ -7,18 +7,13 @@ export default function OperationTracker({ currentState }) {
         if (state === 'cancelada' || state === 'cancelled') return -1;
         switch (state) {
             case 'solicitada':
-            case 'pending':
                 return 1;
-            case 'presupuestada':
-            case 'price_checked':
+            case 'armado_packing':
                 return 2;
-            case 'en_produccion':
-            case 'in_coordination':
+            case 'en_aduana':
                 return 3;
             case 'lista_para_envio':
-            case 'confirmed':
             case 'remitada':
-            case 'delivered':
                 return 4;
             case 'entregada':
             case 'closed':
@@ -32,9 +27,9 @@ export default function OperationTracker({ currentState }) {
     const isCancelled = activeStep === -1;
 
     const steps = [
-        { num: 1, label: 'Solicitada', icon: 'bi-file-earmark-text', desc: 'Orden ingresada' },
-        { num: 2, label: 'Presupuestada', icon: 'bi-calculator', desc: 'Precios y stock' },
-        { num: 3, label: 'En Producción', icon: 'bi-gear-fill', desc: 'Preparando carga' },
+        { num: 1, label: 'Delivery Note', icon: 'bi-file-earmark-text', desc: 'Orden ingresada' },
+        { num: 2, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
+        { num: 3, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
         { num: 4, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
         { num: 5, label: 'Finalizada', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
     ];

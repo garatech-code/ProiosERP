@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
@@ -45,13 +44,13 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         />
       </div>
 
-      <div className="sm:col-span-2">
+      <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-gray-700 mb-1">Peso (kg)</label>
         <input
           type="number"
           value={product.weight_kg || ''}
           disabled
-          className="block w-full py-2 px-3 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 sm:text-sm"
+          className="block w-full py-2 px-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 sm:text-sm text-center"
         />
       </div>
 
@@ -72,12 +71,12 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         )}
       </div>
 
-      <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Stock actual</label>
-        <div className="text-sm font-semibold text-gray-800">{stockActual}</div>
+      <div className="sm:col-span-1">
+        <label className="block text-xs font-medium text-gray-700 mb-1">Stock</label>
+        <div className="text-sm font-semibold text-gray-800 text-center py-2">{stockActual}</div>
       </div>
 
-      <div className="sm:col-span-1">
+      <div className="sm:col-span-3">
         <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. ($)</label>
         <input
           type="number"
@@ -137,6 +136,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
     detalle_servicio: '',
     forma_cotizacion_servicio: 'hora_hombre',
     notes: '',
+    texto_pedido: '',
     products: [],
     delivery_date: '',
     closed_date: '',
@@ -184,6 +184,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
             detalle_servicio: op.detalle_servicio || '',
             forma_cotizacion_servicio: op.forma_cotizacion_servicio || 'hora_hombre',
             notes: op.notes || '',
+            texto_pedido: op.texto_pedido || '',
             products: productsWithStock,
             delivery_date: formatToDatetimeLocal(op.delivery_date),
             closed_date: formatToDatetimeLocal(op.closed_date),
@@ -369,6 +370,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
         closed_date: safeFormatDate(formData.closed_date),
         order_received_date: safeFormatDate(formData.order_received_date),
         client_confirmed_date: safeFormatDate(formData.client_confirmed_date),
+        texto_pedido: formData.texto_pedido,
         detalle_servicio: formData.detalle_servicio,
         forma_cotizacion_servicio: formData.forma_cotizacion_servicio,
       };
@@ -441,6 +443,12 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                   placeholder="Ej: 9432658"
                   value={imoNumber}
                   onChange={(e) => setImoNumber(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleImoSearch();
+                    }
+                  }}
                   className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white"
                 />
                 <button
@@ -631,6 +639,19 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                 </div>
               </div>
             )}
+
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
+              <p className="text-xs text-gray-500 mb-2">Pegue aquí el contenido del correo o pedido original del cliente. Se usará para generar el Delivery Note.</p>
+              <textarea
+                name="texto_pedido"
+                value={formData.texto_pedido}
+                onChange={handleChange}
+                rows={6}
+                className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs"
+                placeholder="Ejemplo: Dear Shipping Dept, Please supply the following items for MV Test..."
+              />
+            </div>
 
             <div>
               <div className="flex justify-between items-end border-b pb-2 mb-4">

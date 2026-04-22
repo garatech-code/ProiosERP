@@ -40,7 +40,7 @@ class OperacionService:
     def procesar_presupuesto(operacion: Operacion, usuario: User):
         """Intenta lanzar la operacion a Presupuestada"""
         if OperacionService._verificar_y_forzar_borrador(operacion, usuario):
-            operacion.estado = Operacion.ESTADO_PENDIENTE_APROBACION
+            operacion.estado_revision = 'pending'
         else:
             operacion.presupuestar()
         
@@ -50,7 +50,7 @@ class OperacionService:
     @staticmethod
     def iniciar_produccion(operacion: Operacion, usuario: User):
         if OperacionService._verificar_y_forzar_borrador(operacion, usuario):
-            operacion.estado = Operacion.ESTADO_PENDIENTE_APROBACION
+            operacion.estado_revision = 'pending'
         else:
             operacion.iniciar_produccion()
         operacion.save()
@@ -63,11 +63,11 @@ class OperacionService:
         if owner.role != User.Role.OWNER:
             raise PermissionDenied("Solo el Owner puede aprobar transiciones bloqueadas.")
 
-        if operacion.estado != Operacion.ESTADO_PENDIENTE_APROBACION:
-            raise ValueError("La operación no está pendiente de aprobación.")
+        if operacion.estado_revision != 'pending':
+            raise ValueError("La operación no está pendiente de revisión.")
 
         # Bypass de FSM estricto mediante override forzado del estado aprobado por el Owner
-        operacion.estado = nuevo_estado
+        operacion.estado_revision = 'approved'
         operacion.save()
 
 

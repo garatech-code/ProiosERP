@@ -49,23 +49,22 @@ class Agency(models.Model):
 
 
 class Operacion(models.Model):
-    ESTADO_SOLICITADA = 'solicitada'
-    ESTADO_PENDIENTE_APROBACION = 'pendiente_aprobacion'
-    ESTADO_PRESUPUESTADA = 'presupuestada'
-    ESTADO_EN_PRODUCCION = 'en_produccion'
-    ESTADO_LISTA_PARA_ENVIO = 'lista_para_envio'
-    ESTADO_REMITADA = 'remitada'
-    ESTADO_ENTREGADA = 'entregada'
+    # NUEVOS ESTADOS FSM (SEGUN NUEVA ARQUITECTURA)
+    ESTADO_SOLICITADA = 'solicitada' # O "Delivery Note Generado"
+    ESTADO_ARMADO_PACKING = 'armado_packing' # Operador contacta proveedores y gestiona el pedido
+    ESTADO_EN_ADUANA = 'en_aduana' # Lista enviada a aduana, se espera rancho
+    ESTADO_LISTA_PARA_ENVIO = 'lista_para_envio' # Rancho OK, listo para coordinar/generar remito
+    ESTADO_REMITADA = 'remitada' # Entregada / Firma
+    ESTADO_ENTREGADA = 'entregada' # Cerrada
     ESTADO_CANCELADA = 'cancelada'
 
     ESTADOS_CHOICES = (
-        (ESTADO_SOLICITADA, 'Solicitada'),
-        (ESTADO_PENDIENTE_APROBACION, 'Pendiente de Aprobación (Borrador)'),
-        (ESTADO_PRESUPUESTADA, 'Presupuestada / Confirmada'),
-        (ESTADO_EN_PRODUCCION, 'En Producción / En Coordinación'),
-        (ESTADO_LISTA_PARA_ENVIO, 'Lista para Envío'),
-        (ESTADO_REMITADA, 'Remitada'),
-        (ESTADO_ENTREGADA, 'Entregada'),
+        (ESTADO_SOLICITADA, 'Generada / Pendiente Packing'),
+        (ESTADO_ARMADO_PACKING, 'En Gestión (Armado del Packing List)'),
+        (ESTADO_EN_ADUANA, 'En Aduana (Esperando Rancho)'),
+        (ESTADO_LISTA_PARA_ENVIO, 'Logística (Despacho y Remito)'),
+        (ESTADO_REMITADA, 'Entregada en sitio'),
+        (ESTADO_ENTREGADA, 'Completada / Cerrada'),
         (ESTADO_CANCELADA, 'Cancelada'),
     )
 
@@ -77,6 +76,9 @@ class Operacion(models.Model):
 
     delivery_method = models.CharField(max_length=20, choices=[('muelle', 'Muelle'), ('lancha', 'Lancha')], default='muelle')
     notas = models.TextField(blank=True)
+    
+    # Campo crucial para pegar el "Delivery Note" / E-mail original del cliente
+    texto_pedido = models.TextField(blank=True, null=True, help_text="Contenido original del e-mail o pedido del cliente.")
 
     # NUEVOS CAMPOS SOLICITADOS POR EL FRONTEND
     order_received_date = models.DateTimeField(null=True, blank=True)
@@ -114,6 +116,20 @@ class Operacion(models.Model):
     stock_consumido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    # CAMPOS DE REVISIÓN (Workflow de Aprobación Admin-Operador)
+    ESTADO_REVISION_NONE = 'none'
+    ESTADO_REVISION_PENDING = 'pending'
+    ESTADO_REVISION_APPROVED = 'approved'
+    ESTADO_REVISION_REJECTED = 'rejected'
+    REVISION_CHOICES = (
+        (ESTADO_REVISION_NONE, 'Ninguna'),
+        (ESTADO_REVISION_PENDING, 'Pendiente de Revisión'),
+        (ESTADO_REVISION_APPROVED, 'Aprobada'),
+        (ESTADO_REVISION_REJECTED, 'Rechazada'),
+    )
+    estado_revision = models.CharField(max_length=20, choices=REVISION_CHOICES, default=ESTADO_REVISION_NONE)
+    mensaje_revision = models.TextField(blank=True, null=True, help_text="Comentarios del operador (al solicitar) o del owner (al aprobar/rechazar).")
 
     estado = FSMField(default=ESTADO_SOLICITADA, choices=ESTADOS_CHOICES, protected=True)
 
@@ -132,37 +148,36 @@ class Operacion(models.Model):
         return f"OP-{self.pk:05d} : {self.cliente} ({self.get_estado_display()})"
 
     # Transiciones FSM que coinciden con las acciones del frontend
-    @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_PRESUPUESTADA)
-    def confirm(self):
-        """Confirmar operación (cliente confirma presupuesto)"""
-        # Verificar stock antes de permitir la transición
-        ok, errores = self.verificar_stock()
-        if not ok:
-            raise ValidationError(f"Stock insuficiente para confirmar: {errores}")
-        
-        self.client_confirmed_date = timezone.now()
-        # Nota: El consumo real se hará en la vista, no aquí, para mantener la atomicidad
-        # con la creación de movimientos en la misma transacción
-
-    @transition(field=estado, source=ESTADO_PRESUPUESTADA, target=ESTADO_EN_PRODUCCION)
-    def start_coordination(self):
-        """Iniciar coordinación / producción"""
+    # Transiciones FSM que coinciden con las acciones del frontend
+    @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_ARMADO_PACKING)
+    def start_packing(self):
+        """Iniciar gestión de proveedores y armado de Packing List"""
         pass
 
-    @transition(field=estado, source=ESTADO_EN_PRODUCCION, target=ESTADO_LISTA_PARA_ENVIO)
-    def finalize_production(self):
-        """Finalizar producción, lista para envío"""
+    @transition(field=estado, source=ESTADO_ARMADO_PACKING, target=ESTADO_EN_ADUANA)
+    def send_to_customs(self):
+        """Avanzar a etapa de aduana (requiere subir el packing list)"""
+        # Nota: El avance a aduana consume virtualmente el stock para separarlo
+        ok, errores = self.verificar_stock()
+        if not ok:
+            raise ValidationError(f"Stock o productos insuficientes/incorrectos para proceder a Aduana: {errores}")
+        self.consumir_stock()
+        self.client_confirmed_date = timezone.now()
+
+    @transition(field=estado, source=ESTADO_EN_ADUANA, target=ESTADO_LISTA_PARA_ENVIO)
+    def finalize_customs(self):
+        """Aduana entrega el Rancho. Listo para logística."""
         pass
 
     @transition(field=estado, source=ESTADO_LISTA_PARA_ENVIO, target=ESTADO_REMITADA)
     def mark_delivered(self):
-        """Marcar como entregada (remitada)"""
+        """Se ha gestionado la logística y se ha emitido el remito"""
         self.delivery_date = timezone.now()
         pass
 
     @transition(field=estado, source=ESTADO_REMITADA, target=ESTADO_ENTREGADA)
     def close(self):
-        """Cerrar operación"""
+        """Cerrar operación y archivada"""
         self.closed_date = timezone.now()
         pass
 
