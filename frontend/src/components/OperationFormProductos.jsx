@@ -34,7 +34,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         <AutocompleteCreate
           label="Producto *"
           // CORRECCIÓN RUTAS: Quitamos la barra inicial
-          endpoint="inventario/products/?categoria=otros"
+          endpoint="/inventario/products/?categoria=otros"
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
@@ -168,13 +168,13 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
     const loadData = async () => {
       try {
         if (currentUser?.role === 'OWNER') {
-          const res = await axios.get('usuarios/users/');
+          const res = await axios.get('/usuarios/users/');
           const fetchedUsers = res.data?.results || res.data;
           if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
         }
 
         if (id) {
-          const res = await axios.get(`operaciones/operations/${id}/`);
+          const res = await axios.get(`/operaciones/operations/${id}/`);
           const op = res.data;
 
           const formatToDatetimeLocal = (isoString) => {
@@ -218,7 +218,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
 
           if (op.ship) {
             try {
-              const shipRes = await axios.get(`operaciones/ships/${op.ship}/`);
+              const shipRes = await axios.get(`/operaciones/ships/${op.ship}/`);
               if (shipRes.data.imo) setImoNumber(shipRes.data.imo);
               if (shipRes.data.flag) setAutoCompleteFlag(shipRes.data.flag);
             } catch (err) { console.error(err); }
@@ -277,7 +277,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
     setImoSuccess(false);
 
     try {
-      const res = await axios.get('operaciones/operations/auto_complete_imo/', { params: { imo: imoNumber } });
+      const res = await axios.get('/operaciones/operations/auto_complete_imo/', { params: { imo: imoNumber } });
       const data = res.data;
 
       const formatToDatetimeLocal = (isoString) => {
@@ -314,10 +314,10 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
     formDataFile.append(fieldName, file);
 
     try {
-      await axios.patch(`operaciones/operations/${id}/`, formDataFile, {
+      await axios.patch(`/operaciones/operations/${id}/`, formDataFile, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const res = await axios.get(`operaciones/operations/${id}/`);
+      const res = await axios.get(`/operaciones/operations/${id}/`);
       setExistingFiles({
         packing_list_file: res.data.packing_list_file,
         remito_file: res.data.remito_file,
@@ -388,9 +388,9 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
 
       let res;
       if (id) {
-        res = await axios.put(`operaciones/operations/${id}/`, payload);
+        res = await axios.put(`/operaciones/operations/${id}/`, payload);
       } else {
-        res = await axios.post('operaciones/operations/', payload);
+        res = await axios.post('/operaciones/operations/', payload);
       }
 
       if (onSuccess) onSuccess(res.data.id);
@@ -499,7 +499,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <AutocompleteCreate
                   label="Cliente *"
-                  endpoint="operaciones/clients/"
+                  endpoint="/operaciones/clients/"
                   value={formData.client}
                   onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
                   extraCreateData={{ email: 'default@email.com' }}
@@ -507,7 +507,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                 />
                 <AutocompleteCreate
                   label="Agencia"
-                  endpoint="operaciones/agencies/"
+                  endpoint="/operaciones/agencies/"
                   value={formData.agency}
                   onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
                   createFields={[
@@ -520,7 +520,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                 <div>
                   <AutocompleteCreate
                     label="Buque *"
-                    endpoint="operaciones/ships/"
+                    endpoint="/operaciones/ships/"
                     value={formData.ship}
                     onSelect={(i) => {
                       setFormData(p => ({ ...p, ship: i?.id || '' }));
@@ -542,7 +542,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                 </div>
                 <AutocompleteCreate
                   label="Puerto *"
-                  endpoint="operaciones/ports/"
+                  endpoint="/operaciones/ports/"
                   value={formData.port}
                   onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
                   createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
