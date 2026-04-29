@@ -119,8 +119,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
 
         nombre_archivo = file.name.lower()
-        es_quimicos = 'quimicos' in nombre_archivo or 'quimico' in nombre_archivo
-
         if not (nombre_archivo.endswith('.xlsx') or nombre_archivo.endswith('.xls')):
             return Response({'error': 'Formato de archivo no soportado. Use .xlsx o .xls'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -131,67 +129,159 @@ class ProductViewSet(viewsets.ModelViewSet):
             logger.error(f"Error al leer Excel: {e}")
             return Response({'error': f'Error al leer el archivo: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ---------- Detección automática del formato ----------
+        # Limpiar y normalizar primeras filas para buscar encabezados
         header_row_idx = None
-        formato_cadenas = False
+        detected_format = None
+        column_mapping = {}
+
+        # Lista de posibles palabras clave para identificar fila de encabezado
+        keywords = {
+            'cadenas': ['productos', 'calibre', 'producto', 'tipo'],
+            'anclas': ['kg', 'num serie', 'numero', 'peso'],
+            'insumos': ['nombre', 'cantidad', 'estado', 'observaciones', 'ubicación'],
+            'quimicos': ['producto', 'cantidad', 'stock']
+        }
+
         for idx, row in df.iterrows():
-            row_str = [str(cell).lower() for cell in row if pd.notna(cell)]
-            if any('productos' in cell for cell in row_str) and any('calibre' in cell for cell in row_str):
-                formato_cadenas = True
+            row_lower = [str(cell).lower().strip() for cell in row if pd.notna(cell)]
+            # Buscar formato Cadenas
+            if any('productos' in cell for cell in row_lower) and any('calibre' in cell for cell in row_lower):
                 header_row_idx = idx
+                detected_format = 'cadenas'
+                # Mapear índices de columnas según el texto exacto
+                for col_idx, val in enumerate(row):
+                    if pd.notna(val):
+                        val_low = str(val).lower().strip()
+                        if 'productos' in val_low:
+                            column_mapping['producto'] = col_idx
+                        elif 'calibre' in val_low:
+                            column_mapping['calibre'] = col_idx
+                        elif 'cantidad' in val_low:
+                            column_mapping['cantidad'] = col_idx
+                        elif 'set' in val_low:
+                            column_mapping['set'] = col_idx
                 break
-            if any('producto' in cell for cell in row_str) and not formato_cadenas:
+            # Buscar formato Anclas (columnas 'kg' o 'num serie')
+            if any('kg' in cell for cell in row_lower) or any('num serie' in cell for cell in row_lower):
                 header_row_idx = idx
+                detected_format = 'anclas'
+                for col_idx, val in enumerate(row):
+                    if pd.notna(val):
+                        val_low = str(val).lower().strip()
+                        if 'kg' == val_low:
+                            column_mapping['kg'] = col_idx
+                        elif 'num serie' in val_low or 'numero' in val_low:
+                            column_mapping['serie'] = col_idx
+                        elif 'numero' == val_low:
+                            column_mapping['numero'] = col_idx  # columna de número de ítem, opcional
+                break
+            # Buscar formato Insumos (Nombre, Cantidad, Estado...)
+            if any('nombre' in cell for cell in row_lower) and any('cantidad' in cell for cell in row_lower):
+                header_row_idx = idx
+                detected_format = 'insumos'
+                for col_idx, val in enumerate(row):
+                    if pd.notna(val):
+                        val_low = str(val).lower().strip()
+                        if 'nombre' in val_low:
+                            column_mapping['nombre'] = col_idx
+                        elif 'cantidad' in val_low:
+                            column_mapping['cantidad'] = col_idx
+                        elif 'estado' in val_low:
+                            column_mapping['estado'] = col_idx
+                        elif 'observaciones' in val_low:
+                            column_mapping['observaciones'] = col_idx
+                        elif 'ubicación' in val_low:
+                            column_mapping['ubicacion'] = col_idx
+                break
+            # Buscar formato Químicos (Producto, Cantidad)
+            if any('producto' in cell for cell in row_lower) and any('cantidad' in cell for cell in row_lower):
+                header_row_idx = idx
+                detected_format = 'quimicos'
+                for col_idx, val in enumerate(row):
+                    if pd.notna(val):
+                        val_low = str(val).lower().strip()
+                        if 'producto' in val_low:
+                            column_mapping['producto'] = col_idx
+                        elif 'cantidad' in val_low:
+                            column_mapping['cantidad'] = col_idx
                 break
 
-        if header_row_idx is None:
-            header_row_idx = -1
+        # Si no se detectó un formato conocido, usar lógica genérica de dos columnas (primera columna = nombre, segunda = cantidad)
+        if detected_format is None:
+            # Buscar una fila que tenga al menos dos celdas no vacías y que no sea encabezado evidente
+            for idx, row in df.iterrows():
+                non_null = [cell for cell in row if pd.notna(cell) and str(cell).strip()]
+                if len(non_null) >= 2:
+                    # Si la primera celda tiene palabras como "stock", "producto", saltar (posible encabezado)
+                    first = str(row.iloc[0]).lower().strip()
+                    if first in ['stock', 'producto', 'nombre', 'descripción', '']:
+                        continue
+                    header_row_idx = idx
+                    detected_format = 'generic_two_column'
+                    column_mapping = {0: 'nombre', 1: 'cantidad'}
+                    break
+            else:
+                # Si no se encuentra, asumir que los datos empiezan en fila 0
+                header_row_idx = -1
+                detected_format = 'generic_two_column'
+                column_mapping = {0: 'nombre', 1: 'cantidad'}
 
+        # ---------- Procesamiento según formato detectado ----------
         productos_creados = 0
         productos_actualizados = 0
         errores = []
 
-        if formato_cadenas:
-            data_start = header_row_idx + 1
-            for idx, row in df.iloc[data_start:].iterrows():
-                producto_raw = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
-                calibre_raw = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ''
-                cantidad_str = str(row.iloc[2]).strip() if pd.notna(row.iloc[2]) else ''
-                set_str = str(row.iloc[3]).strip() if pd.notna(row.iloc[3]) else ''
+        if detected_format == 'cadenas':
+            # Lógica similar a la original pero con columnas dinámicas
+            start_row = header_row_idx + 1
+            for idx, row in df.iloc[start_row:].iterrows():
+                producto_raw = str(row.iloc[column_mapping.get('producto', 0)]).strip() if column_mapping.get('producto') is not None and pd.notna(row.iloc[column_mapping['producto']]) else ''
+                calibre_raw = str(row.iloc[column_mapping.get('calibre', 1)]).strip() if column_mapping.get('calibre') is not None and pd.notna(row.iloc[column_mapping['calibre']]) else ''
+                cantidad_raw = str(row.iloc[column_mapping.get('cantidad', 2)]).strip() if column_mapping.get('cantidad') is not None and pd.notna(row.iloc[column_mapping['cantidad']]) else ''
+                set_raw = str(row.iloc[column_mapping.get('set', 3)]).strip() if column_mapping.get('set') is not None and pd.notna(row.iloc[column_mapping['set']]) else ''
 
                 if not producto_raw or producto_raw.lower() in ['', 'nan', 'none']:
                     continue
 
-                producto_limpio = producto_raw.strip()
-                calibre = calibre_raw if calibre_raw and calibre_raw not in ['nan', 'none'] else ''
+                # Limpiar calibre (extraer número)
+                calibre_num = ''
+                if calibre_raw and calibre_raw not in ['nan', 'none']:
+                    import re
+                    match = re.search(r'(\d+(?:\.\d+)?)', calibre_raw)
+                    if match:
+                        calibre_num = match.group(1)
 
-                if calibre:
-                    nombre_base = ' '.join([p.capitalize() for p in producto_limpio.split()])
-                    nombre_producto = f"{nombre_base} Calibre {calibre}"
-                else:
-                    nombre_producto = producto_limpio.capitalize()
+                nombre_base = ' '.join([p.capitalize() for p in producto_raw.split()])
+                nombre_producto = f"{nombre_base} Calibre {calibre_num}" if calibre_num else nombre_base
 
                 try:
-                    cantidad = float(cantidad_str) if cantidad_str else 0.0
+                    cantidad = float(cantidad_raw) if cantidad_raw else 0.0
                 except ValueError:
-                    errores.append(f'Fila {idx}: cantidad inválida para "{nombre_producto}" -> "{cantidad_str}"')
+                    errores.append(f'Fila {idx}: cantidad inválida "{cantidad_raw}" para {nombre_producto}')
                     continue
 
                 if cantidad <= 0:
                     continue
 
-                if 'cadena' in producto_limpio.lower():
-                    presentacion = f"Cadena calibre {calibre}" if calibre else "Cadena de acero"
-                elif 'kenter' in producto_limpio.lower():
-                    presentacion = f"Kenter calibre {calibre}" if calibre else "Conector Kenter"
-                elif 'grillete giratorio' in producto_limpio.lower():
-                    presentacion = f"Grillete giratorio calibre {calibre}" if calibre else "Grillete giratorio"
-                elif 'grillete' in producto_limpio.lower():
-                    presentacion = f"Grillete calibre {calibre}" if calibre else "Grillete"
+                # Determinar presentación y categoría
+                if 'cadena' in producto_raw.lower():
+                    presentacion = f"Cadena calibre {calibre_num}" if calibre_num else "Cadena de acero"
+                    categoria = 'cadenas'
+                elif 'kenter' in producto_raw.lower():
+                    presentacion = f"Kenter calibre {calibre_num}" if calibre_num else "Conector Kenter"
+                    categoria = 'accesorios_cadena'
+                elif 'grillete giratorio' in producto_raw.lower():
+                    presentacion = f"Grillete giratorio calibre {calibre_num}" if calibre_num else "Grillete giratorio"
+                    categoria = 'accesorios_cadena'
+                elif 'grillete' in producto_raw.lower():
+                    presentacion = f"Grillete calibre {calibre_num}" if calibre_num else "Grillete"
+                    categoria = 'accesorios_cadena'
                 else:
-                    presentacion = f"Componente calibre {calibre}" if calibre else "Componente"
+                    presentacion = f"Componente calibre {calibre_num}" if calibre_num else "Componente"
+                    categoria = 'otros'
 
-                peso_estimado = self._estimar_peso_cadena(producto_limpio, calibre)
-                categoria = 'otros'
+                peso_estimado = self._estimar_peso_cadena(producto_raw, calibre_num)
 
                 try:
                     articulo, created = Articulo.objects.update_or_create(
@@ -201,7 +291,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'peso_kg': peso_estimado,
                             'stock_actual': cantidad,
                             'stock_minimo': 0,
-                            'descripcion': f'Importado desde Excel de cadenas. Calibre: {calibre}, SET: {set_str}, Cantidad original: {cantidad}',
+                            'descripcion': f'Importado desde Excel de cadenas. Calibre: {calibre_num}, SET: {set_raw}, Cantidad original: {cantidad_raw}',
                             'categoria': categoria,
                         }
                     )
@@ -211,45 +301,209 @@ class ProductViewSet(viewsets.ModelViewSet):
                         productos_actualizados += 1
                 except Exception as e:
                     errores.append(f'Error guardando "{nombre_producto}": {str(e)}')
-        else:
-            if header_row_idx >= 0:
-                start_row = header_row_idx + 1
-            else:
-                start_row = 0
-                for idx, row in df.iterrows():
-                    if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip() and not str(row.iloc[0]).strip().lower().startswith('stock'):
-                        start_row = idx
-                        break
 
+        elif detected_format == 'anclas':
+            # Agrupar por peso (kg)
+            start_row = header_row_idx + 1
+            kg_counts = {}
+            kg_series = {}  # guardar números de serie opcionales
             for idx, row in df.iloc[start_row:].iterrows():
-                nombre = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
-                cantidad_str = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ''
+                kg_val = ''
+                if column_mapping.get('kg') is not None and pd.notna(row.iloc[column_mapping['kg']]):
+                    kg_val = str(row.iloc[column_mapping['kg']]).strip()
+                if not kg_val or kg_val.lower() in ['', 'nan', 'none']:
+                    continue
+                # Extraer número del kg
+                import re
+                match = re.search(r'(\d+(?:\.\d+)?)', kg_val)
+                if not match:
+                    continue
+                kg_num = float(match.group(1))
+                serie = ''
+                if column_mapping.get('serie') is not None and pd.notna(row.iloc[column_mapping['serie']]):
+                    serie = str(row.iloc[column_mapping['serie']]).strip()
+                # Contar
+                if kg_num not in kg_counts:
+                    kg_counts[kg_num] = 0
+                    kg_series[kg_num] = []
+                kg_counts[kg_num] += 1
+                if serie:
+                    kg_series[kg_num].append(serie)
 
+            for kg, count in kg_counts.items():
+                nombre_producto = f"Ancla {kg} kg"
+                presentacion = f"Ancla de {kg} kg"
+                descripcion = f"Peso unitario: {kg} kg. Números de serie: {', '.join(kg_series[kg]) if kg_series[kg] else 'No registrados'}"
+                categoria = 'anclas'
+                peso_unitario = kg  # en kg
+                try:
+                    articulo, created = Articulo.objects.update_or_create(
+                        nombre=nombre_producto,
+                        defaults={
+                            'presentacion': presentacion,
+                            'peso_kg': peso_unitario,
+                            'stock_actual': count,
+                            'stock_minimo': 0,
+                            'descripcion': descripcion,
+                            'categoria': categoria,
+                        }
+                    )
+                    if created:
+                        productos_creados += 1
+                    else:
+                        productos_actualizados += 1
+                except Exception as e:
+                    errores.append(f'Error guardando "{nombre_producto}": {str(e)}')
+
+        elif detected_format == 'insumos':
+            start_row = header_row_idx + 1
+            for idx, row in df.iloc[start_row:].iterrows():
+                nombre = ''
+                if column_mapping.get('nombre') is not None and pd.notna(row.iloc[column_mapping['nombre']]):
+                    nombre = str(row.iloc[column_mapping['nombre']]).strip()
                 if not nombre or nombre.lower() in ['', 'nan', 'none']:
                     continue
 
-                match = re.search(r'([\d.,]+)', cantidad_str.replace(',', '.'))
+                cantidad_raw = ''
+                if column_mapping.get('cantidad') is not None and pd.notna(row.iloc[column_mapping['cantidad']]):
+                    cantidad_raw = str(row.iloc[column_mapping['cantidad']]).strip()
+                # Extraer cantidad numérica
+                import re
+                match = re.search(r'(\d+(?:\.\d+)?)', cantidad_raw.replace(',', '.'))
                 if not match:
-                    errores.append(f'Producto "{nombre}": cantidad no válida "{cantidad_str}"')
+                    errores.append(f'Producto "{nombre}": cantidad no válida "{cantidad_raw}"')
                     continue
+                cantidad = float(match.group(1))
 
-                try:
-                    cantidad_num = float(match.group(1))
-                except ValueError:
-                    errores.append(f'Producto "{nombre}": cantidad no convertible a número "{cantidad_str}"')
-                    continue
+                # Obtener estado y observaciones
+                estado = ''
+                if column_mapping.get('estado') is not None and pd.notna(row.iloc[column_mapping['estado']]):
+                    estado = str(row.iloc[column_mapping['estado']]).strip()
+                observaciones = ''
+                if column_mapping.get('observaciones') is not None and pd.notna(row.iloc[column_mapping['observaciones']]):
+                    observaciones = str(row.iloc[column_mapping['observaciones']]).strip()
+                ubicacion = ''
+                if column_mapping.get('ubicacion') is not None and pd.notna(row.iloc[column_mapping['ubicacion']]):
+                    ubicacion = str(row.iloc[column_mapping['ubicacion']]).strip()
 
                 presentacion = ''
-                if 'L' in cantidad_str or 'l' in cantidad_str:
+                if 'l' in cantidad_raw.lower() or 'litro' in cantidad_raw.lower():
                     presentacion = 'Líquido (Litros)'
-                elif 'k' in cantidad_str or 'Kg' in cantidad_str or 'K' in cantidad_str:
+                elif 'kg' in cantidad_raw.lower() or 'k' in cantidad_raw.lower():
                     presentacion = 'Sólido (Kg)'
-                elif 'U' in cantidad_str:
+                elif 'u' in cantidad_raw.lower() or 'unidad' in cantidad_raw.lower():
                     presentacion = 'Unidad'
                 else:
                     presentacion = 'Sin especificar'
 
-                categoria = 'quimicos' if es_quimicos else 'otros'
+                categoria = 'insumos'
+                descripcion = f"Estado: {estado}. Observaciones: {observaciones}. Ubicación: {ubicacion}".strip()
+                if descripcion == "":
+                    descripcion = f"Importado desde Excel de insumos. Cantidad original: {cantidad_raw}"
+
+                try:
+                    articulo, created = Articulo.objects.update_or_create(
+                        nombre=nombre,
+                        defaults={
+                            'presentacion': presentacion,
+                            'peso_kg': 1.0,  # por defecto, se puede ajustar manualmente si se necesita
+                            'stock_actual': cantidad,
+                            'stock_minimo': 0,
+                            'descripcion': descripcion,
+                            'categoria': categoria,
+                        }
+                    )
+                    if created:
+                        productos_creados += 1
+                    else:
+                        productos_actualizados += 1
+                except Exception as e:
+                    errores.append(f'Error guardando "{nombre}": {str(e)}')
+
+        elif detected_format == 'quimicos':
+            start_row = header_row_idx + 1
+            for idx, row in df.iloc[start_row:].iterrows():
+                producto = ''
+                if column_mapping.get('producto') is not None and pd.notna(row.iloc[column_mapping['producto']]):
+                    producto = str(row.iloc[column_mapping['producto']]).strip()
+                if not producto or producto.lower() in ['', 'nan', 'none']:
+                    continue
+
+                cantidad_raw = ''
+                if column_mapping.get('cantidad') is not None and pd.notna(row.iloc[column_mapping['cantidad']]):
+                    cantidad_raw = str(row.iloc[column_mapping['cantidad']]).strip()
+                if not cantidad_raw or cantidad_raw.lower() in ['', 'nan', 'none']:
+                    continue
+
+                # Extraer número y unidad
+                import re
+                match_num = re.search(r'(\d+(?:\.\d+)?)', cantidad_raw.replace(',', '.'))
+                if not match_num:
+                    errores.append(f'Producto "{producto}": cantidad no válida "{cantidad_raw}"')
+                    continue
+                cantidad = float(match_num.group(1))
+
+                # Detectar unidad
+                presentacion = ''
+                if 'l' in cantidad_raw.lower():
+                    presentacion = 'Líquido (Litros)'
+                elif 'k' in cantidad_raw.lower():
+                    presentacion = 'Sólido (Kg)'
+                elif 'u' in cantidad_raw.lower():
+                    presentacion = 'Unidad'
+                else:
+                    presentacion = 'Sin especificar'
+
+                categoria = 'quimicos'
+                descripcion = f"Importado desde Excel de químicos. Unidad original: {cantidad_raw}"
+
+                try:
+                    articulo, created = Articulo.objects.update_or_create(
+                        nombre=producto,
+                        defaults={
+                            'presentacion': presentacion,
+                            'peso_kg': 1.0,
+                            'stock_actual': cantidad,
+                            'stock_minimo': 0,
+                            'descripcion': descripcion,
+                            'categoria': categoria,
+                        }
+                    )
+                    if created:
+                        productos_creados += 1
+                    else:
+                        productos_actualizados += 1
+                except Exception as e:
+                    errores.append(f'Error guardando "{producto}": {str(e)}')
+
+        else:  # generic_two_column
+            start_row = header_row_idx + 1 if header_row_idx >= 0 else 0
+            for idx, row in df.iloc[start_row:].iterrows():
+                nombre = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
+                cantidad_raw = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ''
+
+                if not nombre or nombre.lower() in ['', 'nan', 'none']:
+                    continue
+
+                import re
+                match = re.search(r'(\d+(?:\.\d+)?)', cantidad_raw.replace(',', '.'))
+                if not match:
+                    errores.append(f'Producto "{nombre}": cantidad no válida "{cantidad_raw}"')
+                    continue
+                cantidad = float(match.group(1))
+
+                presentacion = ''
+                if 'l' in cantidad_raw.lower():
+                    presentacion = 'Líquido (Litros)'
+                elif 'k' in cantidad_raw.lower():
+                    presentacion = 'Sólido (Kg)'
+                elif 'u' in cantidad_raw.lower():
+                    presentacion = 'Unidad'
+                else:
+                    presentacion = 'Sin especificar'
+
+                categoria = 'otros'
+                descripcion = f'Importado desde Excel. Unidad original: {cantidad_raw}'
 
                 try:
                     articulo, created = Articulo.objects.update_or_create(
@@ -257,9 +511,9 @@ class ProductViewSet(viewsets.ModelViewSet):
                         defaults={
                             'presentacion': presentacion,
                             'peso_kg': 1.0,
-                            'stock_actual': cantidad_num,
+                            'stock_actual': cantidad,
                             'stock_minimo': 0,
-                            'descripcion': f'Importado desde Excel. Unidad original: {cantidad_str}',
+                            'descripcion': descripcion,
                             'categoria': categoria,
                         }
                     )
