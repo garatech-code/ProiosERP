@@ -36,26 +36,26 @@ export default function OperationTracker({ currentState }) {
 
     if (isCancelled) {
         return (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
-                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-2xl mb-4 shadow-inner">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center h-full min-h-[400px]">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/50 text-red-500 rounded-full flex items-center justify-center text-2xl mb-4 shadow-inner">
                     <i className="bi bi-x-octagon-fill"></i>
                 </div>
-                <h3 className="text-red-800 font-black text-lg">Operación Anulada</h3>
-                <p className="text-red-600 text-xs font-medium mt-2 px-4">El flujo de esta operación ha sido interrumpido permanentemente.</p>
+                <h3 className="text-red-800 dark:text-red-300 font-black text-lg">Operación Anulada</h3>
+                <p className="text-red-600 dark:text-red-400 text-xs font-medium mt-2 px-4">El flujo de esta operación ha sido interrumpido permanentemente.</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 h-full flex flex-col sticky top-24 min-h-[500px]">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 shrink-0">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 h-full flex flex-col sticky top-24 min-h-[500px]">
+            <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-4 shrink-0">
                 <i className="bi bi-signpost-split text-indigo-500 text-lg"></i>
                 Estado del Flujo
             </h3>
 
             <div className="flex-1 relative py-2">
                 {/* Línea vertical de fondo */}
-                <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-slate-100"></div>
+                <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-slate-100 dark:bg-slate-700"></div>
 
                 {/* Línea vertical animada (progreso) */}
                 <div
@@ -75,18 +75,18 @@ export default function OperationTracker({ currentState }) {
                                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-all duration-500 shadow-sm
                   ${isCompleted ? 'bg-indigo-500 border-indigo-500 text-white' : ''}
-                  ${isCurrent ? 'bg-white border-indigo-500 text-indigo-600 ring-4 ring-indigo-50 scale-110' : ''}
-                  ${isPending ? 'bg-white border-slate-200 text-slate-400' : ''}
+                  ${isCurrent ? 'bg-white dark:bg-slate-800 border-indigo-500 text-indigo-600 ring-4 ring-indigo-50 dark:ring-indigo-900/50 scale-110' : ''}
+                  ${isPending ? 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500' : ''}
                 `}>
                                     {isCompleted ? <i className="bi bi-check-lg text-lg"></i> : <i className={`bi ${step.icon} text-sm`}></i>}
                                 </div>
 
                                 {/* Textos */}
                                 <div className={`pt-1 transition-all duration-300 ${isCurrent ? 'transform translate-x-1' : ''}`}>
-                                    <h4 className={`text-sm font-bold ${isCurrent ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                    <h4 className={`text-sm font-bold ${isCurrent ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                         {step.label}
                                     </h4>
-                                    <p className="text-xs font-medium text-slate-500 mt-0.5 leading-tight">{step.desc}</p>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-500 mt-0.5 leading-tight">{step.desc}</p>
 
                                     {isCurrent && (
                                         <span className="inline-block mt-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black rounded uppercase tracking-wider animate-pulse">

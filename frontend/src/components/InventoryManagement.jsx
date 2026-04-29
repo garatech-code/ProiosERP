@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import AutocompleteCreate from './AutocompleteCreate';
+import LogoSpinner from './LogoSpinner';
 
 export default function InventoryManagement() {
   const [products, setProducts] = useState([]);
@@ -678,7 +679,7 @@ export default function InventoryManagement() {
               if (activeTab === 'abastecimiento') setCriticosSearchTerm(e.target.value);
               else setSearchTerm(e.target.value);
             }}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 rounded-xl bg-white focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
           />
       </div>
 
@@ -686,7 +687,7 @@ export default function InventoryManagement() {
       {activeTab !== 'proveedores' && activeTab !== 'abastecimiento' && (
         <>
           {loading ? (
-            <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            <div className="flex justify-center py-20"><LogoSpinner size="w-12 h-12" /></div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProducts.map(product => {
@@ -698,19 +699,19 @@ export default function InventoryManagement() {
                 const minStockNum = Number(product.stock_minimo) || 0;
                 
                 return (
-                  <div key={product.id} className={`rounded-xl shadow-sm border overflow-hidden hover:shadow-lg transition-shadow flex flex-col group ${cardBg} ${borderColor}`}>
+                  <div key={product.id} className={`rounded-xl shadow-sm border overflow-hidden hover:shadow-lg transition-shadow flex flex-col group ${cardBg} dark:bg-slate-800 ${borderColor} dark:border-slate-700`}>
                     <div className="p-5 flex-1 relative">
                       <div className={`absolute top-0 left-0 w-1.5 h-full ${barColor}`}></div>
                       <div className="pl-2">
                         <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors" title={product.nombre}>{product.nombre}</h3>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 transition-colors" title={product.nombre}>{product.nombre}</h3>
                             <div className="flex gap-1 shrink-0">
                                 <button onClick={() => openEditModal(product)} className="text-indigo-300 hover:text-indigo-600"><i className="bi bi-pencil-square"></i></button>
                                 <button onClick={() => confirmDelete(product)} className="text-red-300 hover:text-red-600"><i className="bi bi-trash"></i></button>
                             </div>
                         </div>
                         
-                        <div className="text-xs sm:text-sm text-gray-600 space-y-1 mb-3">
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 space-y-1 mb-3">
                             <p><span className="font-semibold text-gray-400">Presentación:</span> {product.presentacion}</p>
                             <p><span className="font-semibold text-gray-400">Peso Base:</span> {parseFloat(product.peso_kg).toFixed(2)} kg</p>
                             {product.proveedor_nombre && (
@@ -761,8 +762,8 @@ export default function InventoryManagement() {
             </div>
           )}
           {filteredProducts.length === 0 && !loading && (
-            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
-              <p className="text-gray-500">No se encontraron registros en esta pestaña.</p>
+            <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600">
+              <p className="text-gray-500 dark:text-slate-400">No se encontraron registros en esta pestaña.</p>
             </div>
           )}
         </>
@@ -774,10 +775,10 @@ export default function InventoryManagement() {
           {filteredProveedores.map(prov => {
             const condicionLabel = condicionPagoOptions.find(o => o.value === prov.condicion_pago)?.label || prov.condicion_pago;
             return (
-              <div key={prov.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+              <div key={prov.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{prov.nombre}</h3>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{prov.nombre}</h3>
                     <div className="flex gap-1">
                       <button onClick={() => openEditProveedor(prov)} className="text-indigo-300 hover:text-indigo-600"><i className="bi bi-pencil-square"></i></button>
                       <button onClick={() => deleteProveedor(prov.id, prov.nombre)} className="text-red-300 hover:text-red-600"><i className="bi bi-trash"></i></button>
@@ -794,8 +795,8 @@ export default function InventoryManagement() {
             );
           })}
           {filteredProveedores.length === 0 && !loading && (
-            <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
-              <p className="text-gray-500">No hay proveedores registrados.</p>
+            <div className="col-span-full text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600">
+              <p className="text-gray-500 dark:text-slate-400">No hay proveedores registrados.</p>
             </div>
           )}
         </div>
@@ -805,13 +806,13 @@ export default function InventoryManagement() {
       {activeTab === 'abastecimiento' && (
         <>
           {loading ? (
-            <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+            <div className="flex justify-center py-20"><LogoSpinner size="w-12 h-12" /></div>
           ) : (
             <>
               {selectedBudgetCount > 0 && (
-                <div className="mb-4 p-4 bg-indigo-50 rounded-xl flex justify-between items-center">
-                  <span className="text-sm font-medium text-indigo-800">{selectedBudgetCount} producto(s) seleccionado(s)</span>
-                  <button onClick={openBudgetModalForSelected} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                <div className="mb-4 p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex justify-between items-center border border-indigo-100 dark:border-indigo-800">
+                  <span className="text-sm font-medium text-indigo-800 dark:text-indigo-300">{selectedBudgetCount} producto(s) seleccionado(s)</span>
+                  <button onClick={openBudgetModalForSelected} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors">
                     <i className="bi bi-envelope-plus"></i> Solicitar presupuesto para seleccionados
                   </button>
                 </div>
@@ -824,12 +825,12 @@ export default function InventoryManagement() {
                   const selectedProveedorId = selectedForBudget[product.id]?.proveedorId || '';
                   const cantidad = selectedForBudget[product.id]?.cantidad || 1;
                   return (
-                    <div key={product.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-shadow ${isSelected ? 'border-indigo-300 ring-1 ring-indigo-300' : 'border-gray-200'}`}>
+                    <div key={product.id} className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border overflow-hidden transition-shadow ${isSelected ? 'border-indigo-300 dark:border-indigo-500 ring-1 ring-indigo-300 dark:ring-indigo-500' : 'border-gray-200 dark:border-slate-700'}`}>
                       <div className="p-5">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex-1">
-                            <h3 className="text-lg font-bold text-gray-900">{product.nombre}</h3>
-                            <div className="text-sm text-gray-500 mt-1">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{product.nombre}</h3>
+                            <div className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                               <p>Presentación: {product.presentacion}</p>
                               <p>Peso Base: {parseFloat(product.peso_kg).toFixed(2)} kg</p>
                             </div>
@@ -837,23 +838,23 @@ export default function InventoryManagement() {
                           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                             <div className="flex gap-4 items-center">
                               <div className="text-center">
-                                <span className="text-xs text-gray-500">Stock actual</span>
-                                <p className={`font-bold ${stockNum === 0 ? 'text-red-600' : 'text-yellow-600'}`}>{stockNum}</p>
+                                <span className="text-xs text-gray-500 dark:text-slate-400">Stock actual</span>
+                                <p className={`font-bold ${stockNum === 0 ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{stockNum}</p>
                               </div>
                               {minStockNum > 0 && (
                                 <div className="text-center">
-                                  <span className="text-xs text-gray-500">Stock mínimo</span>
-                                  <p className="font-bold text-gray-700">{minStockNum}</p>
+                                  <span className="text-xs text-gray-500 dark:text-slate-400">Stock mínimo</span>
+                                  <p className="font-bold text-gray-700 dark:text-slate-300">{minStockNum}</p>
                                 </div>
                               )}
                             </div>
                             <div className="w-32">
-                              <label className="block text-xs text-gray-500">Cantidad a cotizar</label>
-                              <input type="number" min="0" step="1" value={cantidad} onChange={(e) => updateCantidadForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border rounded text-center" />
+                              <label className="block text-xs text-gray-500 dark:text-slate-400">Cantidad a cotizar</label>
+                              <input type="number" min="0" step="1" value={cantidad} onChange={(e) => updateCantidadForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded text-center transition-colors" />
                             </div>
                             <div className="w-48">
-                              <label className="block text-xs text-gray-500">Proveedor</label>
-                              <select value={selectedProveedorId} onChange={(e) => updateProveedorForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border rounded">
+                              <label className="block text-xs text-gray-500 dark:text-slate-400">Proveedor</label>
+                              <select value={selectedProveedorId} onChange={(e) => updateProveedorForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded transition-colors">
                                 <option value="">Seleccionar</option>
                                 {proveedores.map(prov => (
                                   <option key={prov.id} value={prov.id}>{prov.nombre}</option>
@@ -861,10 +862,10 @@ export default function InventoryManagement() {
                               </select>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => toggleSelectForBudget(product.id, selectedProveedorId)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                              <button onClick={() => toggleSelectForBudget(product.id, selectedProveedorId)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}>
                                 {isSelected ? 'Seleccionado' : 'Seleccionar'}
                               </button>
-                              <button onClick={() => openIndividualBudget(product, selectedProveedorId)} disabled={!selectedProveedorId} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                              <button onClick={() => openIndividualBudget(product, selectedProveedorId)} disabled={!selectedProveedorId} className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-200 dark:hover:bg-emerald-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-emerald-200 dark:border-emerald-800">
                                 <i className="bi bi-envelope-paper me-1"></i>Presupuesto
                               </button>
                             </div>
@@ -876,8 +877,8 @@ export default function InventoryManagement() {
                 })}
               </div>
               {filteredCriticos.length === 0 && !loading && (
-                <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
-                  <p className="text-gray-500">No hay productos con stock crítico (bajo o cero).</p>
+                <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600">
+                  <p className="text-gray-500 dark:text-slate-400">No hay productos con stock crítico (bajo o cero).</p>
                 </div>
               )}
             </>
@@ -889,87 +890,42 @@ export default function InventoryManagement() {
       {/* Modal Proveedor */}
       {showProveedorModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowProveedorModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 bg-slate-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md mx-auto overflow-hidden border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
               </h3>
-              <button onClick={() => setShowProveedorModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button onClick={() => setShowProveedorModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               <form onSubmit={handleProveedorSubmit} className="space-y-4">
+                {[{label:'Razón Social *',field:'nombre',type:'text',required:true},{label:'Contacto',field:'contacto',type:'text'},{label:'Teléfono',field:'telefono',type:'text'},{label:'Email',field:'email',type:'email'},{label:'Rubro',field:'rubro',type:'text',placeholder:'Ej: Alimenticio...'}].map(({label,field,type,required,placeholder}) => (
+                  <div key={field}>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">{label}</label>
+                    <input type={type} value={proveedorForm[field]} onChange={e => setProveedorForm({...proveedorForm, [field]: e.target.value})}
+                      className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 transition-colors"
+                      required={required} placeholder={placeholder}
+                    />
+                  </div>
+                ))}
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Razón Social *</label>
-                  <input 
-                    type="text" 
-                    value={proveedorForm.nombre} 
-                    onChange={e => setProveedorForm({...proveedorForm, nombre: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    required
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Dirección</label>
+                  <textarea value={proveedorForm.direccion} onChange={e => setProveedorForm({...proveedorForm, direccion: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 transition-colors" rows={2}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Contacto</label>
-                  <input 
-                    type="text" 
-                    value={proveedorForm.contacto} 
-                    onChange={e => setProveedorForm({...proveedorForm, contacto: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Teléfono</label>
-                  <input 
-                    type="text" 
-                    value={proveedorForm.telefono} 
-                    onChange={e => setProveedorForm({...proveedorForm, telefono: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
-                  <input 
-                    type="email" 
-                    value={proveedorForm.email} 
-                    onChange={e => setProveedorForm({...proveedorForm, email: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Dirección</label>
-                  <textarea 
-                    value={proveedorForm.direccion} 
-                    onChange={e => setProveedorForm({...proveedorForm, direccion: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Rubro</label>
-                  <input 
-                    type="text" 
-                    value={proveedorForm.rubro} 
-                    onChange={e => setProveedorForm({...proveedorForm, rubro: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    placeholder="Ej: Alimenticio, Metalúrgico, etc."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Condición de Pago</label>
-                  <select
-                    value={proveedorForm.condicion_pago}
-                    onChange={e => setProveedorForm({...proveedorForm, condicion_pago: e.target.value})}
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500"
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Condición de Pago</label>
+                  <select value={proveedorForm.condicion_pago} onChange={e => setProveedorForm({...proveedorForm, condicion_pago: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 transition-colors"
                   >
-                    {condicionPagoOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                    {condicionPagoOptions.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
                   </select>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
-                  <button type="button" onClick={() => setShowProveedorModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                  <button type="button" onClick={() => setShowProveedorModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancelar</button>
                   <button type="submit" disabled={submittingProveedor} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-lg disabled:opacity-50">
                     {submittingProveedor ? 'Guardando...' : 'Guardar'}
                   </button>
@@ -984,110 +940,60 @@ export default function InventoryManagement() {
       {/* Modal Producto */}
       {showProductModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowProductModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-auto overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 bg-slate-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md mx-auto overflow-hidden border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {editingProduct ? 'Editar registro' : `Nuevo ${activeTab === 'quimicos' ? 'Químico' : 'Producto'}`}
               </h3>
-              <button onClick={() => setShowProductModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button onClick={() => setShowProductModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               {validationError && (
-                <div className="mb-4 text-xs font-bold text-red-600 bg-red-50 p-2 rounded">
+                <div className="mb-4 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
                   {validationError}
                 </div>
               )}
               <form onSubmit={handleProductSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nombre *</label>
-                  <input 
-                    type="text" 
-                    value={formData.nombre} 
-                    onChange={e => setFormData({...formData, nombre: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Descripción</label>
-                  <input 
-                    type="text" 
-                    value={formData.descripcion} 
-                    onChange={e => setFormData({...formData, descripcion: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Presentación *</label>
-                  <input 
-                    type="text" 
-                    value={formData.presentacion} 
-                    onChange={e => setFormData({...formData, presentacion: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    placeholder="Ej: Tambor 200L" 
-                    required
-                  />
-                </div>
+                {[{label:'Nombre *',field:'nombre',type:'text',required:true},{label:'Descripción',field:'descripcion',type:'text'},{label:'Presentación *',field:'presentacion',type:'text',required:true,placeholder:'Ej: Tambor 200L'}].map(({label,field,type,required,placeholder}) => (
+                  <div key={field}>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">{label}</label>
+                    <input type={type} value={formData[field]} onChange={e => setFormData({...formData, [field]: e.target.value})}
+                      className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 transition-colors"
+                      required={required} placeholder={placeholder}
+                    />
+                  </div>
+                ))}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Peso Base (Kg/L) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.peso_kg} 
-                      onChange={e => setFormData({...formData, peso_kg: e.target.value})} 
-                      className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Stock Físico</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.stock_actual} 
-                      onChange={e => setFormData({...formData, stock_actual: e.target.value})} 
-                      className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    />
-                  </div>
+                  {[{label:'Peso Base (Kg/L) *',field:'peso_kg',required:true},{label:'Stock Físico',field:'stock_actual'}].map(({label,field,required}) => (
+                    <div key={field}>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">{label}</label>
+                      <input type="number" step="0.01" value={formData[field]} onChange={e => setFormData({...formData, [field]: e.target.value})}
+                        className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 transition-colors"
+                        required={required}
+                      />
+                    </div>
+                  ))}
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    min="0" 
-                    value={formData.stock_minimo} 
-                    onChange={e => setFormData({...formData, stock_minimo: e.target.value})} 
-                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-indigo-500" 
-                    placeholder="Ej: 10" 
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Stock Mínimo (Alerta)</label>
+                  <input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 transition-colors" placeholder="Ej: 10"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Cuando el stock baje a este valor, la tarjeta se pondrá amarilla.</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Cuando el stock baje a este valor, la tarjeta se pondrá amarilla.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Proveedor (opcional)</label>
-                  <AutocompleteCreate
-                    endpoint="/inventario/proveedores/"
-                    value={formData.proveedor}
-                    onSelect={(item) => setFormData({...formData, proveedor: item?.id || ''})}
-                    nameField="nombre"
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Proveedor (opcional)</label>
+                  <AutocompleteCreate endpoint="/inventario/proveedores/" value={formData.proveedor}
+                    onSelect={(item) => setFormData({...formData, proveedor: item?.id || ''})} nameField="nombre"
                     placeholder="Seleccionar o crear proveedor..."
-                    createFields={[
-                      { name: 'nombre', label: 'Razón Social', required: true },
-                      { name: 'contacto', label: 'Contacto' },
-                      { name: 'telefono', label: 'Teléfono' },
-                      { name: 'email', label: 'Email' },
-                      { name: 'direccion', label: 'Dirección' },
-                      { name: 'rubro', label: 'Rubro' },
-                      { name: 'condicion_pago', label: 'Condición de Pago', type: 'select', options: condicionPagoOptions },
-                    ]}
+                    createFields={[{name:'nombre',label:'Razón Social',required:true},{name:'contacto',label:'Contacto'},{name:'telefono',label:'Teléfono'},{name:'email',label:'Email'},{name:'direccion',label:'Dirección'},{name:'rubro',label:'Rubro'},{name:'condicion_pago',label:'Condición de Pago',type:'select',options:condicionPagoOptions}]}
                     extraCreateData={{}}
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
-                  <button type="button" onClick={() => setShowProductModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                  <button type="button" onClick={() => setShowProductModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancelar</button>
                   <button type="submit" disabled={submitting} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-lg disabled:opacity-50">
                     {submitting ? 'Guardando...' : 'Guardar'}
                   </button>
@@ -1102,23 +1008,25 @@ export default function InventoryManagement() {
       {/* Modal Presupuesto */}
       {showBudgetModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowBudgetModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 bg-indigo-50 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-lg font-black text-indigo-900">Solicitar presupuesto a {currentProveedor?.nombre}</h3>
-              <button onClick={() => setShowBudgetModal(false)} className="text-gray-400 hover:text-gray-600">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 bg-indigo-50 dark:bg-indigo-900/30 flex justify-between items-center rounded-t-2xl">
+              <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-300">Solicitar presupuesto a {currentProveedor?.nombre}</h3>
+              <button onClick={() => setShowBudgetModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto">
               <div className="mb-4">
-                <label className="block text-sm font-bold text-gray-700 mb-2">Texto para enviar al proveedor</label>
-                <textarea rows={12} value={budgetText} onChange={(e) => setBudgetText(e.target.value)} className="w-full border rounded-lg p-3 font-mono text-sm"></textarea>
+                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Texto para enviar al proveedor</label>
+                <textarea rows={12} value={budgetText} onChange={(e) => setBudgetText(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-3 font-mono text-sm transition-colors"
+                ></textarea>
               </div>
               <div className="flex justify-end gap-3">
                 <button onClick={copyBudgetToClipboard} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2">
                   <i className="bi bi-clipboard-check"></i> Copiar al portapapeles
                 </button>
-                <button onClick={() => setShowBudgetModal(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cerrar</button>
+                <button onClick={() => setShowBudgetModal(false)} className="px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">Cerrar</button>
               </div>
             </div>
           </div>
@@ -1129,12 +1037,12 @@ export default function InventoryManagement() {
       {/* Modal Eliminación Individual */}
       {showDeleteModal && productToDelete && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden text-center p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden text-center p-6 border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
             <i className="bi bi-exclamation-triangle text-4xl text-red-500 mb-3 block"></i>
-            <h3 className="text-xl font-black mb-2">Eliminar Registro</h3>
-            <p className="text-sm text-gray-500 mb-6">¿Estás seguro de borrar <b>{productToDelete.nombre}</b> permanentemente?</p>
+            <h3 className="text-xl font-black mb-2 dark:text-white">Eliminar Registro</h3>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">¿Estás seguro de borrar <b className="dark:text-white">{productToDelete.nombre}</b> permanentemente?</p>
             <div className="flex justify-center gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancelar</button>
               <button onClick={handleDelete} disabled={submitting} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-lg">Sí, Eliminar</button>
             </div>
           </div>
@@ -1145,32 +1053,32 @@ export default function InventoryManagement() {
       {/* Modal Eliminación Múltiple */}
       {showMultiDeleteModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowMultiDeleteModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-gray-100 bg-red-50 rounded-t-2xl">
-              <h3 className="text-lg font-black text-red-800">Eliminación Masiva ({activeTab})</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh] border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 dark:border-slate-700 bg-red-50 dark:bg-red-900/20 rounded-t-2xl">
+              <h3 className="text-lg font-black text-red-800 dark:text-red-300">Eliminación Masiva ({activeTab})</h3>
             </div>
             <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 text-gray-500">
+                  <tr className="border-b border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400">
                     <th className="p-2"><input type="checkbox" checked={selectedCount > 0 && selectedCount === filteredProducts.length} onChange={toggleSelectAll} className="rounded" /></th>
                     <th className="p-2">Nombre</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                   {filteredProducts.map(p => (
-                    <tr key={p.id}>
+                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                       <td className="p-2"><input type="checkbox" checked={selectedProducts[p.id] || false} onChange={() => toggleSelectProduct(p.id)} className="rounded" /></td>
-                      <td className="p-2 font-medium text-gray-800">{p.nombre}</td>
+                      <td className="p-2 font-medium text-gray-800 dark:text-slate-200">{p.nombre}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="p-4 border-t border-gray-100 flex justify-between items-center bg-slate-50 rounded-b-2xl">
-              <span className="text-xs font-bold text-gray-500">{selectedCount} elegidos</span>
+            <div className="p-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 rounded-b-2xl">
+              <span className="text-xs font-bold text-gray-500 dark:text-slate-400">{selectedCount} elegidos</span>
               <div className="flex gap-2">
-                <button onClick={() => setShowMultiDeleteModal(false)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded-lg">Cancelar</button>
+                <button onClick={() => setShowMultiDeleteModal(false)} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors">Cancelar</button>
                 <button onClick={handleMultiDelete} disabled={selectedCount===0 || deletingMultiple} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg disabled:opacity-50">Borrar</button>
               </div>
             </div>
@@ -1182,53 +1090,50 @@ export default function InventoryManagement() {
       {/* Modal BOM */}
       {showFormulaModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowFormulaModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 bg-indigo-50/50 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-lg font-black text-indigo-900">BOM: {selectedQuimico?.nombre}</h3>
-              <button onClick={() => setShowFormulaModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-900/20 flex justify-between items-center rounded-t-2xl">
+              <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-300">BOM: {selectedQuimico?.nombre}</h3>
+              <button onClick={() => setShowFormulaModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors">
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
             <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
               <div className="mb-4">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nombre de la Receta</label>
-                <input type="text" value={formulaName} onChange={e => setFormulaName(e.target.value)} className="w-full border-gray-300 border px-3 py-2 rounded-lg font-medium outline-none focus:border-indigo-500" placeholder="Ej. Lote Estándar" />
+                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1">Nombre de la Receta</label>
+                <input type="text" value={formulaName} onChange={e => setFormulaName(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white px-3 py-2 rounded-lg font-medium outline-none focus:border-indigo-500 transition-colors" placeholder="Ej. Lote Estándar"
+                />
               </div>
               <div className="mb-4 flex justify-between items-end">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Ingredientes</label>
-                <button onClick={() => setIngredients([...ingredients, {insumo_id:'', cantidad:''}])} className="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-100">+ Agregar</button>
+                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Ingredientes</label>
+                <button onClick={() => setIngredients([...ingredients, {insumo_id:'', cantidad:''}])} className="text-xs font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">+ Agregar</button>
               </div>
               <div className="space-y-3">
                 {ingredients.map((ing, idx) => (
-                  <div key={idx} className="flex gap-2 items-start bg-slate-50 p-2 rounded-xl border border-slate-200">
+                  <div key={idx} className="flex gap-2 items-start bg-slate-50 dark:bg-slate-700 p-2 rounded-xl border border-slate-200 dark:border-slate-600">
                     <div className="flex-1">
-                      <AutocompleteCreate
-                        label="Insumo *" endpoint="/inventario/products/?categoria=otros"
+                      <AutocompleteCreate label="Insumo *" endpoint="/inventario/products/?categoria=otros"
                         value={ing.insumo_id} nameField="nombre"
-                        onSelect={(item) => {
-                          const newIng = [...ingredients];
-                          newIng[idx].insumo_id = item.id;
-                          setIngredients(newIng);
-                        }}
+                        onSelect={(item) => { const newIng = [...ingredients]; newIng[idx].insumo_id = item.id; setIngredients(newIng); }}
                         createFields={[]} extraCreateData={{ categoria: 'otros' }}
                       />
                     </div>
                     <div className="w-24 shrink-0">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1">Cant.</label>
-                      <input type="number" step="0.01" value={ing.cantidad} onChange={e => {
-                        const newIng = [...ingredients]; newIng[idx].cantidad = e.target.value; setIngredients(newIng);
-                      }} className="w-full border-gray-300 border text-sm rounded px-2 py-1.5" />
+                      <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Cant.</label>
+                      <input type="number" step="0.01" value={ing.cantidad} onChange={e => { const newIng = [...ingredients]; newIng[idx].cantidad = e.target.value; setIngredients(newIng); }}
+                        className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm rounded px-2 py-1.5 transition-colors"
+                      />
                     </div>
                     <div className="pt-5 shrink-0">
-                      <button onClick={() => { const newIng=[...ingredients]; newIng.splice(idx,1); setIngredients(newIng); }} className="text-red-400 p-1.5 hover:bg-red-50 rounded"><i className="bi bi-trash"></i></button>
+                      <button onClick={() => { const newIng=[...ingredients]; newIng.splice(idx,1); setIngredients(newIng); }} className="text-red-400 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"><i className="bi bi-trash"></i></button>
                     </div>
                   </div>
                 ))}
-                {ingredients.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Sin ingredientes.</p>}
+                {ingredients.length === 0 && <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-4">Sin ingredientes.</p>}
               </div>
             </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-2xl">
-              <button onClick={() => setShowFormulaModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 hover:bg-gray-200 rounded-lg">Cancelar</button>
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-700/50 border-t border-gray-100 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
+              <button onClick={() => setShowFormulaModal(false)} className="px-4 py-2 font-bold text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors">Cancelar</button>
               <button onClick={saveFormula} disabled={submitting} className="px-4 py-2 bg-indigo-600 border border-transparent hover:bg-indigo-700 text-white font-bold text-sm rounded-lg disabled:opacity-50">Guardar</button>
             </div>
           </div>

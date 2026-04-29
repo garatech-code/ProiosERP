@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import OperarioActionPanel from './OperarioActionPanel';
 import OperationTracker from './OperationTracker';
 import ProductSearchCards from './ProductSearchCards'; // NUEVO COMPONENTE
+import LogoSpinner from './LogoSpinner';
 import * as XLSX from 'xlsx';
 
 export default function OperationDetail() {
@@ -36,6 +37,28 @@ export default function OperationDetail() {
   // Nuevos estados para los desplegables del packing list
   const [proveedor, setProveedor] = useState('PROIOS SA'); // opción por defecto
   const [paisDestino, setPaisDestino] = useState('argentina'); // 'argentina' o 'bandera'
+
+  // Edit nombre inline
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+
+  useEffect(() => {
+    if (operation) {
+      setTempName(operation.nombre || '');
+    }
+  }, [operation]);
+
+  const handleSaveName = async () => {
+    try {
+      await axios.patch(`/operaciones/operations/${id}/`, { nombre: tempName });
+      showToast('Nombre actualizado correctamente', 'success');
+      setEditingName(false);
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al actualizar nombre', 'error');
+    }
+  };
 
   const showToast = (message, type = 'info') => {
     setToastMessage({ message, type });
@@ -333,7 +356,7 @@ export default function OperationDetail() {
   const isOperario = user?.role === 'OPERARIO';
   const isOwner = user?.role === 'OWNER';
 
-  if (loading) return <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
+  if (loading) return <div className="flex justify-center mt-20"><LogoSpinner size="w-16 h-16" /></div>;
   if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
   if (!operation) return <div className="text-center mt-10">No se encontró la operación</div>;
 
@@ -341,19 +364,49 @@ export default function OperationDetail() {
   const shipFlag = operation.ship_flag || (operation.ship ? operation.ship.flag : '');
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white shadow-sm sticky top-0 z-40">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+      <nav className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40 border-b border-transparent dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/')} className="text-slate-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50">
+              <button onClick={() => navigate('/')} className="text-slate-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30">
                 <i className="bi bi-arrow-left text-xl"></i>
               </button>
-              <h1 className="text-xl font-black text-slate-800 tracking-tight">OP-{String(operation.id).padStart(4, '0')}</h1>
+              
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={tempName} 
+                    onChange={(e) => setTempName(e.target.value)} 
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+                    className="px-2 py-1 text-sm bg-white dark:bg-slate-700 border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white w-64"
+                    autoFocus
+                  />
+                  <button onClick={handleSaveName} className="text-emerald-600 hover:text-emerald-700 p-1"><i className="bi bi-check-lg"></i></button>
+                  <button onClick={() => { setEditingName(false); setTempName(operation.nombre || ''); }} className="text-red-500 hover:text-red-600 p-1"><i className="bi bi-x-lg"></i></button>
+                </div>
+              ) : (
+                <div className="flex flex-col justify-center group relative">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+                      {operation.nombre || `OP-${String(operation.id).padStart(4, '0')}`}
+                    </h1>
+                    <button onClick={() => setEditingName(true)} className="text-slate-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <i className="bi bi-pencil-square"></i>
+                    </button>
+                  </div>
+                  {operation.nombre && (
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold tracking-widest uppercase mt-[-2px]">
+                      OP-{String(operation.id).padStart(4, '0')}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm font-semibold text-slate-600 hidden sm:block">Hola, {user?.username}</span>
-              <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" title="Cerrar sesión">
+              <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 hidden sm:block">Hola, {user?.username}</span>
+              <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors" title="Cerrar sesión">
                 <i className="bi bi-box-arrow-right text-lg"></i>
               </button>
             </div>
@@ -424,11 +477,11 @@ export default function OperationDetail() {
 
             <div className="lg:col-span-2 space-y-6">
 
-              <div className="bg-white shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200">
-                <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100">
+              <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
+                <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
                   <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900">Resumen Operativo</h3>
-                    <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">Información logística y de tiempos</p>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white">Resumen Operativo</h3>
+                    <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">Información logística y de tiempos</p>
                   </div>
                   <div className="flex items-center gap-3">
                     {checkingStock && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
@@ -438,33 +491,33 @@ export default function OperationDetail() {
 
                 <div>
                   <dl className="grid grid-cols-1 sm:grid-cols-2">
-                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 bg-slate-50/50">
-                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Cliente</dt>
-                      <dd className="text-sm font-semibold text-slate-900">{operation.client_name}</dd>
+                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Cliente</dt>
+                      <dd className="text-sm font-semibold text-slate-900 dark:text-white">{operation.client_name}</dd>
                     </div>
-                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100">
-                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Buque</dt>
-                      <dd className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
+                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Buque</dt>
+                      <dd className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <i className="bi bi-geo-alt-fill text-indigo-400"></i> {operation.ship_name}
                       </dd>
                     </div>
-                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100">
-                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Puerto</dt>
-                      <dd className="text-sm font-semibold text-slate-900">{operation.port_name}</dd>
+                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700">
+                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Puerto</dt>
+                      <dd className="text-sm font-semibold text-slate-900 dark:text-white">{operation.port_name}</dd>
                     </div>
-                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 bg-indigo-50/30">
-                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ETA (Arribo)</dt>
-                      <dd className="text-sm font-black text-indigo-700">{formatDate(operation.eta)}</dd>
+                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/20">
+                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">ETA (Arribo)</dt>
+                      <dd className="text-sm font-black text-indigo-700 dark:text-indigo-400">{formatDate(operation.eta)}</dd>
                     </div>
-                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 bg-slate-50/50">
-                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Agencia / Entrega</dt>
-                      <dd className="text-sm font-semibold text-slate-900">
+                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Agencia / Entrega</dt>
+                      <dd className="text-sm font-semibold text-slate-900 dark:text-white">
                         {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
                       </dd>
                     </div>
-                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100">
-                      <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Notas</dt>
-                      <dd className="text-sm font-medium text-slate-600 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
+                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
+                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Notas</dt>
+                      <dd className="text-sm font-medium text-slate-600 dark:text-slate-300 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
                     </div>
                   </dl>
 
@@ -486,12 +539,12 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {!isOperario ? (
                   <>
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
                       <div className="flex justify-between items-center">
-                        <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+                        <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
                           <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
                         </h3>
                         {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
@@ -504,25 +557,25 @@ export default function OperationDetail() {
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-slate-200">
+                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                         <thead>
-                          <tr className="bg-white uppercase tracking-wider text-[10px] font-black text-slate-400">
+                          <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
                             <th className="px-6 py-4 text-left">Producto</th>
                             <th className="px-6 py-4 text-center">Cant.</th>
                             <th className="px-6 py-4 text-center">Disponibilidad</th>
                             <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-slate-100">
+                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
                           {operation.products?.map((prod, idx) => {
                             const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
                             return (
-                              <tr key={idx} className={`hover:bg-slate-50 transition-colors ${!isSuficiente ? 'bg-red-50/50' : ''}`}>
+                              <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
                                 <td className="px-6 py-4">
-                                  <p className="text-sm font-bold text-slate-800">{prod.product_name}</p>
-                                  <p className="text-xs text-slate-500 font-medium">${prod.unit_price} / unidad</p>
+                                  <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
                                 </td>
-                                <td className="px-6 py-4 text-center text-sm text-slate-700 font-black">{prod.quantity}</td>
+                                <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
                                 <td className="px-6 py-4 text-center">
                                   {prod.stock_actual >= prod.quantity ? (
                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
@@ -540,9 +593,9 @@ export default function OperationDetail() {
                               </tr>
                             );
                           })}
-                          <tr className="bg-indigo-50/30">
+                          <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
                             <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
-                            <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                            <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -568,19 +621,19 @@ export default function OperationDetail() {
               </div>
 
               {operation.texto_pedido && (
-                <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden mb-6">
-                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
-                    <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <i className="bi bi-chat-left-text-fill text-indigo-500"></i> Delivery Note Original
                     </h3>
                   </div>
-                  <div className="p-4 sm:p-6 text-sm text-slate-700 whitespace-pre-wrap font-mono bg-slate-50 border-t border-slate-100 overflow-x-auto">
+                  <div className="p-4 sm:p-6 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
                     {operation.texto_pedido}
                   </div>
                   
                   {/* COMPONENTE DE TARJETAS DE BUSQUEDA INYECTADO AQUÍ */}
                   {(!isOperario) && (
-                    <div className="px-4 py-4 sm:px-6 border-t border-slate-200 bg-white">
+                    <div className="px-4 py-4 sm:px-6 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                       <ProductSearchCards initialProducts={detectedProducts} />
                     </div>
                   )}
@@ -588,36 +641,38 @@ export default function OperationDetail() {
               )}
 
               {/* NUEVO BLOQUE: Opciones para el Packing List */}
-              <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
-                  <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
-                    <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
-                  </h3>
+              <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
+                    </h3>
+                  </div>
                 </div>
                 <div className="p-4 sm:p-6 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">PROVEEDOR</label>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PROVEEDOR</label>
                       <select
                         value={proveedor}
                         onChange={(e) => setProveedor(e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                       >
                         <option value="PROIOS SA">PROIOS SA (CUIT: 30-63661723-3)</option>
                         <option value="PROIOS SALVAGE SA">PROIOS SALVAGE SA (CUIT: 33-71087653-9)</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
                       <select
                         value={paisDestino}
                         onChange={(e) => setPaisDestino(e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                       >
                         <option value="argentina">Argentina (empresa argentina)</option>
                         <option value="bandera">Bandera del buque (cliente extranjero)</option>
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                         {paisDestino === 'argentina' ? 'Se usará Argentina' : (shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Bandera no especificada en el buque')}
                       </p>
                     </div>
@@ -625,17 +680,17 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              <div className="bg-white shadow-sm sm:rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 bg-slate-50/50">
-                  <h3 className="text-lg leading-6 font-black text-slate-900 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
                     <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
                   </h3>
                 </div>
                 <div className="p-4 sm:p-6 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
-                      <h4 className="text-sm font-bold text-slate-800">Packing List</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                       {operation.packing_list_file && (
                         <button
                           onClick={() => openPreview(operation.packing_list_file)}
@@ -665,10 +720,10 @@ export default function OperationDetail() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
-                      <h4 className="text-sm font-bold text-slate-800">Remito Firmado</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
                       {operation.remito_file && (
                         <button
                           onClick={() => openPreview(operation.remito_file)}
@@ -684,10 +739,10 @@ export default function OperationDetail() {
                     </label>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
                     <div>
-                      <h4 className="text-sm font-bold text-slate-800">Rancho / Permiso Aduanero</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Autorización oficial de embarque de provisiones.</p>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
                       {operation.rancho_file && (
                         <button
                           onClick={() => openPreview(operation.rancho_file)}

@@ -29,8 +29,15 @@ class UserViewSet(viewsets.ModelViewSet):
         # Admin y Owner pueden ver todos los usuarios para gestiones y asignaciones
         user = self.request.user
         if user.role == user.Role.OWNER:
-            return User.objects.all()
-        return User.objects.filter(id=user.id)
+            qs = User.objects.all()
+        else:
+            qs = User.objects.filter(id=user.id)
+            
+        role_param = self.request.query_params.get('role')
+        if role_param:
+            qs = qs.filter(role=role_param)
+            
+        return qs
 
 class FeedbackItemViewSet(viewsets.ModelViewSet):
     queryset = FeedbackItem.objects.all()

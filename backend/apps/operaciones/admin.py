@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Operacion, Client, Ship, Port, Agency, OperacionDetalle
+from .models import Operacion, Client, Ship, Port, Agency, OperacionDetalle, AgendaEvent
 
 class OperacionAdmin(admin.ModelAdmin):
     list_display = ('id', 'cliente', 'ship', 'estado', 'eta')
@@ -13,3 +13,9 @@ admin.site.register(Ship)
 admin.site.register(Port)
 admin.site.register(Agency)
 admin.site.register(OperacionDetalle)
+
+@admin.register(AgendaEvent)
+class AgendaEventAdmin(admin.ModelAdmin):
+    list_display = ('title', 'start_date', 'end_date', 'assigned_to', 'created_by')
+    list_filter = ('assigned_to', 'created_by')
+    search_fields = ('title', 'description')

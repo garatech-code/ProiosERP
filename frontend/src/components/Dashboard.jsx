@@ -244,8 +244,14 @@ export default function Dashboard() {
                           <span className="text-xs font-bold text-gray-400">#OP-{String(op.id).padStart(4, '0')}</span>
                           {getStatusBadge(op.status)}
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-1">{op.ship_name || op.ship || 'Buque Desconocido'}</h3>
-                        <p className="text-sm font-medium text-gray-600">{op.client_name || op.client || 'Cliente N/D'}</p>
+                        <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-1" title={op.nombre || 'Operación sin nombre'}>
+                          {op.nombre || 'Operación sin nombre'}
+                        </h3>
+                        <p className="text-sm font-medium text-gray-600 flex flex-wrap items-center gap-1">
+                          <span className="font-semibold text-gray-700">{op.ship_name || op.ship || 'Buque N/D'}</span>
+                          <span className="text-gray-400 text-xs hidden sm:inline">|</span>
+                          <span className="line-clamp-1">{op.client_name || op.client || 'Cliente N/D'}</span>
+                        </p>
                       </div>
                     </div>
 

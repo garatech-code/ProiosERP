@@ -126,6 +126,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
   const [formData, setFormData] = useState({
+    nombre: '',
     client: '',
     ship: '',
     port: '',
@@ -174,6 +175,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
           }));
 
           setFormData({
+            nombre: op.nombre || '',
             client: op.cliente || '',
             ship: op.ship || '',
             port: op.port || '',
@@ -360,6 +362,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
 
       const payload = {
         ...formData,
+        nombre: formData.nombre,
         products: validProducts.map(p => ({
           product: Number(p.product), // Asegurar número
           quantity: p.quantity,
@@ -416,12 +419,12 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 shrink-0">
-          <h2 className="text-xl font-bold text-amber-800">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 shrink-0">
+          <h2 className="text-xl font-bold text-amber-800 dark:text-amber-300">
             {id ? `Editar Operación Servicio #${id}` : 'Nueva Operación: Servicio'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-amber-100 hover:bg-amber-200 rounded-full p-2 transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-amber-100 dark:bg-slate-600 hover:bg-amber-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -473,8 +476,19 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
           <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
 
             <div>
-              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Datos Generales</h3>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Datos Generales</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nombre / Identificador de la Operación</label>
+                  <input
+                    type="text"
+                    name="nombre"
+                    value={formData.nombre}
+                    onChange={handleChange}
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                    placeholder="Ej. Revisión anual de equipos..."
+                  />
+                </div>
                 <AutocompleteCreate
                   label="Cliente *"
                   endpoint="/operaciones/clients/"
@@ -516,24 +530,16 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                   createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
                 />
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">ETA Estimado *</label>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">ETA Estimado *</label>
                   <input
-                    type="datetime-local"
-                    name="eta"
-                    value={formData.eta}
-                    onChange={handleChange}
-                    required
-                    className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    type="datetime-local" name="eta" value={formData.eta} onChange={handleChange} required
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Tipo de Operación *</label>
-                  <select
-                    name="tipo_operacion"
-                    value={formData.tipo_operacion}
-                    onChange={handleChange}
-                    required
-                    className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Tipo de Operación *</label>
+                  <select name="tipo_operacion" value={formData.tipo_operacion} onChange={handleChange} required
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                   >
                     <option value="productos">Insumos y Repuestos</option>
                     <option value="quimicos">Productos Químicos</option>
@@ -541,12 +547,9 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Método de Entrega</label>
-                  <select
-                    name="delivery_method"
-                    value={formData.delivery_method}
-                    onChange={handleChange}
-                    className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
+                  <select name="delivery_method" value={formData.delivery_method} onChange={handleChange}
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                   >
                     <option value="muelle">Muelle</option>
                     <option value="lancha">Lancha</option>
@@ -557,28 +560,19 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Detalles del Servicio Técnico</h3>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Detalles del Servicio Técnico</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Descripción del Servicio a Realizar *</label>
-                  <textarea
-                    name="detalle_servicio"
-                    value={formData.detalle_servicio}
-                    onChange={handleChange}
-                    rows={4}
-                    required
-                    placeholder="Escriba aquí los detalles del servicio como 'Reparación de bomba de achique', 'Calibración de instrumentos', etc."
-                    className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm"
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Descripción del Servicio a Realizar *</label>
+                  <textarea name="detalle_servicio" value={formData.detalle_servicio} onChange={handleChange} rows={4} required
+                    placeholder="Escriba aquí los detalles del servicio..."
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
                   ></textarea>
                 </div>
                 <div className="sm:col-span-1">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Forma de Cotización *</label>
-                  <select
-                    name="forma_cotizacion_servicio"
-                    value={formData.forma_cotizacion_servicio}
-                    onChange={handleChange}
-                    required
-                    className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm"
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Forma de Cotización *</label>
+                  <select name="forma_cotizacion_servicio" value={formData.forma_cotizacion_servicio} onChange={handleChange} required
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
                   >
                     <option value="hora_hombre">Por Hora Hombre</option>
                     <option value="dias">Por Días Trabajados</option>
@@ -590,16 +584,16 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
 
             {currentUser?.role === 'OWNER' && (
               <div>
-                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Equipo Asignado</h3>
-                <p className="text-xs text-gray-500 mb-4">Seleccione quiénes tendrán acceso a la gestión de esta orden.</p>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Equipo Asignado</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">Seleccione quiénes tendrán acceso a la gestión de esta orden.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                      <span className="text-sm font-bold text-gray-700">Operadores (Logística)</span>
+                  <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden">
+                    <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
+                      <span className="text-sm font-bold text-gray-700 dark:text-slate-200">Operadores (Logística)</span>
                     </div>
                     <div className="p-4 max-h-40 overflow-y-auto">
                       {availableUsers.filter(u => u.role === 'OPERADOR').map(u => (
-                        <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors">
+                        <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
                           <input
                             type="checkbox"
                             checked={formData.operadores_id.includes(u.id)}
@@ -609,19 +603,19 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                             }}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-sm text-gray-700 font-medium">{u.username}</span>
+                          <span className="text-sm text-gray-700 dark:text-slate-200 font-medium">{u.username}</span>
                         </label>
                       ))}
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                      <span className="text-sm font-bold text-gray-700">Operarios (Planta)</span>
+                  <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden">
+                    <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
+                      <span className="text-sm font-bold text-gray-700 dark:text-slate-200">Operarios (Planta)</span>
                     </div>
                     <div className="p-4 max-h-40 overflow-y-auto">
                       {availableUsers.filter(u => u.role === 'OPERARIO').map(u => (
-                        <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors">
+                        <label key={u.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
                           <input
                             type="checkbox"
                             checked={formData.operarios_id.includes(u.id)}
@@ -631,7 +625,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
                             }}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-sm text-gray-700 font-medium">{u.username}</span>
+                          <span className="text-sm text-gray-700 dark:text-slate-200 font-medium">{u.username}</span>
                         </label>
                       ))}
                     </div>
@@ -641,21 +635,17 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
             )}
 
             <div>
-              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider border-b pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
-              <p className="text-xs text-gray-500 mb-2">Pegue aquí el contenido del correo o pedido original del cliente. Se usará para generar el Delivery Note.</p>
-              <textarea
-                name="texto_pedido"
-                value={formData.texto_pedido}
-                onChange={handleChange}
-                rows={6}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs"
-                placeholder="Ejemplo: Dear Shipping Dept, Please supply the following items for MV Test..."
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Pegue aquí el contenido del correo o pedido original.</p>
+              <textarea name="texto_pedido" value={formData.texto_pedido} onChange={handleChange} rows={6}
+                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs transition-colors"
+                placeholder="Ejemplo: Dear Shipping Dept..."
               />
             </div>
 
             <div>
-              <div className="flex justify-between items-end border-b pb-2 mb-4">
-                <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Repuestos Adicionales / Carga</h3>
+              <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">
+                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Repuestos Adicionales / Carga</h3>
                 <button
                   type="button"
                   onClick={addProduct}
@@ -688,13 +678,9 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-800 mb-2">Notas Adicionales</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows={3}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Notas Adicionales</label>
+              <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3}
+                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                 placeholder="Información extra para logística o planta..."
               />
             </div>
@@ -748,12 +734,9 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
           </form>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 shadow-sm transition-colors"
-          >
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl">
+          <button type="button" onClick={onClose}
+            className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-600 shadow-sm transition-colors">
             Cancelar
           </button>
           <button

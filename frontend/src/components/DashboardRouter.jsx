@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import LogoSpinner from './LogoSpinner';
 
 // Importaciones perezosas (Lazy Loading)
 // El navegador solo descargará el archivo que corresponda al rol del usuario.
@@ -11,7 +12,7 @@ const OperarioDashboard = lazy(() => import('../dashboards/OperarioDashboard'));
 
 const LoadingFallback = () => (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <LogoSpinner size="w-16 h-16" />
         <p className="text-gray-500 font-medium tracking-wide">Cargando tu espacio de trabajo...</p>
     </div>
 );

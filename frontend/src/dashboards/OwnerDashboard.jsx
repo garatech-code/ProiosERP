@@ -8,7 +8,10 @@ import OperationFormQuimicos from '../components/OperationFormQuimicos';
 import OperationFormServicios from '../components/OperationFormServicios';
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
-import DebugFeedback from '../components/DebugFeedback'; // <-- IMPORT DEL NUEVO COMPONENTE
+import DebugFeedback from '../components/DebugFeedback';
+import AgendaEventModal from '../components/AgendaEventModal';
+import { useTheme } from '../context/ThemeContext';
+import LogoSpinner from '../components/LogoSpinner';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -32,6 +35,7 @@ const localizer = dateFnsLocalizer({
 
 export default function OwnerDashboard() {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
     const [activeTab, setActiveTab] = useState('overview'); // overview, operations, calendar, inbox
@@ -51,12 +55,63 @@ export default function OwnerDashboard() {
 
     const [operationModalState, setOperationModalState] = useState({ isOpen: false, type: null, id: null });
 
+    // Eventos de Agenda
+    const [agendaEvents, setAgendaEvents] = useState([]);
+    const [agendaEventModalState, setAgendaEventModalState] = useState({ isOpen: false, eventToEdit: null });
+    const [selectedOperatorFilter, setSelectedOperatorFilter] = useState(user?.id || '');
+    const [operators, setOperators] = useState([]);
+    const [hasNewAgendaEvent, setHasNewAgendaEvent] = useState(false);
+
     // NUEVO: Estado para controlar el modal de Debug/Sugerencias
     const [showDebugForm, setShowDebugForm] = useState(false);
 
     useEffect(() => {
         fetchData();
+        fetchOperators();
     }, []);
+
+    useEffect(() => {
+        fetchAgendaEvents();
+    }, [selectedOperatorFilter]);
+
+    useEffect(() => {
+        if (activeTab === 'calendar') {
+            setHasNewAgendaEvent(false);
+            localStorage.setItem('last_seen_agenda', new Date().toISOString());
+        }
+    }, [activeTab]);
+
+    const fetchOperators = async () => {
+        try {
+            const res = await axios.get('/usuarios/users/?role=OPERADOR');
+            if (res.data) setOperators(res.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const fetchAgendaEvents = async () => {
+        try {
+            let url = '/operaciones/events/';
+            if (selectedOperatorFilter) {
+                url += `?user_id=${selectedOperatorFilter}`;
+            }
+            const res = await axios.get(url);
+            setAgendaEvents(res.data);
+
+            const lastSeen = localStorage.getItem('last_seen_agenda');
+            if (res.data.length > 0) {
+                const latestEvent = new Date(Math.max(...res.data.map(e => new Date(e.created_at))));
+                if (!lastSeen || latestEvent > new Date(lastSeen)) {
+                    if (activeTab !== 'calendar') {
+                        setHasNewAgendaEvent(true);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     useEffect(() => {
         let filtered = operations;
@@ -182,7 +237,7 @@ export default function OwnerDashboard() {
     const calendarEvents = useMemo(() => {
         const evts = operations.filter(op => op.eta).map(op => ({
             id: op.id,
-            title: `${getTypePrefix(op.tipo_operacion)} OP-${op.id} ${op.ship_name}`,
+            title: `${getTypePrefix(op.tipo_operacion)} OP-${op.id} ${op.nombre || op.ship_name || 'Sin nombre'}`,
             start: new Date(op.eta),
             end: new Date(op.eta),
             resource: op,
@@ -198,12 +253,25 @@ export default function OwnerDashboard() {
             type: 'holiday'
         }));
 
-        return [...evts, ...holEvts];
-    }, [operations, holidays]);
+        const agendaEvts = agendaEvents.map(e => ({
+            id: `agenda-${e.id}`,
+            original_id: e.id,
+            title: `[AGENDA] ${e.title}`,
+            start: new Date(e.start_date),
+            end: e.end_date ? new Date(e.end_date) : new Date(e.start_date),
+            resource: e,
+            type: 'agenda'
+        }));
+
+        return [...evts, ...holEvts, ...agendaEvts];
+    }, [operations, holidays, agendaEvents]);
 
     const eventStyleGetter = (event) => {
         if (event.type === 'holiday') {
             return { style: { backgroundColor: '#fecdd3', color: '#881337', fontWeight: 'bold', border: 'none', padding: '2px' } };
+        }
+        if (event.type === 'agenda') {
+            return { style: { backgroundColor: '#10b981', color: 'white', borderRadius: '4px', border: 'none' } };
         }
         return { style: { backgroundColor: '#4f46e5', color: 'white', borderRadius: '4px', border: 'none' } };
     };
@@ -211,22 +279,22 @@ export default function OwnerDashboard() {
     // Renderizado de Contenidos
     const renderOverview = () => (
         <div className="space-y-6 animate-fadeIn">
-            <h2 className="text-2xl font-bold text-gray-800">Panorama (KPIs)</h2>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Panorama (KPIs)</h2>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">T. Operaciones</span>
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2 text-center">T. Operaciones</span>
                     <span className="text-4xl sm:text-5xl font-black text-indigo-600">{metrics.total}</span>
                 </div>
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">En Proceso</span>
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2 text-center">En Proceso</span>
                     <span className="text-4xl sm:text-5xl font-black text-amber-500">{metrics.en_proceso}</span>
                 </div>
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">Finalizadas</span>
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2 text-center">Finalizadas</span>
                     <span className="text-4xl sm:text-5xl font-black text-emerald-500">{metrics.finalizadas}</span>
                 </div>
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center items-center">
-                    <span className="text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">User Activos</span>
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col justify-center items-center">
+                    <span className="text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-2 text-center">User Activos</span>
                     <span className="text-4xl sm:text-5xl font-black text-blue-500">{metrics.usuarios_activos || 0}</span>
                 </div>
             </div>
@@ -242,8 +310,29 @@ export default function OwnerDashboard() {
     );
 
     const renderCalendar = () => (
-        <div className="animate-fadeIn bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 h-[700px] flex flex-col">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Agenda y Arribos Estimados (ETA)</h2>
+        <div className="animate-fadeIn bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 h-[700px] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Agenda y Arribos Estimados (ETA)</h2>
+                <div className="flex items-center gap-3">
+                    <select
+                        className="py-1.5 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                        value={selectedOperatorFilter}
+                        onChange={(e) => setSelectedOperatorFilter(e.target.value)}
+                    >
+                        <option value={user?.id || ''}>Mi Agenda</option>
+                        <option value="">Todos los Operadores</option>
+                        {operators.map(op => (
+                            <option key={op.id} value={op.id}>{op.username}</option>
+                        ))}
+                    </select>
+                    <button 
+                        onClick={() => setAgendaEventModalState({ isOpen: true, eventToEdit: null })}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
+                    >
+                        <i className="bi bi-plus-lg"></i> Nuevo Evento
+                    </button>
+                </div>
+            </div>
             <div className="flex-1 min-h-0">
                 <Calendar
                     localizer={localizer}
@@ -258,7 +347,8 @@ export default function OwnerDashboard() {
                     onNavigate={setCalDate}
                     eventPropGetter={eventStyleGetter}
                     onSelectEvent={(e) => {
-                        if (e.type !== 'holiday') navigate(`/operations/${e.id}`);
+                        if (e.type === 'eta') navigate(`/operations/${e.id}`);
+                        if (e.type === 'agenda') setAgendaEventModalState({ isOpen: true, eventToEdit: e.resource });
                     }}
                     messages={{
                         next: "Sig",
@@ -277,7 +367,7 @@ export default function OwnerDashboard() {
     const renderOperationsList = (opsToRender) => (
         <div className="animate-fadeIn">
             <div className="flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
-                <h2 className="text-2xl font-bold text-gray-800 hidden sm:block">Listado de Operaciones</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 hidden sm:block">Listado de Operaciones</h2>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-64">
@@ -287,14 +377,14 @@ export default function OwnerDashboard() {
                         <input
                             type="text"
                             placeholder="Buscar cliente, buque..."
-                            className="pl-9 block w-full py-2 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            className="pl-9 block w-full py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 rounded-xl leading-5 bg-white placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
 
                     <select
-                        className="py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        className="py-2 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                         value={typeFilter}
                         onChange={(e) => setTypeFilter(e.target.value)}
                     >
@@ -305,7 +395,7 @@ export default function OwnerDashboard() {
                     </select>
 
                     <select
-                        className="py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        className="py-2 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
@@ -321,32 +411,38 @@ export default function OwnerDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
                 {opsToRender?.length === 0 ? (
-                    <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300">
-                        <p className="text-gray-500">No hay operaciones en esta vista.</p>
+                    <div className="col-span-full py-16 text-center bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600">
+                        <p className="text-gray-500 dark:text-slate-400">No hay operaciones en esta vista.</p>
                     </div>
                 ) : (
                     opsToRender?.map((op) => (
-                        <div key={op.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all flex flex-col group relative">
+                        <div key={op.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative">
                             <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
                             <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <div className="flex items-center gap-1.5 mb-1">
                                             {getTypeIcon(op.tipo_operacion)}
-                                            <span className="text-[10px] font-bold text-gray-400">#OP-{String(op.id).padStart(4, '0')}</span>
+                                            <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500">#{getTypePrefix(op.tipo_operacion)}OP-{String(op.id).padStart(4, '0')}</span>
                                             {getStatusBadge(op.status || op.estado)}
                                             {op.estado_revision === 'pending' && (
                                                 <span className="ml-1 bg-amber-100 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded animate-pulse" title="Requiere ser revisada"><i className="bi bi-shield-exclamation mr-1"></i>REVISAR</span>
                                             )}
                                         </div>
-                                        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 truncate">{op.ship_name || 'Buque Desconocido'}</h3>
+                                        <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 truncate" title={op.nombre || 'Operación sin nombre'}>
+                                            {op.nombre || 'Operación sin nombre'}
+                                        </h3>
                                     </div>
                                 </div>
 
-                                <div className="text-xs sm:text-sm text-gray-600 mb-3 bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100 flex-1">
-                                    <p className="truncate"><strong>Cliente:</strong> {op.client_name}</p>
-                                    <p className="truncate"><strong>Puerto:</strong> {op.port_name}</p>
-                                    <p className="truncate text-indigo-700 font-medium"><strong>ETA:</strong> {op.eta ? format(new Date(op.eta), 'dd/MM/yy HH:mm') : 'N/A'}</p>
+                                <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 mb-3 bg-slate-50 dark:bg-slate-700/50 p-2 sm:p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex-1">
+                                    <p className="truncate flex items-center gap-1">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{op.ship_name || 'Buque N/D'}</span>
+                                        <span className="text-slate-400">|</span>
+                                        <span>{op.client_name || 'Cliente N/D'}</span>
+                                    </p>
+                                    <p className="truncate mt-1"><strong>Puerto:</strong> {op.port_name}</p>
+                                    <p className="truncate text-indigo-600 dark:text-indigo-400 font-medium"><strong>ETA:</strong> {op.eta ? format(new Date(op.eta), 'dd/MM/yy HH:mm') : 'N/A'}</p>
                                 </div>
 
                                 <div className="flex flex-wrap gap-1.5 mb-3">
@@ -355,15 +451,15 @@ export default function OwnerDashboard() {
                                     {renderDocSemaphore('RCH', op.rancho_file, op.status || op.estado)}
                                 </div>
 
-                                <div className="mt-auto pt-3 flex justify-between items-center border-t border-gray-100">
-                                    <div className="font-black text-slate-800 text-sm truncate max-w-[50%]">
+                                <div className="mt-auto pt-3 flex justify-between items-center border-t border-gray-100 dark:border-slate-700">
+                                    <div className="font-black text-slate-800 dark:text-white text-sm truncate max-w-[50%]">
                                         $<span className="text-lg">{calculateTotal(op.products).toLocaleString()}</span>
                                     </div>
                                     <div className="flex gap-2">
                                         {op.estado !== 'entregada' && op.estado !== 'cancelada' && (
                                             <button onClick={(e) => cancelOperation(op.id, e)} className="text-xs font-semibold text-gray-400 hover:text-red-600 px-2">Anular</button>
                                         )}
-                                        <button onClick={() => navigate(`/operations/${op.id}`)} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold rounded-lg transition-colors">Ver</button>
+                                        <button onClick={() => navigate(`/operations/${op.id}`)} className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-bold rounded-lg transition-colors">Ver</button>
                                     </div>
                                 </div>
                             </div>
@@ -379,7 +475,7 @@ export default function OwnerDashboard() {
     );
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200">
             {/* Sidebar Desktop */}
             <aside className={`relative bg-slate-900 text-white flex-col hidden md:flex h-screen sticky top-0 shadow-xl z-20 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20 items-center'}`}>
                 {/* Toggle Button */}
@@ -409,7 +505,9 @@ export default function OwnerDashboard() {
                         {isSidebarOpen && <span>Resumen KPIs</span>}
                     </button>
                     <button title={!isSidebarOpen ? "Agenda ETAs" : ""} onClick={() => setActiveTab('calendar')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-                        <i className="bi bi-calendar-event text-lg shrink-0"></i>
+                        <i className="bi relative bi-calendar-event text-lg shrink-0">
+                            {hasNewAgendaEvent && activeTab !== 'calendar' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-pulse"></span>}
+                        </i>
                         {isSidebarOpen && <span>Agenda ETAs</span>}
                     </button>
                     <button title={!isSidebarOpen ? "Operaciones" : ""} onClick={() => setActiveTab('operations')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
@@ -463,6 +561,15 @@ export default function OwnerDashboard() {
                         {isSidebarOpen && <span>Testing & Debug</span>}
                     </button>
 
+                    <button
+                        title={!isSidebarOpen ? "Cambiar Tema" : ""}
+                        onClick={toggleTheme}
+                        className={`mb-4 flex justify-center items-center gap-2 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700 rounded-xl text-xs font-bold transition-colors ${isSidebarOpen ? 'w-full' : 'w-10 h-10'}`}
+                    >
+                        <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'} text-base`}></i>
+                        {isSidebarOpen && <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>}
+                    </button>
+
                     <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
                         <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
                             {user?.username?.[0]?.toUpperCase()}
@@ -505,13 +612,15 @@ export default function OwnerDashboard() {
             </div>
 
             {/* Mobile Bottom Tabs */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 flex justify-around p-2 pb-safe">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 z-30 flex justify-around p-2 pb-safe">
                 <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center p-2 ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-pie-chart-fill text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Resumen</span>
                 </button>
                 <button onClick={() => setActiveTab('calendar')} className={`flex flex-col items-center p-2 ${activeTab === 'calendar' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi bi-calendar-event text-xl"></i>
+                    <i className="bi relative bi-calendar-event text-xl">
+                        {hasNewAgendaEvent && activeTab !== 'calendar' && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 border-2 border-white rounded-full"></span>}
+                    </i>
                     <span className="text-[10px] mt-1 font-semibold">Agenda</span>
                 </button>
                 <button onClick={() => setActiveTab('operations')} className={`flex flex-col items-center p-2 ${activeTab === 'operations' ? 'text-indigo-600' : 'text-gray-400'}`}>
@@ -532,12 +641,12 @@ export default function OwnerDashboard() {
             </div>
 
             {/* Main Content Area */}
-            <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative pb-16 md:pb-0">
+            <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative pb-16 md:pb-0 transition-colors duration-200">
 
                 {/* Header Solo Desktop */}
-                <header className="hidden md:flex bg-white px-8 py-4 items-center justify-between border-b border-gray-200">
+                <header className="hidden md:flex bg-white dark:bg-slate-800 px-8 py-4 items-center justify-between border-b border-gray-200 dark:border-slate-700 transition-colors duration-200">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800 capitalize">
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 capitalize">
                             {activeTab === 'overview' && 'Panorama Gerencial'}
                             {activeTab === 'calendar' && 'Planificación & Agenda'}
                             {activeTab === 'operations' && 'Gestión Operativa'}
@@ -545,7 +654,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'approvals' && 'Revisiones de Operaciones'}
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
                         </h2>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-slate-400">
                             {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
@@ -559,9 +668,8 @@ export default function OwnerDashboard() {
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
                     {loading && (
-                        <div className="flex flex-col items-center justify-center py-20 space-y-4 h-full">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                            <p className="text-gray-500 font-medium tracking-wider animate-pulse">Sincronizando información...</p>
+                        <div className="flex-1 flex items-center justify-center">
+                            <LogoSpinner size="w-16 h-16" />
                         </div>
                     )}
 
@@ -618,6 +726,13 @@ export default function OwnerDashboard() {
                 <DebugFeedback onClose={() => setShowDebugForm(false)} />
             )}
 
+            <AgendaEventModal
+                isOpen={agendaEventModalState.isOpen}
+                onClose={() => setAgendaEventModalState({ isOpen: false, eventToEdit: null })}
+                eventToEdit={agendaEventModalState.eventToEdit}
+                onSave={fetchAgendaEvents}
+            />
+
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -626,12 +741,32 @@ export default function OwnerDashboard() {
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; border: 2px solid #f8fafc; }
                 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-                /* Big Calendar Overrides */
+                /* Big Calendar Overrides - Light */
                 .rbc-calendar { font-family: inherit; }
                 .rbc-toolbar button { border-radius: 8px; font-weight: 600; color: #4b5563; }
                 .rbc-toolbar button.rbc-active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
                 .rbc-event { opacity: 0.9 !important; border-radius: 6px !important; }
                 .rbc-today { background-color: #f8fafc !important; }
+                /* Big Calendar Overrides - Dark Mode */
+                .dark .rbc-calendar { background: transparent; color: #e2e8f0; }
+                .dark .rbc-toolbar button { color: #94a3b8; background: #334155; border-color: #475569; }
+                .dark .rbc-toolbar button:hover { background: #475569; color: #f1f5f9; }
+                .dark .rbc-toolbar button.rbc-active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+                .dark .rbc-month-view, .dark .rbc-time-view, .dark .rbc-agenda-view { border-color: #334155; }
+                .dark .rbc-header { background: #1e293b; color: #94a3b8; border-color: #334155; }
+                .dark .rbc-day-bg { background: #1e293b; }
+                .dark .rbc-off-range-bg { background: #0f172a; }
+                .dark .rbc-today { background-color: #1e3a5f !important; }
+                .dark .rbc-date-cell { color: #94a3b8; }
+                .dark .rbc-date-cell.rbc-now { color: #818cf8; font-weight: bold; }
+                .dark .rbc-month-row { border-color: #334155; }
+                .dark .rbc-day-slot .rbc-time-slot { border-color: #334155; }
+                .dark .rbc-time-header-content { border-color: #334155; }
+                .dark .rbc-time-content { border-color: #334155; }
+                .dark .rbc-agenda-table { color: #cbd5e1; }
+                .dark .rbc-agenda-table thead { background: #1e293b; color: #64748b; }
+                .dark .rbc-agenda-date-cell, .dark .rbc-agenda-time-cell { color: #94a3b8; }
+                .dark .rbc-agenda-empty { color: #64748b; }
             `}} />
         </div>
     );

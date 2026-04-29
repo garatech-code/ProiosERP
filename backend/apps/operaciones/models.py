@@ -79,6 +79,9 @@ class Operacion(models.Model):
     
     # Campo crucial para pegar el "Delivery Note" / E-mail original del cliente
     texto_pedido = models.TextField(blank=True, null=True, help_text="Contenido original del e-mail o pedido del cliente.")
+    
+    # Nombre identificatorio para la operación (visible en cards y detail)
+    nombre = models.CharField(max_length=200, blank=True, null=True, help_text="Nombre identificatorio de la operación")
 
     # NUEVOS CAMPOS SOLICITADOS POR EL FRONTEND
     order_received_date = models.DateTimeField(null=True, blank=True)
@@ -255,3 +258,17 @@ class OperacionDetalle(models.Model):
 
     def __str__(self):
         return f'Detalle OP-{self.operacion_id} Art-{self.articulo_id}'
+
+
+class AgendaEvent(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField(blank=True, null=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_events')
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='assigned_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.assigned_to})"

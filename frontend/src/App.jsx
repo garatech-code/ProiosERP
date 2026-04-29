@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Login from './components/Login';
 import DashboardRouter from './components/DashboardRouter';
 import OperationFormProductos from './components/OperationFormProductos';
@@ -57,9 +58,13 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <ThemeProvider>
+        <Router>
+          <div className="min-h-screen">
+            <AppRoutes />
+          </div>
+        </Router>
+      </ThemeProvider>
     </AuthProvider>
   );
 };

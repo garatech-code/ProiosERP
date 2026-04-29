@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency
+from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent
 from apps.inventario.models import Articulo
 from apps.usuarios.models import User
 import json
@@ -108,7 +108,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'forma_cotizacion_servicio',
-            'estado_revision', 'mensaje_revision', 'texto_pedido'
+            'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -286,3 +286,17 @@ class OperacionSerializer(serializers.ModelSerializer):
                 cantidad=cantidad,
                 precio_unitario=prod.get('unit_price', 0)
             )
+
+
+class AgendaEventSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.username', read_only=True)
+
+    class Meta:
+        model = AgendaEvent
+        fields = [
+            'id', 'title', 'description', 'start_date', 'end_date',
+            'created_by', 'created_by_name', 'assigned_to', 'assigned_to_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by', 'created_at', 'updated_at']

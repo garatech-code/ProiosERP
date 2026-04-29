@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import ComposeEmailModal from './ComposeEmailModal';
+import LogoSpinner from './LogoSpinner';
 
 export default function InboxView() {
   const { user } = useAuth();
@@ -80,11 +81,11 @@ export default function InboxView() {
   });
 
   return (
-    <div className="h-[calc(100vh-180px)] md:h-[calc(100vh-140px)] flex bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="h-[calc(100vh-180px)] md:h-[calc(100vh-140px)] flex bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
       
       {/* Left Sidebar - Email List */}
-      <div className={`w-full md:w-1/3 flex-col border-r border-gray-200 bg-gray-50 ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-4 border-b border-gray-200 bg-white flex justify-between items-center">
+      <div className={`w-full md:w-1/3 flex-col border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-between items-center">
           <div className="flex gap-2">
             <button 
               onClick={() => setFilter('inbound')}
@@ -117,12 +118,12 @@ export default function InboxView() {
         
         <div className="flex-1 overflow-y-auto">
           {loading && emails.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+            <div className="p-8 text-center text-gray-400 dark:text-slate-500">
+              <LogoSpinner size="w-8 h-8 mx-auto mb-2" />
               Cargando...
             </div>
           ) : filteredEmails.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 text-sm">
+            <div className="p-8 text-center text-gray-500 dark:text-slate-400 text-sm">
               No hay correos en esta bandeja.
             </div>
           ) : (
@@ -130,18 +131,18 @@ export default function InboxView() {
               <div 
                 key={email.id} 
                 onClick={() => handleSelectEmail(email)}
-                className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${selectedEmail?.id === email.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'hover:bg-gray-100 border-l-4 border-transparent'} ${!email.is_read && email.direction === 'inbound' ? 'font-bold' : ''}`}
+                className={`p-4 border-b border-gray-100 dark:border-slate-700 cursor-pointer transition-colors ${selectedEmail?.id === email.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-l-4 border-indigo-500' : 'hover:bg-gray-100 dark:hover:bg-slate-700/50 border-l-4 border-transparent'} ${!email.is_read && email.direction === 'inbound' ? 'font-bold' : ''}`}
               >
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-sm truncate pr-2 text-gray-900">
+                  <span className="text-sm truncate pr-2 text-gray-900 dark:text-white">
                     {email.direction === 'inbound' ? (email.sender_name || email.sender_address) : email.recipient_address}
                   </span>
-                  <span className="text-xs text-gray-500 shrink-0">
+                  <span className="text-xs text-gray-500 dark:text-slate-400 shrink-0">
                     {new Date(email.date_received).toLocaleDateString([], { month: 'short', day: 'numeric'})}
                   </span>
                 </div>
-                <h4 className="text-sm text-gray-800 truncate">{email.subject || '(Sin Asunto)'}</h4>
-                <p className="text-xs text-gray-500 truncate mt-1">{email.body_text?.substring(0, 50) || 'Contenido HTML...'}</p>
+                <h4 className="text-sm text-gray-800 dark:text-slate-200 truncate">{email.subject || '(Sin Asunto)'}</h4>
+                <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-1">{email.body_text?.substring(0, 50) || 'Contenido HTML...'}</p>
                 {email.operacion && (
                   <span className="inline-block mt-2 px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-bold rounded">
                     OP-{email.operacion}
@@ -154,31 +155,31 @@ export default function InboxView() {
       </div>
 
       {/* Right Content - Email Reader */}
-      <div className={`w-full md:w-2/3 flex-col bg-white ${!selectedEmail ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-2/3 flex-col bg-white dark:bg-slate-800 ${!selectedEmail ? 'hidden md:flex' : 'flex'}`}>
         {selectedEmail ? (
           <>
-            <div className="p-4 md:p-6 border-b border-gray-100">
+            <div className="p-4 md:p-6 border-b border-gray-100 dark:border-slate-700">
               <div className="flex items-center gap-2 mb-4">
-                <button onClick={() => setSelectedEmail(null)} className="md:hidden p-2 -ml-2 text-gray-500 hover:text-indigo-600 rounded-lg transition-colors">
+                <button onClick={() => setSelectedEmail(null)} className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
                 </button>
-                <h2 className="text-lg md:text-xl font-bold text-gray-900 truncate flex-1">{selectedEmail.subject || '(Sin Asunto)'}</h2>
-                <button onClick={handleReply} className="px-3 md:px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0">
+                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{selectedEmail.subject || '(Sin Asunto)'}</h2>
+                <button onClick={handleReply} className="px-3 md:px-4 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0">
                   <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                   Responder
                 </button>
               </div>
-              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <div className="flex justify-between items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-700">
                 <div>
-                  <p className="text-sm font-bold text-gray-900">{selectedEmail.sender_name || selectedEmail.sender_address}</p>
-                  <p className="text-xs text-gray-500">Para: {selectedEmail.recipient_address}</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">{selectedEmail.sender_name || selectedEmail.sender_address}</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400">Para: {selectedEmail.recipient_address}</p>
                 </div>
-                <div className="text-xs text-gray-400 font-medium">
+                <div className="text-xs text-gray-400 dark:text-slate-500 font-medium">
                   {new Date(selectedEmail.date_received).toLocaleString()}
                 </div>
               </div>
             </div>
-            <div className="p-6 overflow-y-auto flex-1 prose prose-sm max-w-none text-gray-800">
+            <div className="p-6 overflow-y-auto flex-1 prose dark:prose-invert prose-sm max-w-none text-gray-800 dark:text-slate-200">
               {selectedEmail.body_html ? (
                 <div dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }} />
               ) : (
@@ -186,13 +187,13 @@ export default function InboxView() {
               )}
             </div>
             {selectedEmail.adjuntos?.length > 0 && (
-              <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-2 overflow-x-auto">
-                <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+              <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/30 flex gap-2 overflow-x-auto">
+                <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                   Adjuntos:
                 </span>
                 {selectedEmail.adjuntos.map(adj => (
-                  <span key={adj.id} className="px-2 py-1 bg-white border border-gray-200 rounded text-xs text-indigo-600 font-medium whitespace-nowrap">
+                  <span key={adj.id} className="px-2 py-1 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-xs text-indigo-600 dark:text-indigo-400 font-medium whitespace-nowrap">
                     {adj.filename}
                   </span>
                 ))}
@@ -200,9 +201,9 @@ export default function InboxView() {
             )}
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 p-8 text-center">
             <svg className="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-            <p className="font-medium text-lg text-gray-500">Bandeja de Entrada</p>
+            <p className="font-medium text-lg text-gray-500 dark:text-slate-400">Bandeja de Entrada</p>
             <p className="text-sm">Selecciona un correo para leerlo o redacta uno nuevo.</p>
           </div>
         )}

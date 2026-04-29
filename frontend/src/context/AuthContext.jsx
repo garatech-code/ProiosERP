@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
         if (token) {
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
-                return { username: payload.username, role: payload.role };
+                return { id: payload.user_id, username: payload.username, role: payload.role };
             } catch (e) {
                 return null;
             }
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('refresh_token', refresh);
             // Decodificar token
             const payload = JSON.parse(atob(access.split('.')[1]));
-            setUser({ username: payload.username, role: payload.role });
+            setUser({ id: payload.user_id, username: payload.username, role: payload.role });
         } catch (error) {
             console.error('Login error', error);
             throw error;

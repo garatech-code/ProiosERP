@@ -12,13 +12,14 @@ from openpyxl.utils import get_column_letter
 import io
 import logging
 
-from apps.operaciones.models import Operacion, Client, Ship, Port, Agency
+from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent
 from apps.usuarios.models import User
 from apps.operaciones.services import get_or_create_ship_from_imo, get_or_create_port_from_name
 
 from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
-    PortSerializer, AgencySerializer, OperacionDetalleSerializer
+    PortSerializer, AgencySerializer, OperacionDetalleSerializer,
+    AgendaEventSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -524,5 +525,39 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if mensaje:
             op.mensaje_revision = mensaje
             
+            
         op.save()
         return Response({'status': 'review_resolved', 'action': action})
+
+class AgendaEventViewSet(viewsets.ModelViewSet):
+    serializer_class = AgendaEventSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = AgendaEvent.objects.all().select_related('created_by', 'assigned_to')
+
+        if user.role in [User.Role.OWNER, User.Role.CONTABLE]:
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                qs = qs.filter(assigned_to_id=user_id)
+            return qs
+
+        return qs.filter(Q(assigned_to=user) | Q(created_by=user)).distinct()
+
+    def perform_create(self, serializer):
+        assigned_to = serializer.validated_data.get('assigned_to')
+        user = self.request.user
+        
+        if user.role not in [User.Role.OWNER, User.Role.CONTABLE] and assigned_to != user:
+            raise ValidationError("No tiene permiso para asignar eventos a otros usuarios.")
+            
+        instance = serializer.save(created_by=user)
+        logger.info(f"Nuevo Evento de Agenda creado por {user.username}: {instance.title} (Asignado a: {instance.assigned_to.username})")
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        logger.info(f"Evento de Agenda actualizado por {self.request.user.username}: {instance.title}")
+
+    def perform_destroy(self, instance):
+        logger.info(f"Evento de Agenda eliminado por {self.request.user.username}: {instance.title}")
+        instance.delete()
