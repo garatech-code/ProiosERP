@@ -338,8 +338,8 @@ export default function OperadorDashboard() {
                                                 <span className="ml-1 bg-amber-100 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded animate-pulse"><i className="bi bi-clock-history mr-1"></i>EN REVISIÓN</span>
                                             )}
                                         </div>
-                                        <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 truncate" title={op.nombre || 'Operación sin nombre'}>
-                                            {op.nombre || 'Operación sin nombre'}
+                                        <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 truncate" title={op.nombre || op.ship_name || 'Operación sin nombre'}>
+                                            {op.nombre || op.ship_name || 'Operación sin nombre'}
                                         </h3>
                                     </div>
                                 </div>

@@ -20,26 +20,40 @@ const AppRoutes = () => {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    let timeoutId;
+    let intervalId;
 
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
+    const updateActivity = () => {
       if (user) {
-        timeoutId = setTimeout(() => {
+        localStorage.setItem('last_activity', Date.now().toString());
+      }
+    };
+
+    const checkInactivity = () => {
+      if (user) {
+        const lastActivity = parseInt(localStorage.getItem('last_activity') || Date.now().toString(), 10);
+        const now = Date.now();
+        // 5 minutos de inactividad
+        if (now - lastActivity > 5 * 60 * 1000) {
           logout();
           window.location.href = '/login';
-        }, 5 * 60 * 1000); // 5 minutos de inactividad
+        }
       }
     };
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
     
-    events.forEach(e => window.addEventListener(e, resetTimer));
-    resetTimer();
+    if (user) {
+      // Inicializar
+      updateActivity();
+      events.forEach(e => window.addEventListener(e, updateActivity));
+      
+      // Chequear cada 10 segundos
+      intervalId = setInterval(checkInactivity, 10000);
+    }
 
     return () => {
-      clearTimeout(timeoutId);
-      events.forEach(e => window.removeEventListener(e, resetTimer));
+      clearInterval(intervalId);
+      events.forEach(e => window.removeEventListener(e, updateActivity));
     };
   }, [user, logout]);
 
