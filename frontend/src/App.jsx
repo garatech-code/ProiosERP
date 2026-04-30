@@ -35,11 +35,11 @@ const AppRoutes = () => {
       if (user) {
         const lastActivity = parseInt(localStorage.getItem('last_activity') || Date.now().toString(), 10);
         const now = Date.now();
-        
+
         // TODO: MODO PRUEBA: Cambiado a 1 minuto (1 * 60 * 1000). 
         // Para volver a 5 minutos, cambiar este valor a: 5 * 60 * 1000
-        const timeoutMs = 1 * 60 * 1000; 
-        
+        const timeoutMs = 5 * 60 * 1000;
+
         if (now - lastActivity > timeoutMs) {
           // Si expira, redirigir guardando la URL actual usando un param GET si es posible,
           // o confiar en el AuthContext/ProtectedRoute que atrapará el redireccionamiento.
@@ -52,12 +52,12 @@ const AppRoutes = () => {
     };
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    
+
     if (user) {
       // Inicializar
       updateActivity();
       events.forEach(e => window.addEventListener(e, updateActivity));
-      
+
       // Chequear cada 10 segundos
       intervalId = setInterval(checkInactivity, 10000);
     }
