@@ -35,7 +35,7 @@ export default function OperadorDashboard() {
     const navigate = useNavigate();
 
     // El Operador no tiene pestaña overview, así que el inicio es operations
-    const [activeTab, setActiveTab] = useState('operations'); // operations, calendar, inbox, inventory
+    const [activeTab, setActiveTab] = useState(() => localStorage.getItem('operadorDashboard_activeTab') || 'operations'); // operations, calendar, inbox, inventory
     const [operations, setOperations] = useState([]);
     const [filteredOps, setFilteredOps] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -53,7 +53,13 @@ export default function OperadorDashboard() {
 
     // Eventos de Agenda
     const [agendaEvents, setAgendaEvents] = useState([]);
-    const [agendaEventModalState, setAgendaEventModalState] = useState({ isOpen: false, eventToEdit: null });
+    const [agendaEventModalState, setAgendaEventModalState] = useState(() => {
+        const saved = localStorage.getItem('operadorDashboard_agendaEventModalState');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { }
+        }
+        return { isOpen: false, eventToEdit: null };
+    });
     const [hasNewAgendaEvent, setHasNewAgendaEvent] = useState(false);
 
     useEffect(() => {
@@ -62,11 +68,16 @@ export default function OperadorDashboard() {
     }, []);
 
     useEffect(() => {
+        localStorage.setItem('operadorDashboard_activeTab', activeTab);
         if (activeTab === 'calendar') {
             setHasNewAgendaEvent(false);
             localStorage.setItem('last_seen_agenda', new Date().toISOString());
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        localStorage.setItem('operadorDashboard_agendaEventModalState', JSON.stringify(agendaEventModalState));
+    }, [agendaEventModalState]);
 
     const fetchAgendaEvents = async () => {
         try {

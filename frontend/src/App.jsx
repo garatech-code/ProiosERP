@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -9,9 +9,12 @@ import OperationDetail from './components/OperationDetail';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
   if (loading) return null;
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Guardamos la URL exacta en la que estaba (incluyendo query params)
+    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
   }
   return children;
 };
@@ -32,10 +35,18 @@ const AppRoutes = () => {
       if (user) {
         const lastActivity = parseInt(localStorage.getItem('last_activity') || Date.now().toString(), 10);
         const now = Date.now();
-        // 5 minutos de inactividad
-        if (now - lastActivity > 5 * 60 * 1000) {
+        
+        // TODO: MODO PRUEBA: Cambiado a 1 minuto (1 * 60 * 1000). 
+        // Para volver a 5 minutos, cambiar este valor a: 5 * 60 * 1000
+        const timeoutMs = 1 * 60 * 1000; 
+        
+        if (now - lastActivity > timeoutMs) {
+          // Si expira, redirigir guardando la URL actual usando un param GET si es posible,
+          // o confiar en el AuthContext/ProtectedRoute que atrapará el redireccionamiento.
+          // Como usamos window.location.href, pasamos el redirect_to
+          const currentPath = window.location.pathname + window.location.search;
           logout();
-          window.location.href = '/login';
+          window.location.href = `/login?redirect_to=${encodeURIComponent(currentPath)}`;
         }
       }
     };

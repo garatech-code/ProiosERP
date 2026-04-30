@@ -136,32 +136,44 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
-  const [formData, setFormData] = useState({
-    nombre: '',
-    client: '',
-    ship: '',
-    port: '',
-    agency: '',
-    eta: '',
-    tipo_operacion: 'productos',
-    delivery_method: 'muelle',
-    notes: '',
-    texto_pedido: '',
-    products: [],
-    delivery_date: '',
-    closed_date: '',
-    order_received_date: '',
-    client_confirmed_date: '',
-    operadores_id: [],
-    operarios_id: [],
+  const DRAFT_KEY = 'draft_op_productos';
+
+  const [formData, setFormData] = useState(() => {
+    // Modo edición: no restaurar borrador
+    if (!id) {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { }
+      }
+    }
+    return {
+      nombre: '',
+      client: '',
+      ship: '',
+      port: '',
+      agency: '',
+      eta: '',
+      tipo_operacion: 'productos',
+      delivery_method: 'muelle',
+      notes: '',
+      texto_pedido: '',
+      products: [],
+      delivery_date: '',
+      closed_date: '',
+      order_received_date: '',
+      client_confirmed_date: '',
+      operadores_id: [],
+      operarios_id: [],
+    };
   });
 
   // NUEVA FUNCIÓN: Manejo inteligente de cierre
   const handleCloseModal = () => {
+    localStorage.removeItem(DRAFT_KEY); // Borrar borrador al cancelar explicitamente
     if (onClose) {
-      onClose(); // Ejecutar cierre del modal
+      onClose();
     } else {
-      navigate(-1); // Volver a la ruta anterior (Operation Detail)
+      navigate(-1);
     }
   };
 
@@ -236,6 +248,13 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
 
     loadData();
   }, [id, currentUser]);
+
+  // Autosave silencioso: guardar borrador cada vez que cambia formData (sólo en modo creación)
+  useEffect(() => {
+    if (!id) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+    }
+  }, [formData, id]);
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -397,6 +416,9 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
       }
 
       if (onSuccess) onSuccess(res.data.id);
+
+      // Borrar borrador al guardar exitosamente
+      localStorage.removeItem(DRAFT_KEY);
 
       // NUEVO: Cerramos el modal usando la función inteligente
       handleCloseModal();

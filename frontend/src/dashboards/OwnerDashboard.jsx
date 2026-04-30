@@ -38,7 +38,7 @@ export default function OwnerDashboard() {
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState('overview'); // overview, operations, calendar, inbox
+    const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ownerDashboard_activeTab') || 'overview'); // overview, operations, calendar, inbox
     const [operations, setOperations] = useState([]);
     const [filteredOps, setFilteredOps] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -53,11 +53,23 @@ export default function OwnerDashboard() {
     const [calView, setCalView] = useState('week');
     const [calDate, setCalDate] = useState(new Date());
 
-    const [operationModalState, setOperationModalState] = useState({ isOpen: false, type: null, id: null });
+    const [operationModalState, setOperationModalState] = useState(() => {
+        const saved = localStorage.getItem('ownerDashboard_operationModalState');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { }
+        }
+        return { isOpen: false, type: null, id: null };
+    });
 
     // Eventos de Agenda
     const [agendaEvents, setAgendaEvents] = useState([]);
-    const [agendaEventModalState, setAgendaEventModalState] = useState({ isOpen: false, eventToEdit: null });
+    const [agendaEventModalState, setAgendaEventModalState] = useState(() => {
+        const saved = localStorage.getItem('ownerDashboard_agendaEventModalState');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { }
+        }
+        return { isOpen: false, eventToEdit: null };
+    });
     const [selectedOperatorFilter, setSelectedOperatorFilter] = useState(user?.id || '');
     const [operators, setOperators] = useState([]);
     const [hasNewAgendaEvent, setHasNewAgendaEvent] = useState(false);
@@ -75,11 +87,20 @@ export default function OwnerDashboard() {
     }, [selectedOperatorFilter]);
 
     useEffect(() => {
+        localStorage.setItem('ownerDashboard_activeTab', activeTab);
         if (activeTab === 'calendar') {
             setHasNewAgendaEvent(false);
             localStorage.setItem('last_seen_agenda', new Date().toISOString());
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        localStorage.setItem('ownerDashboard_operationModalState', JSON.stringify(operationModalState));
+    }, [operationModalState]);
+
+    useEffect(() => {
+        localStorage.setItem('ownerDashboard_agendaEventModalState', JSON.stringify(agendaEventModalState));
+    }, [agendaEventModalState]);
 
     const fetchOperators = async () => {
         try {

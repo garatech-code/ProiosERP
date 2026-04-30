@@ -11,13 +11,18 @@ export default function InventoryManagement() {
   const [activeTab, setActiveTab] = useState('todo');
   const [loading, setLoading] = useState(true);
   
+  const PRODUCT_DRAFT_KEY = 'draft_inventory_producto';
+  const PROVEEDOR_DRAFT_KEY = 'draft_inventory_proveedor';
+
   // Proveedores
   const [proveedores, setProveedores] = useState([]);
   const [filteredProveedores, setFilteredProveedores] = useState([]);
   const [showProveedorModal, setShowProveedorModal] = useState(false);
   const [editingProveedor, setEditingProveedor] = useState(null);
-  const [proveedorForm, setProveedorForm] = useState({
-    nombre: '', contacto: '', telefono: '', email: '', direccion: '', rubro: '', condicion_pago: 'contado',
+  const [proveedorForm, setProveedorForm] = useState(() => {
+    const saved = localStorage.getItem(PROVEEDOR_DRAFT_KEY);
+    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
+    return { nombre: '', contacto: '', telefono: '', email: '', direccion: '', rubro: '', condicion_pago: 'contado' };
   });
   const [submittingProveedor, setSubmittingProveedor] = useState(false);
   
@@ -31,9 +36,10 @@ export default function InventoryManagement() {
   // Productos
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [formData, setFormData] = useState({
-    nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0,
-    stock_minimo: 0, proveedor: '', categoria: 'otros',
+  const [formData, setFormData] = useState(() => {
+    const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
+    if (saved) { try { return JSON.parse(saved); } catch (e) { } }
+    return { nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, proveedor: '', categoria: 'otros' };
   });
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
@@ -61,6 +67,19 @@ export default function InventoryManagement() {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  // Autosave silencioso para borradores de formularios
+  useEffect(() => {
+    if (!editingProduct) {
+      localStorage.setItem(PRODUCT_DRAFT_KEY, JSON.stringify(formData));
+    }
+  }, [formData, editingProduct]);
+
+  useEffect(() => {
+    if (!editingProveedor) {
+      localStorage.setItem(PROVEEDOR_DRAFT_KEY, JSON.stringify(proveedorForm));
+    }
+  }, [proveedorForm, editingProveedor]);
   
   const fetchProducts = async () => {
     try {
@@ -183,10 +202,13 @@ export default function InventoryManagement() {
   // ---------- Proveedores ----------
   const openCreateProveedor = () => {
     setEditingProveedor(null);
-    setProveedorForm({ 
-      nombre: '', contacto: '', telefono: '', email: '', direccion: '', 
-      rubro: '', condicion_pago: 'contado' 
-    });
+    const saved = localStorage.getItem(PROVEEDOR_DRAFT_KEY);
+    if (saved) {
+      try { setProveedorForm(JSON.parse(saved)); }
+      catch (e) { setProveedorForm({ nombre: '', contacto: '', telefono: '', email: '', direccion: '', rubro: '', condicion_pago: 'contado' }); }
+    } else {
+      setProveedorForm({ nombre: '', contacto: '', telefono: '', email: '', direccion: '', rubro: '', condicion_pago: 'contado' });
+    }
     setShowProveedorModal(true);
   };
   
@@ -220,6 +242,7 @@ export default function InventoryManagement() {
         showToast('Proveedor creado', 'success');
       }
       setShowProveedorModal(false);
+      localStorage.removeItem(PROVEEDOR_DRAFT_KEY); // Borrar borrador al guardar
       fetchProveedores();
     } catch (err) {
       console.error(err);
@@ -331,10 +354,17 @@ export default function InventoryManagement() {
     setEditingProduct(null);
     let defaultCategoria = 'otros';
     if (activeTab === 'quimicos') defaultCategoria = 'quimicos';
-    setFormData({ 
-      nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0,
-      stock_minimo: 0, proveedor: '', categoria: defaultCategoria
-    });
+    const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
+    if (saved) {
+      try { 
+        const draft = JSON.parse(saved);
+        setFormData({ ...draft, categoria: draft.categoria || defaultCategoria });
+      } catch (e) {
+        setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, proveedor: '', categoria: defaultCategoria });
+      }
+    } else {
+      setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, proveedor: '', categoria: defaultCategoria });
+    }
     setValidationError('');
     setShowProductModal(true);
   };
@@ -391,6 +421,7 @@ export default function InventoryManagement() {
         showToast('Creado con éxito', 'success');
       }
       setShowProductModal(false);
+      localStorage.removeItem(PRODUCT_DRAFT_KEY); // Borrar borrador al guardar
       fetchProducts();
     } catch {
       setValidationError('Error de red o de validación del servidor.');

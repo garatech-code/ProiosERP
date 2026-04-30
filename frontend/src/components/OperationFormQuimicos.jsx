@@ -125,24 +125,34 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
-  const [formData, setFormData] = useState({
-    nombre: '',
-    client: '',
-    ship: '',
-    port: '',
-    agency: '',
-    eta: '',
-    tipo_operacion: 'quimicos',
-    delivery_method: 'muelle',
-    notes: '',
-    texto_pedido: '',
-    products: [],
-    delivery_date: '',
-    closed_date: '',
-    order_received_date: '',
-    client_confirmed_date: '',
-    operadores_id: [],
-    operarios_id: [],
+  const DRAFT_KEY = 'draft_op_quimicos';
+
+  const [formData, setFormData] = useState(() => {
+    if (!id) {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { }
+      }
+    }
+    return {
+      nombre: '',
+      client: '',
+      ship: '',
+      port: '',
+      agency: '',
+      eta: '',
+      tipo_operacion: 'quimicos',
+      delivery_method: 'muelle',
+      notes: '',
+      texto_pedido: '',
+      products: [],
+      delivery_date: '',
+      closed_date: '',
+      order_received_date: '',
+      client_confirmed_date: '',
+      operadores_id: [],
+      operarios_id: [],
+    };
   });
 
   useEffect(() => {
@@ -216,6 +226,13 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
 
     loadData();
   }, [id, currentUser]);
+
+  // Autosave silencioso (sólo en modo creación)
+  useEffect(() => {
+    if (!id) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+    }
+  }, [formData, id]);
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -380,6 +397,7 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
       }
 
       if (onSuccess) onSuccess(res.data.id);
+      localStorage.removeItem(DRAFT_KEY); // Borrar borrador al guardar
       if (onClose) onClose();
 
     } catch (err) {
@@ -419,7 +437,7 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
           <h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">
             {id ? `Editar Operación Químicos #${id}` : 'Nueva Operación: Químicos'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-emerald-100 dark:bg-slate-600 hover:bg-emerald-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
+          <button onClick={() => { localStorage.removeItem(DRAFT_KEY); onClose && onClose(); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-emerald-100 dark:bg-slate-600 hover:bg-emerald-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>

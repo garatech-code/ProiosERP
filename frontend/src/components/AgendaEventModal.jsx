@@ -14,6 +14,8 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const DRAFT_KEY = 'draft_agenda_event';
+
     const isOwner = user?.role === 'OWNER' || user?.role === 'CONTABLE';
 
     useEffect(() => {
@@ -31,15 +33,43 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                 setEndDate(eventToEdit.end_date ? new Date(eventToEdit.end_date).toISOString().slice(0, 16) : '');
                 setAssignedTo(String(eventToEdit.assigned_to || user.id));
             } else {
-                setTitle('');
-                setDescription('');
-                setStartDate('');
-                setEndDate('');
-                setAssignedTo(String(user.id));
+                // Intentar cargar borrador si no es edición
+                const saved = localStorage.getItem(DRAFT_KEY);
+                if (saved) {
+                    try {
+                        const draft = JSON.parse(saved);
+                        setTitle(draft.title || '');
+                        setDescription(draft.description || '');
+                        setStartDate(draft.startDate || '');
+                        setEndDate(draft.endDate || '');
+                        setAssignedTo(draft.assignedTo || String(user.id));
+                    } catch (e) {
+                        console.error("Error al cargar borrador de agenda:", e);
+                    }
+                } else {
+                    setTitle('');
+                    setDescription('');
+                    setStartDate('');
+                    setEndDate('');
+                    setAssignedTo(String(user.id));
+                }
                 setError(null);
             }
         }
     }, [isOpen, eventToEdit, user, isOwner]);
+
+    // Autosave silencioso
+    useEffect(() => {
+        if (isOpen && !eventToEdit) {
+            const draft = { title, description, startDate, endDate, assignedTo };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        }
+    }, [title, description, startDate, endDate, assignedTo, isOpen, eventToEdit]);
+
+    const handleClose = () => {
+        if (!eventToEdit) localStorage.removeItem(DRAFT_KEY);
+        onClose();
+    };
 
     const fetchOperators = async () => {
         try {
@@ -78,6 +108,7 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
             } else {
                 await axios.post('/operaciones/events/', eventData);
             }
+            localStorage.removeItem(DRAFT_KEY);
             onSave();
             onClose();
         } catch (err) {
@@ -112,7 +143,7 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                     <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-300">
                         {eventToEdit ? 'Editar Evento de Agenda' : 'Nuevo Evento de Agenda'}
                     </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
@@ -206,7 +237,7 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                     <div className="flex gap-3">
                         <button
                             type="button"
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
                             disabled={loading}
                         >
