@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import OperarioActionPanel from './OperarioActionPanel';
 import OperationTracker from './OperationTracker';
 import ProductSearchCards from './ProductSearchCards'; // NUEVO COMPONENTE
+import OperationEmails from './OperationEmails'; // COMPONENTE DE CORREOS
 import LogoSpinner from './LogoSpinner';
 import * as XLSX from 'xlsx';
 
@@ -68,7 +69,7 @@ export default function OperationDetail() {
   // Parser con Regex para auto-detectar productos en texto libre
   const detectedProducts = useMemo(() => {
     if (!operation?.texto_pedido) return [];
-    
+
     const lines = operation.texto_pedido.split('\n');
     let parsedProducts = [];
     let idCounter = 1;
@@ -76,31 +77,26 @@ export default function OperationDetail() {
     // Diferentes "modelos" o patrones de heurística Regex para procesar el texto plano
     const patterns = [
       // Modelo 1: Producto - Cantidad: X [Unidad]
-      // Ej: Botas de seguridad - Cantidad: 10 pares | Chalecos - Cant: 5
       {
         regex: /(.+?)[–\-:]\s*(?:Cant(?:idad|\.)?)\s*(?::)?\s*(\d+)\s*(.*)/i,
         extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
       },
       // Modelo 2: X [Unidad] de Producto
-      // Ej: 10 pares de botas de seguridad | 25 unidades de raciones
       {
         regex: /^(\d+)\s+([a-zA-Z]+)?\s*(?:de|del)?\s+(.+)$/i,
         extract: (m) => ({ nombre: m[3], cantidad: m[1], unidad: m[2] })
       },
       // Modelo 3: Producto x X [Unidad]
-      // Ej: Linternas recargables x 15 unidades | Guantes x5
       {
         regex: /(.+?)\s+x\s*(\d+)\s*(.*)/i,
         extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
       },
       // Modelo 4: Producto (X [Unidad])
-      // Ej: Raciones de comida marítima (100 unidades)
       {
         regex: /(.+?)\s*\((\d+)\s*([a-zA-Z]+)?\)/i,
         extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
       },
       // Modelo 5: QTY: X - Producto
-      // Ej: Qty: 20 - Botas de Trabajo
       {
         regex: /(?:Qty|Cantidad)(?::)?\s*(\d+)\s*([a-zA-Z]+)?\s*[\-\|]\s*(.+)/i,
         extract: (m) => ({ nombre: m[3], cantidad: m[1], unidad: m[2] })
@@ -118,10 +114,10 @@ export default function OperationDetail() {
         const match = trimmedLine.match(pattern.regex);
         if (match) {
           const { nombre, cantidad, unidad } = pattern.extract(match);
-          
+
           // Prevenir falsos positivos filtrando nombres inusualmente largos o vacíos
           const safeName = nombre ? nombre.trim().replace(/^[\-\:]|[\-\:]$/g, '').trim() : '';
-          
+
           if (safeName && safeName.length > 2 && safeName.length < 80) {
             parsedProducts.push({
               id: `auto_${idCounter++}`,
@@ -372,13 +368,13 @@ export default function OperationDetail() {
               <button onClick={() => navigate('/')} className="text-slate-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30">
                 <i className="bi bi-arrow-left text-xl"></i>
               </button>
-              
+
               {editingName ? (
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="text" 
-                    value={tempName} 
-                    onChange={(e) => setTempName(e.target.value)} 
+                  <input
+                    type="text"
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
                     className="px-2 py-1 text-sm bg-white dark:bg-slate-700 border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white w-64"
                     autoFocus
@@ -630,7 +626,7 @@ export default function OperationDetail() {
                   <div className="p-4 sm:p-6 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
                     {operation.texto_pedido}
                   </div>
-                  
+
                   {/* COMPONENTE DE TARJETAS DE BUSQUEDA INYECTADO AQUÍ */}
                   {(!isOperario) && (
                     <div className="px-4 py-4 sm:px-6 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
@@ -700,20 +696,20 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
                       <button
                         onClick={previewPackingListExcel}
-                        className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                        className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                       >
                         <i className="bi bi-eye-fill"></i> Vista Previa
                       </button>
                       <button
                         onClick={downloadPackingListExcel}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                        className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                       >
-                        <i className="bi bi-file-earmark-spreadsheet"></i> Exportar Excel
+                        <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
                       </button>
-                      <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
                         <i className="bi bi-cloud-arrow-up-fill"></i> Subir
                         <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
                       </label>
@@ -733,7 +729,7 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
                       <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
                     </label>
@@ -752,7 +748,7 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
                       <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
                     </label>
@@ -760,40 +756,45 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 mt-8 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-white w-full sm:w-auto">
+              {/* INTEGRACIÓN DEL NUEVO COMPONENTE DE CORREOS */}
+              <div className="mt-8 mb-8">
+                <OperationEmails operacionId={id} />
+              </div>
+
+              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-white w-full sm:w-auto text-center sm:text-left">
                   <h4 className="font-black text-lg">Controles Operativos</h4>
                   <p className="text-xs text-slate-400 font-medium">Avanza la operación a la siguiente fase.</p>
                 </div>
 
-                <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-end">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto sm:justify-end">
                   {isOwner && operation.status !== 'closed' && operation.estado !== 'entregada' && operation.status !== 'cancelled' && operation.estado !== 'cancelada' && (
                     <button
                       onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock retenido (si lo hay) no regresará automáticamente en esta versión beta.')}
                       disabled={actionLoading}
-                      className="px-4 py-2 border-2 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-sm font-bold rounded-xl transition-colors"
+                      className="w-full sm:w-auto px-4 py-2 border-2 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
-                      <i className="bi bi-x-octagon-fill mr-1"></i> Anular
+                      <i className="bi bi-x-octagon-fill"></i> Anular
                     </button>
                   )}
                   {isOwner && (
-                    <button onClick={() => navigate(`/operations/${id}/edit`)} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors">
-                      <i className="bi bi-pencil-fill mr-1"></i> Editar Info
+                    <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                      <i className="bi bi-pencil-fill"></i> Editar Info
                     </button>
                   )}
 
                   {/* BLOQUE DE FLUJO DE REVISIONES Y CORTES CONDICIONALES PARA OPERADORES */}
                   {isOperador && operation.estado_revision !== 'approved' && operation.estado_revision !== 'pending' && operation.estado !== 'entregada' && operation.estado !== 'cancelada' && (
-                    <div className="w-full bg-slate-700/50 p-4 rounded-xl border border-slate-600 mt-2 sm:mt-0 max-w-sm ml-auto">
+                    <div className="w-full bg-slate-700/50 p-4 rounded-xl border border-slate-600 mt-2 sm:mt-0 sm:max-w-sm sm:ml-auto">
                       <h5 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2"><i className="bi bi-shield-check"></i> Solicitar Revisión</h5>
-                      <textarea 
+                      <textarea
                         value={mensajeRevision}
                         onChange={(e) => setMensajeRevision(e.target.value)}
-                        placeholder="Nota o reporte para el administrador..." 
+                        placeholder="Nota o reporte para el administrador..."
                         className="w-full text-sm bg-slate-800 text-white border-slate-600 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2"
                         rows="2"
                       />
-                      <button 
+                      <button
                         onClick={handleRequestReview}
                         disabled={revisionActionLoading}
                         className="w-full px-5 py-2.5 text-sm font-black rounded-lg shadow-lg bg-indigo-500 text-white hover:bg-indigo-400 transition-all font-bold"
@@ -804,24 +805,24 @@ export default function OperationDetail() {
                   )}
 
                   {isOwner && operation.estado_revision === 'pending' && (
-                    <div className="w-full bg-amber-900/30 p-4 rounded-xl border border-amber-500/30 mt-2 sm:mt-0 max-w-sm ml-auto text-amber-100">
+                    <div className="w-full bg-amber-900/30 p-4 rounded-xl border border-amber-500/30 mt-2 sm:mt-0 sm:max-w-sm sm:ml-auto text-amber-100">
                       <h5 className="text-xs font-bold uppercase tracking-widest mb-2"><i className="bi bi-check-all"></i> Responder a Revisión</h5>
-                      <textarea 
+                      <textarea
                         value={mensajeRevision}
                         onChange={(e) => setMensajeRevision(e.target.value)}
-                        placeholder="Escribe tu feedback de aprobación/rechazo..." 
+                        placeholder="Escribe tu feedback de aprobación/rechazo..."
                         className="w-full text-sm bg-slate-800 text-white border-slate-600 rounded-lg p-2 focus:ring-amber-500 focus:border-amber-500 mb-2 placeholder-slate-400"
                         rows="2"
                       />
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => handleResolveReview('reject')}
                           disabled={revisionActionLoading}
                           className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-all"
                         >
                           Rechazar
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleResolveReview('approve')}
                           disabled={revisionActionLoading}
                           className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all"
@@ -836,35 +837,35 @@ export default function OperationDetail() {
                     <button
                       onClick={() => handleAction('confirm_operation', '¿Declarar Delivery Note ingresado y pasar al estado de Armado de Packing List?')}
                       disabled={actionLoading}
-                      className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all"
+                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                     >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam mr-1"></i> Armar Packing List</>}
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
                     </button>
                   )}
                   {(!isOperador || operation.estado_revision === 'approved') && operation.can_send_to_customs && !isOperario && (
                     <button
                       onClick={() => handleAction('start_coordination', '¿Enviar Packing List a Aduanas? Esto consumirá el stock del inventario.')}
                       disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
-                      className={`px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all ${(stockVerification && !stockVerification.todo_suficiente)
+                      className={`w-full sm:w-auto px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${(stockVerification && !stockVerification.todo_suficiente)
                         ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
                         : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
                         }`}
                     >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-building-check mr-1"></i> Enviar a Aduanas</>}
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-building-check"></i> Enviar a Aduanas</>}
                     </button>
                   )}
                   {(!isOperador || operation.estado_revision === 'approved') && operation.can_coordinate && !isOperario && (
-                    <button onClick={() => handleAction('finalize_production', '¿Aduana dio el Rancho? Pasar a logística.')} disabled={actionLoading} className="px-5 py-2.5 bg-purple-500 hover:bg-purple-400 text-white text-sm font-black rounded-xl shadow-lg shadow-purple-500/30 transition-all">
+                    <button onClick={() => handleAction('finalize_production', '¿Aduana dio el Rancho? Pasar a logística.')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 hover:bg-purple-400 text-white text-sm font-black rounded-xl shadow-lg shadow-purple-500/30 transition-all text-center">
                       {actionLoading ? 'Procesando...' : 'Autorizar Logística'}
                     </button>
                   )}
                   {(!isOperador || operation.estado_revision === 'approved') && operation.can_deliver && !isOperario && (
-                    <button onClick={() => handleAction('mark_delivered', '¿Emitir el remito de entrega final?')} disabled={actionLoading} className="px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-sm font-black rounded-xl shadow-lg shadow-blue-500/30 transition-all">
+                    <button onClick={() => handleAction('mark_delivered', '¿Emitir el remito de entrega final?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-sm font-black rounded-xl shadow-lg shadow-blue-500/30 transition-all text-center">
                       {actionLoading ? 'Procesando...' : 'Emitir Remito'}
                     </button>
                   )}
                   {(!isOperador || operation.estado_revision === 'approved') && operation.estado === 'remitada' && !isOperario && (
-                    <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all">
+                    <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
                       {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
                     </button>
                   )}
@@ -896,7 +897,7 @@ export default function OperationDetail() {
                 <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Puerto</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.port}</p></div>
                 <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ETA</p><p className="text-sm font-semibold text-indigo-600">{new Date(packingData.eta).toLocaleString()}</p></div>
               </div>
-              <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm">
+              <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr className="uppercase tracking-wider text-[10px] font-black text-slate-500">
@@ -912,20 +913,20 @@ export default function OperationDetail() {
                   <tbody className="bg-white divide-y divide-slate-100">
                     {packingData.products.map((prod, idx) => (
                       <tr key={idx} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 text-sm font-bold text-slate-800">{prod.name}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-slate-800 whitespace-nowrap">{prod.name}</td>
                         <td className="px-4 py-3 text-sm text-center font-bold text-slate-600">{prod.quantity}</td>
-                        <td className="px-4 py-3 text-xs font-medium text-slate-500">{prod.presentation}</td>
-                        <td className="px-4 py-3 text-sm text-right text-slate-600">{prod.unit_weight} kg</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-slate-800">{prod.total_weight} kg</td>
-                        <td className="px-4 py-3 text-sm text-right text-slate-500">${prod.unit_price}</td>
-                        <td className="px-4 py-3 text-sm text-right font-black text-indigo-700">${prod.subtotal}</td>
+                        <td className="px-4 py-3 text-xs font-medium text-slate-500 whitespace-nowrap">{prod.presentation}</td>
+                        <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{prod.unit_weight} kg</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-slate-800 whitespace-nowrap">{prod.total_weight} kg</td>
+                        <td className="px-4 py-3 text-sm text-right text-slate-500 whitespace-nowrap">${prod.unit_price}</td>
+                        <td className="px-4 py-3 text-sm text-right font-black text-indigo-700 whitespace-nowrap">${prod.subtotal}</td>
                       </tr>
                     ))}
                     <tr className="bg-indigo-50/50">
                       <td colSpan="4" className="px-4 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Totales de Carga</td>
-                      <td className="px-4 py-4 text-right text-sm font-black text-indigo-800">{packingData.total_weight} kg</td>
+                      <td className="px-4 py-4 text-right text-sm font-black text-indigo-800 whitespace-nowrap">{packingData.total_weight} kg</td>
                       <td></td>
-                      <td className="px-4 py-4 text-right text-lg font-black text-indigo-700">${packingData.total_price.toFixed(2)}</td>
+                      <td className="px-4 py-4 text-right text-lg font-black text-indigo-700 whitespace-nowrap">${packingData.total_price.toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>

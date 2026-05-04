@@ -36,7 +36,7 @@ const AppRoutes = () => {
         const lastActivity = parseInt(localStorage.getItem('last_activity') || Date.now().toString(), 10);
         const now = Date.now();
 
-        // TODO: MODO PRUEBA: Cambiado a 1 minuto (1 * 60 * 1000). 
+
         // Para volver a 5 minutos, cambiar este valor a: 5 * 60 * 1000
         const timeoutMs = 5 * 60 * 1000;
 
