@@ -57,7 +57,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
         return qs.filter(
             Q(operadores_asignados=user) |
-            Q(operarios_asignados=user) |
             Q(contables_asignados=user)
         ).distinct()
 

@@ -336,7 +336,11 @@ export default function OperadorDashboard() {
                     </div>
                 ) : (
                     filteredOps?.map((op) => (
-                        <div key={op.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative">
+                        <div 
+                            key={op.id} 
+                            onClick={() => navigate(`/operations/${op.id}`)}
+                            className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative cursor-pointer"
+                        >
                             <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
                             <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
                                 <div className="flex justify-between items-start mb-2">
@@ -376,9 +380,7 @@ export default function OperadorDashboard() {
                                         $<span className="text-lg">{calculateTotal(op.products).toLocaleString()}</span>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => navigate(`/operations/${op.id}`)} className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-bold rounded-lg transition-colors flex items-center gap-1">
-                                            <i className="bi bi-eye-fill"></i> Gestionar
-                                        </button>
+                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">Ver Detalles <i className="bi bi-chevron-right"></i></span>
                                     </div>
                                 </div>
                             </div>

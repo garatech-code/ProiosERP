@@ -2,12 +2,22 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import ComposeEmailModal from './ComposeEmailModal'; // Importamos tu modal
+import ReadEmailModal from './ReadEmailModal'; // Nuevo modal de lectura
 
-export default function OperationEmails({ operacionId }) {
+const getEmailPreview = (htmlOrText) => {
+    if (!htmlOrText) return '(Sin contenido)';
+    const temp = document.createElement("div");
+    temp.innerHTML = htmlOrText;
+    const text = (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
+    return text.length > 120 ? text.slice(0, 120) + '...' : text;
+};
+
+export default function OperationEmails({ operacionId, defaultRecipient }) {
     const { user } = useAuth(); // Obtenemos el usuario para el modal
     const [emails, setEmails] = useState([]);
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [replyTo, setReplyTo] = useState(null);
+    const [readEmail, setReadEmail] = useState(null); // Estado para el modal de lectura
 
     const fetchEmails = useCallback(() => {
         axios.get(`/correos/inbox/?operacion_id=${operacionId}`)
@@ -20,14 +30,21 @@ export default function OperationEmails({ operacionId }) {
     }, [fetchEmails]);
 
     // Manejadores para abrir el modal
-    const handleReply = (email) => {
+    const handleReply = (email, e) => {
+        if (e) e.stopPropagation(); // Evitar que se abra el modal de lectura al hacer clic en responder
         setReplyTo(email);
+        setReadEmail(null); // Cerramos el de lectura si está abierto
         setIsComposeOpen(true);
     };
 
     const handleNewEmail = () => {
         setReplyTo(null);
+        setReadEmail(null);
         setIsComposeOpen(true);
+    };
+
+    const handleReadEmail = (email) => {
+        setReadEmail(email);
     };
 
     return (
@@ -37,9 +54,9 @@ export default function OperationEmails({ operacionId }) {
                 {/* Botón para enviar un correo nuevo desde la operación */}
                 <button
                     onClick={handleNewEmail}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors"
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                 >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                    <i className="bi bi-pencil-square"></i>
                     Nuevo Mensaje
                 </button>
             </div>
@@ -49,43 +66,55 @@ export default function OperationEmails({ operacionId }) {
                     No hay correos vinculados a esta operación.
                 </p>
             ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                     {emails.map(email => (
-                        <div key={email.id} className="p-4 border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 rounded-lg">
+                        <div 
+                            key={email.id} 
+                            onClick={() => handleReadEmail(email)}
+                            className="p-4 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors shadow-sm group"
+                        >
                             <div className="flex justify-between items-start mb-2">
                                 <div>
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded mr-2 ${email.direction === 'inbound' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded mr-2 uppercase tracking-wider ${email.direction === 'inbound' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                                         {email.direction === 'inbound' ? 'Recibido' : 'Enviado'}
                                     </span>
-                                    <span className="font-bold text-sm text-gray-900 dark:text-white">
+                                    <span className="font-bold text-sm text-slate-900 dark:text-white">
                                         {email.direction === 'inbound' ? email.sender_address : email.recipient_address}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="text-xs text-gray-500">{new Date(email.date_received).toLocaleString()}</span>
+                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
+                                        {new Date(email.date_received).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                    </span>
 
                                     {/* Botón de responder específico para este correo */}
-                                    {email.direction === 'inbound' && (
-                                        <button
-                                            onClick={() => handleReply(email)}
-                                            className="text-gray-400 hover:text-indigo-600 transition-colors"
-                                            title="Responder"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={(e) => handleReply(email, e)}
+                                        className="text-slate-400 hover:text-indigo-600 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                                        title="Responder"
+                                    >
+                                        <i className="bi bi-reply-fill text-sm"></i>
+                                    </button>
                                 </div>
                             </div>
-                            <p className="text-sm font-semibold text-gray-800 dark:text-slate-200 mb-1">{email.subject}</p>
-                            <p className="text-xs text-gray-600 dark:text-slate-400 line-clamp-2">
-                                {email.body_text || 'Contenido HTML...'}
+                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 mb-1">{email.subject}</p>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-2">
+                                {getEmailPreview(email.body_html || email.body_text)}
                             </p>
                         </div>
                     ))}
                 </div>
             )}
 
-            {/* Renderizado del Modal */}
+            {/* Renderizado de Modales */}
+            {readEmail && (
+                <ReadEmailModal
+                    email={readEmail}
+                    onClose={() => setReadEmail(null)}
+                    onReply={(email) => handleReply(email)}
+                />
+            )}
+
             {isComposeOpen && (
                 <ComposeEmailModal
                     onClose={() => setIsComposeOpen(false)}
@@ -96,6 +125,7 @@ export default function OperationEmails({ operacionId }) {
                     replyTo={replyTo}
                     user={user}
                     defaultOperacionId={operacionId} // Pasamos el ID actual
+                    defaultRecipient={defaultRecipient} // Pasamos el destinatario sugerido
                 />
             )}
         </div>

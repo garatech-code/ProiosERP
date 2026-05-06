@@ -44,3 +44,20 @@ class FeedbackItem(models.Model):
 
     def __str__(self):
         return f"[{self.get_estado_display()}] {self.titulo[:50]}"
+
+
+class PersonalPlantel(models.Model):
+    nombres = models.CharField(max_length=200)
+    apellidos = models.CharField(max_length=200)
+    dni = models.CharField(max_length=20, unique=True)
+    rol = models.CharField(max_length=100, help_text="Ej: Operario, Capataz, Especialista")
+    activo = models.BooleanField(default=True)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Personal de Plantel"
+        verbose_name_plural = "Personal de Plantel"
+        ordering = ['apellidos', 'nombres']
+
+    def __str__(self):
+        return f"{self.apellidos}, {self.nombres} ({self.dni}) - {self.rol}"

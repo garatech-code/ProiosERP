@@ -8,6 +8,7 @@ import OperationFormQuimicos from '../components/OperationFormQuimicos';
 import OperationFormServicios from '../components/OperationFormServicios';
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
+import StaffManagement from '../components/StaffManagement';
 import DebugFeedback from '../components/DebugFeedback';
 import AgendaEventModal from '../components/AgendaEventModal';
 import { useTheme } from '../context/ThemeContext';
@@ -437,7 +438,11 @@ export default function OwnerDashboard() {
                     </div>
                 ) : (
                     opsToRender?.map((op) => (
-                        <div key={op.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative">
+                        <div 
+                            key={op.id} 
+                            onClick={() => navigate(`/operations/${op.id}`)}
+                            className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative cursor-pointer"
+                        >
                             <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
                             <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
                                 <div className="flex justify-between items-start mb-2">
@@ -476,11 +481,11 @@ export default function OwnerDashboard() {
                                     <div className="font-black text-slate-800 dark:text-white text-sm truncate max-w-[50%]">
                                         $<span className="text-lg">{calculateTotal(op.products).toLocaleString()}</span>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 items-center">
+                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity mr-2">Ver Detalles <i className="bi bi-chevron-right"></i></span>
                                         {op.estado !== 'entregada' && op.estado !== 'cancelada' && (
-                                            <button onClick={(e) => cancelOperation(op.id, e)} className="text-xs font-semibold text-gray-400 hover:text-red-600 px-2">Anular</button>
+                                            <button onClick={(e) => cancelOperation(op.id, e)} className="text-xs font-semibold text-gray-400 hover:text-red-600 px-2 transition-colors">Anular</button>
                                         )}
-                                        <button onClick={() => navigate(`/operations/${op.id}`)} className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-bold rounded-lg transition-colors">Ver</button>
                                     </div>
                                 </div>
                             </div>
@@ -568,6 +573,11 @@ export default function OwnerDashboard() {
                     <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => setActiveTab('inventory')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-box-seam text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Inventario & Recetas</span>}
+                    </button>
+
+                    <button title={!isSidebarOpen ? "Plantel Operarios" : ""} onClick={() => setActiveTab('staff')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'staff' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-people-fill text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Plantel Operarios</span>}
                     </button>
                 </div>
 
@@ -659,6 +669,10 @@ export default function OwnerDashboard() {
                     </i>
                     <span className="text-[10px] mt-1 font-semibold">Revisar</span>
                 </button>
+                <button onClick={() => setActiveTab('staff')} className={`flex flex-col items-center p-2 ${activeTab === 'staff' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-people-fill text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Plantel</span>
+                </button>
             </div>
 
             {/* Main Content Area */}
@@ -674,12 +688,13 @@ export default function OwnerDashboard() {
                             {activeTab === 'inbox' && 'Comunicaciones'}
                             {activeTab === 'approvals' && 'Revisiones de Operaciones'}
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
+                            {activeTab === 'staff' && 'Personal de Plantel'}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
-                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
-                    {activeTab !== 'inventory' && (
+                    {activeTab !== 'inventory' && activeTab !== 'staff' && (
                         <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                             <i className="bi bi-plus-lg text-lg"></i>
                             Nueva Operación
@@ -708,6 +723,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'approvals' && renderOperationsList(operations.filter(op => op.estado_revision === 'pending'))}
                             {activeTab === 'inbox' && renderInbox()}
                             {activeTab === 'inventory' && <InventoryManagement />}
+                            {activeTab === 'staff' && <StaffManagement />}
                         </>
                     )}
                 </div>

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent
 from apps.inventario.models import Articulo
-from apps.usuarios.models import User
+from apps.usuarios.models import User, PersonalPlantel
 import json
 
 
@@ -68,10 +68,13 @@ class OperacionDetalleSerializer(serializers.ModelSerializer):
 
 class OperacionSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='cliente.name', read_only=True)
+    client_email = serializers.CharField(source='cliente.email', read_only=True)
     ship_name = serializers.CharField(source='ship.name', read_only=True)
     ship_flag = serializers.CharField(source='ship.flag', read_only=True)
     port_name = serializers.CharField(source='port.name', read_only=True)
     agency_name = serializers.CharField(source='agency.name', read_only=True)
+    operarios_nombres = serializers.SerializerMethodField()
+    operarios_usuarios_nombres = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField(read_only=True)
     products = serializers.JSONField(required=False)
 
@@ -87,27 +90,32 @@ class OperacionSerializer(serializers.ModelSerializer):
         source='operadores_asignados', required=False
     )
     operarios_id = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=User.objects.all(),
+        many=True, queryset=PersonalPlantel.objects.all(),
         source='operarios_asignados', required=False
     )
     contables_id = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(),
         source='contables_asignados', required=False
     )
+    operarios_usuarios_id = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(),
+        source='operarios_usuarios_asignados', required=False
+    )
 
     class Meta:
         model = Operacion
         fields = [
-            'id', 'client_name', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'eta',
+            'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'eta',
             'delivery_method', 'status', 'products', 'detalles',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
             'packing_list_file', 'remito_file', 'rancho_file',
-            'operadores_id', 'operarios_id', 'contables_id',
+            'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
+            'operarios_nombres', 'operarios_usuarios_nombres',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
-            'detalle_servicio', 'forma_cotizacion_servicio',
+            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre'
         ]
         extra_kwargs = {
@@ -122,6 +130,12 @@ class OperacionSerializer(serializers.ModelSerializer):
             'closed_date': {'required': False, 'allow_null': True},
         }
         read_only_fields = ['estado_revision', 'mensaje_revision']
+
+    def get_operarios_nombres(self, obj):
+        return [f"{s.apellidos}, {s.nombres}" for s in obj.operarios_asignados.all()]
+
+    def get_operarios_usuarios_nombres(self, obj):
+        return [u.username for u in obj.operarios_usuarios_asignados.all()]
 
     def get_can_confirm(self, obj):
         return obj.estado == Operacion.ESTADO_SOLICITADA

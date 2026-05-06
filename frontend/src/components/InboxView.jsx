@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import DOMPurify from 'dompurify';
 import ComposeEmailModal from './ComposeEmailModal';
 import LogoSpinner from './LogoSpinner';
+
+const getEmailPreview = (htmlOrText) => {
+    if (!htmlOrText) return '(Sin contenido)';
+    const temp = document.createElement("div");
+    temp.innerHTML = htmlOrText;
+    const text = (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
+    return text.length > 50 ? text.slice(0, 50) + '...' : text;
+};
 
 export default function InboxView() {
   const { user } = useAuth();
@@ -142,7 +151,9 @@ export default function InboxView() {
                   </span>
                 </div>
                 <h4 className="text-sm text-gray-800 dark:text-slate-200 truncate">{email.subject || '(Sin Asunto)'}</h4>
-                <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-1">{email.body_text?.substring(0, 50) || 'Contenido HTML...'}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-1">
+                  {getEmailPreview(email.body_html || email.body_text)}
+                </p>
                 {email.operacion && (
                   <span className="inline-block mt-2 px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-bold rounded">
                     OP-{email.operacion}
@@ -181,7 +192,7 @@ export default function InboxView() {
             </div>
             <div className="p-6 overflow-y-auto flex-1 prose dark:prose-invert prose-sm max-w-none text-gray-800 dark:text-slate-200">
               {selectedEmail.body_html ? (
-                <div dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }} />
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedEmail.body_html) }} />
               ) : (
                 <div className="whitespace-pre-wrap font-sans">{selectedEmail.body_text}</div>
               )}

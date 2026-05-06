@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 
-export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user }) {
+export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, defaultOperacionId, defaultRecipient }) {
   const [formData, setFormData] = useState({
-    recipient: '',
+    recipient: defaultRecipient || '',
     subject: '',
     body: '',
     operacion_id: '',
@@ -114,38 +114,39 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user })
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-800">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+          <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+            <i className="bi bi-pencil-square text-indigo-500"></i>
             {replyTo ? 'Responder Mensaje' : 'Redactar Nuevo Mensaje'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 rounded-full p-1 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 shadow-sm transition-colors">
+            <i className="bi bi-x-lg"></i>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Para *</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Para *</label>
               <input
-                type="text"
+                type="email"
                 name="recipient"
                 value={formData.recipient}
                 onChange={handleChange}
                 required
-                className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                 placeholder="cliente@empresa.com"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Vincular a Operación (Opcional)</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular a Operación (Opcional)</label>
               <select
                 name="operacion_id"
                 value={formData.operacion_id}
                 onChange={handleChange}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
               >
                 <option value="">-- Sin Vincular --</option>
                 {operations.map(op => (
@@ -156,23 +157,23 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user })
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Asunto *</label>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Asunto *</label>
             <input
               type="text"
               name="subject"
               value={formData.subject}
               onChange={handleChange}
               required
-              className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-medium"
+              className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-medium transition-colors"
             />
           </div>
 
           <div className="flex-1 flex flex-col">
-            <label className="block text-xs font-bold text-gray-700 mb-1 flex justify-between items-end">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex justify-between items-end">
               <span>Mensaje *</span>
-              <label className="flex items-center gap-1 font-normal text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded cursor-pointer">
-                <input type="checkbox" name="useTemplate" checked={formData.useTemplate} onChange={handleChange} className="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300" />
-                Usar Plantilla Institucional ProIOS
+              <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase">
+                <input type="checkbox" name="useTemplate" checked={formData.useTemplate} onChange={handleChange} className="rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800" />
+                Usar Plantilla ProIOS
               </label>
             </label>
             <textarea
@@ -181,39 +182,35 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user })
               onChange={handleChange}
               required
               rows={8}
-              className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none"
+              className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none custom-scrollbar transition-colors"
               placeholder="Escribe tu mensaje aquí..."
             ></textarea>
-            <p className="mt-2 text-[11px] text-gray-500">
+            <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
               * La firma se añadirá automáticamente al final del mensaje con tus datos: <b>{user?.first_name} {user?.last_name || user?.username} ({user?.role})</b>.
             </p>
           </div>
 
-          <div className="pt-4 mt-2 border-t border-gray-100 flex justify-end gap-3">
+          <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-lg text-sm font-bold transition-colors"
+              className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors shadow-sm"
             >
               Descartar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-sm shadow-indigo-200 hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-sm shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
-                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   Enviando...
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                  Enviar
+                  <i className="bi bi-send-fill"></i> Enviar
                 </>
               )}
             </button>

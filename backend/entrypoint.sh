@@ -11,7 +11,7 @@ done
 echo "PostgreSQL started"
 
 # Run migrations
-echo "Applying database migrations..."
+echo "Applying database  migrations..."
 python manage.py migrate
 
 # Check/Create Superuser
@@ -35,6 +35,7 @@ if not User.objects.filter(username=admin_username).exists():
     print(f'>>> Superuser {admin_username} created successfully.')
 else:
     print(f'>>> Superuser {admin_username} already exists. Skipping creation.')
+    
 "
 
 # Collect static files

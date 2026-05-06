@@ -5,6 +5,9 @@ from email.utils import parsedate_to_datetime
 import re
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
+from django.utils import timezone
+from datetime import timedelta
 from apps.correos.models import EmailMessage, EmailAttachment
 from apps.operaciones.models import Operacion
 
@@ -61,14 +64,22 @@ def sync_outlook_inbox():
     if EMAIL_IMAP_PASS == 'COMPLETAR_AQUI':
         return "Credentials missing. Skipping sync."
 
+    lock_id = "lock_sync_outlook_inbox"
+    if not cache.add(lock_id, 'true', timeout=60 * 10):
+        return "Sync already running. Skipping."
+
     try:
         mail = imaplib.IMAP4_SSL(EMAIL_IMAP_SERVER)
         mail.login(EMAIL_IMAP_USER, EMAIL_IMAP_PASS)
         mail.select('inbox')
 
-        # Buscar emails con la flag UNSEEN
-        status, messages = mail.search(None, 'UNSEEN')
-        if status != 'OK':
+        now = timezone.now()
+        yesterday_str = (now - timedelta(days=1)).strftime('%d-%b-%Y')
+        twelve_hours_ago = now - timedelta(hours=12)
+
+        # Buscar emails con la flag UNSEEN desde ayer
+        status, messages = mail.search(None, f'(UNSEEN SINCE "{yesterday_str}")')
+        if status != 'OK' or not messages[0]:
             mail.logout()
             return "No messages found or error."
 
@@ -93,6 +104,10 @@ def sync_outlook_inbox():
                     cc = clean_header(msg.get('Cc'))
                     
                     date_tuple = parsedate_to_datetime(msg.get('Date'))
+                    
+                    # Filtro estricto local: solo últimas 12 horas
+                    if date_tuple < twelve_hours_ago:
+                        continue
                     
                     body_text, body_html = extract_body(msg)
                     
@@ -145,6 +160,8 @@ def sync_outlook_inbox():
 
     except Exception as e:
         return f"IMAP Sync Error: {str(e)}"
+    finally:
+        cache.delete(lock_id)
 
 # Settings provisorios de SMTP
 EMAIL_SMTP_SERVER = 'smtp.gmail.com'

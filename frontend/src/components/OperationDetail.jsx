@@ -511,6 +511,12 @@ export default function OperationDetail() {
                         {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
                       </dd>
                     </div>
+                    {operation.tipo_operacion === 'servicios' && operation.subtipo_servicio && (
+                      <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-amber-50/20 dark:bg-amber-900/10">
+                        <dt className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Especialidad</dt>
+                        <dd className="text-sm font-black text-amber-700 dark:text-amber-300">{operation.subtipo_servicio}</dd>
+                      </div>
+                    )}
                     <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
                       <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Notas</dt>
                       <dd className="text-sm font-medium text-slate-600 dark:text-slate-300 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
@@ -522,13 +528,19 @@ export default function OperationDetail() {
                       <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
                         <i className="bi bi-people-fill"></i> Personal de Misión Asignado
                       </p>
-                      <div className="flex gap-4 text-xs">
-                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                          Operadores (Oficina): {operation.operadores_id?.length || 0}
-                        </span>
-                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                          Operarios (Planta): {operation.operarios_id?.length || 0}
-                        </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
+                        <div className="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
+                          <p className="text-slate-400 uppercase font-black mb-1">Logística</p>
+                          <p className="font-bold">{operation.operadores_id?.length || 0} Asignados</p>
+                        </div>
+                        <div className="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
+                          <p className="text-slate-400 uppercase font-black mb-1">Operarios (App)</p>
+                          <p className="font-bold">{operation.operarios_usuarios_nombres?.length > 0 ? operation.operarios_usuarios_nombres.join(', ') : 'Ninguno'}</p>
+                        </div>
+                        <div className="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
+                          <p className="text-slate-400 uppercase font-black mb-1">Plantel (Staff)</p>
+                          <p className="font-bold">{operation.operarios_nombres?.length > 0 ? operation.operarios_nombres.join(', ') : 'Ninguno'}</p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -758,7 +770,7 @@ export default function OperationDetail() {
 
               {/* INTEGRACIÓN DEL NUEVO COMPONENTE DE CORREOS */}
               <div className="mt-8 mb-8">
-                <OperationEmails operacionId={id} />
+                <OperationEmails operacionId={id} defaultRecipient={operation.client_email} />
               </div>
 
               <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">

@@ -110,6 +110,7 @@ class Operacion(models.Model):
         (TIPO_COTIZACION_LUMPSUM, 'Lumpsum (Suma Global)'),
     )
     detalle_servicio = models.TextField(blank=True, null=True, help_text="Descripción detallada para operaciones de tipo Servicio.")
+    subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
 
     # ARCHIVOS
@@ -140,7 +141,8 @@ class Operacion(models.Model):
 
     operadores_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_asignadas', blank=True)
     contables_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_contables', blank=True)
-    operarios_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_operario', blank=True)
+    operarios_asignados = models.ManyToManyField('usuarios.PersonalPlantel', related_name='operaciones_asociadas', blank=True)
+    operarios_usuarios_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_como_operario', blank=True)
 
     class Meta:
         verbose_name = "Operación"
