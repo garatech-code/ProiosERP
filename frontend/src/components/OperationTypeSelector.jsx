@@ -15,9 +15,9 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
         </div>
 
         <div className="p-6 md:p-8 bg-slate-50 dark:bg-slate-800/50">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
-            {/* Card Productos */}
+            {/* Productos */}
             <button
               onClick={() => onSelect('productos')}
               className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-indigo-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-indigo-100"
@@ -31,7 +31,7 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
               </p>
             </button>
 
-            {/* Card Quimicos */}
+            {/* Químicos */}
             <button
               onClick={() => onSelect('quimicos')}
               className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-emerald-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-emerald-100"
@@ -45,7 +45,7 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
               </p>
             </button>
 
-            {/* Card Servicios */}
+            {/* Servicios */}
             <button
               onClick={() => onSelect('servicios')}
               className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-amber-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-amber-100"
@@ -56,6 +56,20 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
               <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Servicios Técnicos</h3>
               <p className="text-xs text-gray-500 dark:text-slate-400">
                 Reparaciones a bordo, calibraciones o confección de certificados. Permite cotizar horas-hombre y añadir repuestos.
+              </p>
+            </button>
+
+            {/* Otros (NUEVO) */}
+            <button
+              onClick={() => onSelect('otros')}
+              className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-gray-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-gray-200"
+            >
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i className="bi bi-folder text-3xl"></i>
+              </div>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Otros</h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Operaciones generales, sin clasificación específica. Para todo aquello que no encaje en las categorías anteriores.
               </p>
             </button>
 

@@ -15,6 +15,128 @@ class ProveedorViewSet(viewsets.ModelViewSet):
     serializer_class = ProveedorSerializer
     filterset_fields = ['nombre', 'rubro']
 
+    @action(detail=False, methods=['post'], url_path='upload_excel')
+    def upload_excel(self, request):
+        """
+        Carga masiva de proveedores desde un archivo Excel.
+        Soporta .xlsx (openpyxl) y .xls (xlrd).
+        """
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
+
+        nombre_archivo = file.name.lower()
+        if not (nombre_archivo.endswith('.xlsx') or nombre_archivo.endswith('.xls')):
+            return Response({'error': 'Formato no soportado. Use .xlsx o .xls'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determinar el motor de lectura según la extensión real
+        try:
+            if nombre_archivo.endswith('.xlsx'):
+                engine = 'openpyxl'
+            else:
+                # Para .xls necesitamos xlrd, pero puede fallar si no está instalado
+                try:
+                    import xlrd
+                    engine = 'xlrd'
+                except ImportError:
+                    return Response({'error': 'Para archivos .xls es necesario instalar la librería "xlrd". Ejecute: pip install xlrd'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Leer el archivo con pandas
+            df = pd.read_excel(file, engine=engine)
+        except Exception as e:
+            # Mensaje de error más claro
+            error_msg = str(e)
+            if "zip file" in error_msg or "not a zip file" in error_msg:
+                error_msg = "El archivo no es un Excel válido. Asegúrese de que la extensión coincida con el formato real."
+            return Response({'error': f'Error al leer el archivo: {error_msg}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Normalizar nombres de columnas
+        df.columns = [str(col).strip().lower().replace(' ', '_') for col in df.columns]
+
+        # Columnas esperadas
+        expected_columns = ['nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'condicion_pago']
+        missing = [col for col in expected_columns if col not in df.columns]
+        if missing:
+            return Response({'error': f'Faltan columnas obligatorias: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Valores válidos para condicion_pago
+        CONDICIONES_VALIDAS = dict(Proveedor.CONDICION_PAGO_CHOICES).keys()
+
+        creados = 0
+        actualizados = 0
+        errores = []
+
+        with transaction.atomic():
+            for idx, row in df.iterrows():
+                nombre = str(row.get('nombre', '')).strip()
+                if not nombre:
+                    errores.append(f"Fila {idx+2}: 'nombre' es obligatorio")
+                    continue
+
+                contacto = str(row.get('contacto', '')).strip() if pd.notna(row.get('contacto')) else ''
+                telefono = str(row.get('telefono', '')).strip() if pd.notna(row.get('telefono')) else ''
+                email = str(row.get('email', '')).strip() if pd.notna(row.get('email')) else ''
+                direccion = str(row.get('direccion', '')).strip() if pd.notna(row.get('direccion')) else ''
+                rubro = str(row.get('rubro', '')).strip() if pd.notna(row.get('rubro')) else ''
+                condicion_pago = str(row.get('condicion_pago', '')).strip() if pd.notna(row.get('condicion_pago')) else ''
+
+                if condicion_pago and condicion_pago not in CONDICIONES_VALIDAS:
+                    errores.append(f"Fila {idx+2}: condicion_pago '{condicion_pago}' no válida. Opciones: {', '.join(CONDICIONES_VALIDAS)}")
+                    continue
+
+                defaults = {
+                    'contacto': contacto,
+                    'telefono': telefono,
+                    'email': email,
+                    'direccion': direccion,
+                    'rubro': rubro,
+                }
+                if condicion_pago:
+                    defaults['condicion_pago'] = condicion_pago
+
+                try:
+                    proveedor, created = Proveedor.objects.update_or_create(
+                        nombre=nombre,
+                        defaults=defaults
+                    )
+                    if created:
+                        creados += 1
+                    else:
+                        actualizados += 1
+                except Exception as e:
+                    errores.append(f"Fila {idx+2}: error al guardar '{nombre}' - {str(e)}")
+
+        return Response({
+            'message': f'Procesado: {creados} creados, {actualizados} actualizados.',
+            'creados': creados,
+            'actualizados': actualizados,
+            'errores': errores
+        }, status=status.HTTP_200_OK if (creados + actualizados) > 0 else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='template')
+    def download_template(self, request):
+        """
+        Descarga una plantilla Excel con las columnas requeridas y datos de ejemplo.
+        """
+        data = {
+            'nombre': ['Proveedor Ejemplo S.A.', 'Otro Proveedor'],
+            'contacto': ['Juan Pérez', 'María Gómez'],
+            'telefono': ['123456789', '987654321'],
+            'email': ['juan@proveedor.com', 'maria@otro.com'],
+            'direccion': ['Calle Falsa 123', ''],
+            'rubro': ['Industrial', 'Logística'],
+            'condicion_pago': ['contado', '30_dias'],
+        }
+        df = pd.DataFrame(data)
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Proveedores')
+        output.seek(0)
+        response = Response(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="plantilla_proveedores.xlsx"'
+        return response
+
+
 class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ArticuloSerializer
 
