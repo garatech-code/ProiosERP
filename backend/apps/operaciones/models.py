@@ -49,13 +49,13 @@ class Agency(models.Model):
 
 
 class Operacion(models.Model):
-    # NUEVOS ESTADOS FSM (SEGUN NUEVA ARQUITECTURA)
-    ESTADO_SOLICITADA = 'solicitada' # O "Delivery Note Generado"
-    ESTADO_ARMADO_PACKING = 'armado_packing' # Operador contacta proveedores y gestiona el pedido
-    ESTADO_EN_ADUANA = 'en_aduana' # Lista enviada a aduana, se espera rancho
-    ESTADO_LISTA_PARA_ENVIO = 'lista_para_envio' # Rancho OK, listo para coordinar/generar remito
-    ESTADO_REMITADA = 'remitada' # Entregada / Firma
-    ESTADO_ENTREGADA = 'entregada' # Cerrada
+    # Estados FSM
+    ESTADO_SOLICITADA = 'solicitada'
+    ESTADO_ARMADO_PACKING = 'armado_packing'
+    ESTADO_EN_ADUANA = 'en_aduana'
+    ESTADO_LISTA_PARA_ENVIO = 'lista_para_envio'
+    ESTADO_REMITADA = 'remitada'
+    ESTADO_ENTREGADA = 'entregada'
     ESTADO_CANCELADA = 'cancelada'
 
     ESTADOS_CHOICES = (
@@ -76,31 +76,30 @@ class Operacion(models.Model):
 
     delivery_method = models.CharField(max_length=20, choices=[('muelle', 'Muelle'), ('lancha', 'Lancha')], default='muelle')
     notas = models.TextField(blank=True)
-    
-    # Campo crucial para pegar el "Delivery Note" / E-mail original del cliente
+
     texto_pedido = models.TextField(blank=True, null=True, help_text="Contenido original del e-mail o pedido del cliente.")
-    
-    # Nombre identificatorio para la operación (visible en cards y detail)
     nombre = models.CharField(max_length=200, blank=True, null=True, help_text="Nombre identificatorio de la operación")
 
-    # NUEVOS CAMPOS SOLICITADOS POR EL FRONTEND
     order_received_date = models.DateTimeField(null=True, blank=True)
     client_confirmed_date = models.DateTimeField(null=True, blank=True)
     delivery_date = models.DateTimeField(null=True, blank=True)
     closed_date = models.DateTimeField(null=True, blank=True)
 
+    # Tipos de operación (incluye 'otros')
     TIPO_PRODUCTOS = 'productos'
     TIPO_QUIMICOS = 'quimicos'
     TIPO_SERVICIOS = 'servicios'
+    TIPO_OTROS = 'otros'                     # NUEVO
     TIPO_CHOICES = (
         (TIPO_PRODUCTOS, 'Productos'),
         (TIPO_QUIMICOS, 'Químicos'),
         (TIPO_SERVICIOS, 'Servicios'),
+        (TIPO_OTROS, 'Otros'),               # NUEVO
     )
     tipo_operacion = models.CharField(max_length=20, choices=TIPO_CHOICES, default=TIPO_PRODUCTOS)
     aprobacion_requerida_owner = models.BooleanField(default=False)
 
-    # CAMPOS ESPECÍFICOS DE SERVICIOS
+    # Campos específicos de servicios
     TIPO_COTIZACION_HORA_HOMBRE = 'hora_hombre'
     TIPO_COTIZACION_DIAS = 'dias'
     TIPO_COTIZACION_LUMPSUM = 'lumpsum'
@@ -113,15 +112,15 @@ class Operacion(models.Model):
     subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
 
-    # ARCHIVOS
+    # Archivos
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)
     rancho_file = models.FileField(upload_to='ranchos/', null=True, blank=True)
     stock_consumido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
-    
-    # CAMPOS DE REVISIÓN (Workflow de Aprobación Admin-Operador)
+
+    # Campos de revisión
     ESTADO_REVISION_NONE = 'none'
     ESTADO_REVISION_PENDING = 'pending'
     ESTADO_REVISION_APPROVED = 'approved'
@@ -152,8 +151,7 @@ class Operacion(models.Model):
     def __str__(self):
         return f"OP-{self.pk:05d} : {self.cliente} ({self.get_estado_display()})"
 
-    # Transiciones FSM que coinciden con las acciones del frontend
-    # Transiciones FSM que coinciden con las acciones del frontend
+    # Transiciones FSM
     @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_ARMADO_PACKING)
     def start_packing(self):
         """Iniciar gestión de proveedores y armado de Packing List"""
@@ -162,7 +160,6 @@ class Operacion(models.Model):
     @transition(field=estado, source=ESTADO_ARMADO_PACKING, target=ESTADO_EN_ADUANA)
     def send_to_customs(self):
         """Avanzar a etapa de aduana (requiere subir el packing list)"""
-        # Nota: El avance a aduana consume virtualmente el stock para separarlo
         ok, errores = self.verificar_stock()
         if not ok:
             raise ValidationError(f"Stock o productos insuficientes/incorrectos para proceder a Aduana: {errores}")
@@ -192,12 +189,7 @@ class Operacion(models.Model):
         pass
 
     def verificar_stock(self):
-        """
-        Verifica si hay stock suficiente para todos los detalles de la operación.
-        Retorna: (bool, list) - (todo_ok, lista_de_errores)
-        """
         from apps.inventario.models import Articulo
-        
         errores = []
         for detalle in self.detalles.all():
             try:
@@ -214,27 +206,17 @@ class Operacion(models.Model):
                     'articulo_id': detalle.articulo_id,
                     'error': f'Artículo ID {detalle.articulo_id} no existe en inventario'
                 })
-        
         return len(errores) == 0, errores
 
     def consumir_stock(self):
-        """
-        Consume el stock de todos los artículos de la operación.
-        Debe llamarse dentro de una transacción atómica.
-        """
         from apps.inventario.models import Articulo, MovimientoStock
-        
         if self.stock_consumido:
             raise ValueError("El stock de esta operación ya fue consumido")
-        
         ok, errores = self.verificar_stock()
         if not ok:
             raise ValueError(f"Stock insuficiente: {errores}")
-        
         for detalle in self.detalles.all():
             articulo = Articulo.objects.select_for_update().get(id=detalle.articulo_id)
-            
-            # Crear movimiento de salida
             MovimientoStock.objects.create(
                 articulo=articulo,
                 tipo='SALIDA',
@@ -243,18 +225,15 @@ class Operacion(models.Model):
                 operacion_id=self.id,
                 razon=f"Consumo por operación {self.id} - {self.cliente.name}"
             )
-            
-            # Actualizar stock
             articulo.stock_actual -= detalle.cantidad
             articulo.save()
-        
         self.stock_consumido = True
         self.save(update_fields=['stock_consumido'])
 
 
 class OperacionDetalle(models.Model):
     operacion = models.ForeignKey(Operacion, on_delete=models.CASCADE, related_name='detalles')
-    articulo_id = models.IntegerField()  # Lax FK to inventario.Articulo
+    articulo_id = models.IntegerField()
     cantidad = models.IntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
 

@@ -6,6 +6,7 @@ import OperationTypeSelector from '../components/OperationTypeSelector';
 import OperationFormProductos from '../components/OperationFormProductos';
 import OperationFormQuimicos from '../components/OperationFormQuimicos';
 import OperationFormServicios from '../components/OperationFormServicios';
+import OperationFormOtros from '../components/OperationFormOtros'; // NUEVO
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
 import StaffManagement from '../components/StaffManagement';
@@ -39,7 +40,7 @@ export default function OwnerDashboard() {
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ownerDashboard_activeTab') || 'overview'); // overview, operations, calendar, inbox
+    const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ownerDashboard_activeTab') || 'overview');
     const [operations, setOperations] = useState([]);
     const [filteredOps, setFilteredOps] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -75,7 +76,6 @@ export default function OwnerDashboard() {
     const [operators, setOperators] = useState([]);
     const [hasNewAgendaEvent, setHasNewAgendaEvent] = useState(false);
 
-    // NUEVO: Estado para controlar el modal de Debug/Sugerencias
     const [showDebugForm, setShowDebugForm] = useState(false);
 
     useEffect(() => {
@@ -221,12 +221,14 @@ export default function OwnerDashboard() {
     const getTypeIcon = (type) => {
         if (type === 'quimicos') return <i title="Químicos" className="bi bi-flask-fill text-emerald-500 text-sm"></i>;
         if (type === 'servicios') return <i title="Servicios" className="bi bi-tools text-amber-500 text-sm"></i>;
+        if (type === 'otros') return <i title="Otros" className="bi bi-folder text-gray-500 text-sm"></i>;
         return <i title="Productos" className="bi bi-box-seam text-indigo-500 text-sm"></i>;
     };
 
     const getTypePrefix = (type) => {
         if (type === 'quimicos') return '[QMC]';
         if (type === 'servicios') return '[SRV]';
+        if (type === 'otros') return '[OTR]';
         return '[PRD]';
     };
 
@@ -255,7 +257,6 @@ export default function OwnerDashboard() {
         fetchData();
     };
 
-    // Preparar eventos para el calendario
     const calendarEvents = useMemo(() => {
         const evts = operations.filter(op => op.eta).map(op => ({
             id: op.id,
@@ -320,7 +321,6 @@ export default function OwnerDashboard() {
                     <span className="text-4xl sm:text-5xl font-black text-blue-500">{metrics.usuarios_activos || 0}</span>
                 </div>
             </div>
-            {/* Próximamente gráficos */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 bg-indigo-50/50 mt-6">
                 <h3 className="text-lg font-bold text-indigo-900 mb-2 whitespace-nowrap overflow-hidden text-ellipsis">
                     <i className="bi bi-lightbulb-fill text-amber-500 mr-2 text-xl"></i>
@@ -414,6 +414,7 @@ export default function OwnerDashboard() {
                         <option value="productos">■ Productos</option>
                         <option value="quimicos">■ Químicos</option>
                         <option value="servicios">■ Servicios</option>
+                        <option value="otros">■ Otros</option> {/* NUEVO */}
                     </select>
 
                     <select
@@ -443,7 +444,7 @@ export default function OwnerDashboard() {
                             onClick={() => navigate(`/operations/${op.id}`)}
                             className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative cursor-pointer"
                         >
-                            <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
+                            <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : op.tipo_operacion === 'otros' ? 'bg-gray-500' : 'bg-indigo-500'}`}></div>
                             <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
@@ -502,9 +503,8 @@ export default function OwnerDashboard() {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200">
-            {/* Sidebar Desktop */}
+            {/* Sidebar Desktop (sin cambios relevantes) */}
             <aside className={`relative bg-slate-900 text-white flex-col hidden md:flex h-screen sticky top-0 shadow-xl z-20 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20 items-center'}`}>
-                {/* Toggle Button */}
                 <button
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                     className="absolute -right-3 top-8 bg-indigo-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:bg-indigo-500 transition-colors z-30"
@@ -525,7 +525,6 @@ export default function OwnerDashboard() {
 
                 <div className={`py-6 flex-1 space-y-1 ${isSidebarOpen ? 'px-4' : 'px-2 flex flex-col items-center'}`}>
                     {isSidebarOpen && <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Principal</p>}
-
                     <button title={!isSidebarOpen ? "Resumen KPIs" : ""} onClick={() => setActiveTab('overview')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-pie-chart-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Resumen KPIs</span>}
@@ -551,7 +550,6 @@ export default function OwnerDashboard() {
                             <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-400 border-2 border-slate-900 rounded-full"></span>
                         )}
                     </button>
-
                     <button title={!isSidebarOpen ? "Revisiones Pendientes" : ""} onClick={() => setActiveTab('approvals')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'approvals' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <div className="flex items-center gap-3">
                             <i className="bi bi-shield-check text-lg shrink-0"></i>
@@ -563,18 +561,15 @@ export default function OwnerDashboard() {
                             operations.some(op => op.estado_revision === 'pending') && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-slate-900 rounded-full animate-bounce"></span>
                         )}
                     </button>
-
                     {isSidebarOpen ? (
                         <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-2">Sistema</p>
                     ) : (
                         <div className="w-full border-t border-slate-800 my-4"></div>
                     )}
-
                     <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => setActiveTab('inventory')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-box-seam text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Inventario & Recetas</span>}
                     </button>
-
                     <button title={!isSidebarOpen ? "Plantel Operarios" : ""} onClick={() => setActiveTab('staff')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'staff' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-people-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Plantel Operarios</span>}
@@ -582,7 +577,6 @@ export default function OwnerDashboard() {
                 </div>
 
                 <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
-                    {/* BOTÓN DEBUG EN SIDEBAR DESKTOP */}
                     <button
                         title={!isSidebarOpen ? "Reportar Error" : ""}
                         onClick={() => setShowDebugForm(true)}
@@ -591,7 +585,6 @@ export default function OwnerDashboard() {
                         <i className="bi bi-bug-fill text-base"></i>
                         {isSidebarOpen && <span>Testing & Debug</span>}
                     </button>
-
                     <button
                         title={!isSidebarOpen ? "Cambiar Tema" : ""}
                         onClick={toggleTheme}
@@ -600,7 +593,6 @@ export default function OwnerDashboard() {
                         <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'} text-base`}></i>
                         {isSidebarOpen && <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>}
                     </button>
-
                     <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
                         <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
                             {user?.username?.[0]?.toUpperCase()}
@@ -619,14 +611,13 @@ export default function OwnerDashboard() {
                 </div>
             </aside>
 
-            {/* Navbar Mobile */}
+            {/* Navbar Mobile (sin cambios) */}
             <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
                     <h1 className="font-black text-lg">ProIOS</h1>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* BOTÓN DEBUG EN MOBILE */}
                     <button
                         onClick={() => setShowDebugForm(true)}
                         className="bg-indigo-900/80 text-indigo-300 hover:bg-indigo-600 hover:text-white p-2 rounded-lg font-bold text-sm transition-colors border border-indigo-500/50"
@@ -634,7 +625,6 @@ export default function OwnerDashboard() {
                     >
                         <i className="bi bi-bug-fill"></i>
                     </button>
-
                     <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded-lg text-white shadow-sm font-bold text-sm flex items-center gap-1">
                         <i className="bi bi-plus-lg"></i>
                         Añadir
@@ -642,7 +632,7 @@ export default function OwnerDashboard() {
                 </div>
             </div>
 
-            {/* Mobile Bottom Tabs */}
+            {/* Mobile Bottom Tabs (sin cambios) */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 z-30 flex justify-around p-2 pb-safe">
                 <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center p-2 ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-pie-chart-fill text-xl"></i>
@@ -677,8 +667,6 @@ export default function OwnerDashboard() {
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative pb-16 md:pb-0 transition-colors duration-200">
-
-                {/* Header Solo Desktop */}
                 <header className="hidden md:flex bg-white dark:bg-slate-800 px-8 py-4 items-center justify-between border-b border-gray-200 dark:border-slate-700 transition-colors duration-200">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 capitalize">
@@ -708,13 +696,11 @@ export default function OwnerDashboard() {
                             <LogoSpinner size="w-16 h-16" />
                         </div>
                     )}
-
                     {error && (
                         <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
                             <p className="text-red-700 font-medium">{error}</p>
                         </div>
                     )}
-
                     {!loading && !error && (
                         <>
                             {activeTab === 'overview' && renderOverview()}
@@ -757,8 +743,14 @@ export default function OwnerDashboard() {
                     onSuccess={handleFormSuccess}
                 />
             )}
+            {operationModalState.isOpen && operationModalState.type === 'otros' && (   // NUEVO
+                <OperationFormOtros
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
 
-            {/* MODAL DE DEBUG & SUGERENCIAS */}
             {showDebugForm && (
                 <DebugFeedback onClose={() => setShowDebugForm(false)} />
             )}
@@ -778,13 +770,11 @@ export default function OwnerDashboard() {
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; border: 2px solid #f8fafc; }
                 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-                /* Big Calendar Overrides - Light */
                 .rbc-calendar { font-family: inherit; }
                 .rbc-toolbar button { border-radius: 8px; font-weight: 600; color: #4b5563; }
                 .rbc-toolbar button.rbc-active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
                 .rbc-event { opacity: 0.9 !important; border-radius: 6px !important; }
                 .rbc-today { background-color: #f8fafc !important; }
-                /* Big Calendar Overrides - Dark Mode */
                 .dark .rbc-calendar { background: transparent; color: #e2e8f0; }
                 .dark .rbc-toolbar button { color: #94a3b8; background: #334155; border-color: #475569; }
                 .dark .rbc-toolbar button:hover { background: #475569; color: #f1f5f9; }

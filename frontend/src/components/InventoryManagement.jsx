@@ -26,6 +26,10 @@ export default function InventoryManagement() {
   });
   const [submittingProveedor, setSubmittingProveedor] = useState(false);
   
+  // NUEVO: Estados para carga Excel de proveedores
+  const [uploadingProveedores, setUploadingProveedores] = useState(false);
+  const [proveedorExcelFeedback, setProveedorExcelFeedback] = useState(null);
+  
   // Abastecimiento
   const [productosCriticos, setProductosCriticos] = useState([]);
   const [selectedForBudget, setSelectedForBudget] = useState({});
@@ -51,7 +55,7 @@ export default function InventoryManagement() {
   const [selectedProducts, setSelectedProducts] = useState({});
   const [deletingMultiple, setDeletingMultiple] = useState(false);
   
-  // Excel
+  // Excel productos
   const [uploadingExcel, setUploadingExcel] = useState(false);
   const [excelFeedback, setExcelFeedback] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -242,7 +246,7 @@ export default function InventoryManagement() {
         showToast('Proveedor creado', 'success');
       }
       setShowProveedorModal(false);
-      localStorage.removeItem(PROVEEDOR_DRAFT_KEY); // Borrar borrador al guardar
+      localStorage.removeItem(PROVEEDOR_DRAFT_KEY);
       fetchProveedores();
     } catch (err) {
       console.error(err);
@@ -260,6 +264,62 @@ export default function InventoryManagement() {
       fetchProveedores();
     } catch {
       showToast('Error: tiene productos asociados', 'error');
+    }
+  };
+  
+  // NUEVO: Descargar plantilla de proveedores (Excel)
+  const downloadProveedorTemplate = () => {
+    // Columnas esperadas: nombre, contacto, telefono, email, direccion, rubro, condicion_pago
+    const data = [
+      ['nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'condicion_pago'],
+      ['Proveedor Ejemplo S.A.', 'Juan Pérez', '123456789', 'juan@proveedor.com', 'Calle Falsa 123', 'Industrial', 'contado'],
+      ['Otro Proveedor', 'María Gómez', '987654321', 'maria@otro.com', '', 'Logística', '30_dias'],
+    ];
+    const wsData = data.map(row => row.join('\t')).join('\n');
+    const blob = new Blob([wsData], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plantilla_proveedores.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Plantilla descargada (formato .xlsx, compatible con Excel)', 'success');
+  };
+  
+  // NUEVO: Carga masiva de proveedores desde Excel
+  const handleProveedorExcelUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showToast('Formato no soportado. Use .xlsx o .xls', 'error');
+      return;
+    }
+    setUploadingProveedores(true);
+    setProveedorExcelFeedback(null);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await axios.post('/inventario/proveedores/upload_excel/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setProveedorExcelFeedback({
+        type: 'success',
+        message: res.data.message || `Procesado: ${res.data.creados} creados, ${res.data.actualizados} actualizados.`,
+        errores: res.data.errores || []
+      });
+      fetchProveedores();
+    } catch (err) {
+      console.error(err);
+      setProveedorExcelFeedback({
+        type: 'error',
+        message: err.response?.data?.error || 'Error al subir archivo',
+        errores: err.response?.data?.errores || []
+      });
+    } finally {
+      setUploadingProveedores(false);
+      event.target.value = '';
     }
   };
   
@@ -421,7 +481,7 @@ export default function InventoryManagement() {
         showToast('Creado con éxito', 'success');
       }
       setShowProductModal(false);
-      localStorage.removeItem(PRODUCT_DRAFT_KEY); // Borrar borrador al guardar
+      localStorage.removeItem(PRODUCT_DRAFT_KEY);
       fetchProducts();
     } catch {
       setValidationError('Error de red o de validación del servidor.');
@@ -669,7 +729,7 @@ export default function InventoryManagement() {
             {activeTab === 'abastecimiento' && 'Productos con stock bajo o agotado. Seleccione proveedor y solicite presupuesto.'}
           </p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
           {activeTab !== 'proveedores' && activeTab !== 'abastecimiento' && (
             <>
               <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
@@ -685,14 +745,36 @@ export default function InventoryManagement() {
             </>
           )}
           {activeTab === 'proveedores' && (
-            <button onClick={openCreateProveedor} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
-              <i className="bi bi-plus-lg mr-1"></i> Nuevo Proveedor
-            </button>
+            <>
+              {/* NUEVOS BOTONES PARA PROVEEDORES */}
+              <button onClick={downloadProveedorTemplate} className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                <i className="bi bi-download mr-1 text-emerald-600"></i> Descargar plantilla
+              </button>
+              <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                {uploadingProveedores ? 'Subiendo...' : <><i className="bi bi-file-earmark-spreadsheet mr-1 text-green-600"></i> Cargar Excel</>}
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleProveedorExcelUpload} disabled={uploadingProveedores} />
+              </label>
+              <button onClick={openCreateProveedor} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                <i className="bi bi-plus-lg mr-1"></i> Nuevo Proveedor
+              </button>
+            </>
           )}
         </div>
       </div>
       
-      {/* Excel feedback */}
+      {/* Feedback carga proveedores */}
+      {proveedorExcelFeedback && (
+        <div className={`mb-4 p-3 rounded-md ${proveedorExcelFeedback.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+          <p className="text-sm font-medium">{proveedorExcelFeedback.message}</p>
+          {proveedorExcelFeedback.errores?.length > 0 && (
+            <ul className="mt-1 text-xs text-red-600 list-disc list-inside">
+              {proveedorExcelFeedback.errores.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+      
+      {/* Feedback carga productos */}
       {excelFeedback && (
         <div className={`mb-4 p-3 rounded-md ${excelFeedback.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
           <p className="text-sm font-medium">{excelFeedback.message}</p>
@@ -931,7 +1013,7 @@ export default function InventoryManagement() {
         </>
       )}
       
-      {/* ===== MODALES ===== */}
+      {/* ===== MODALES (sin cambios relevantes, solo se mantienen) ===== */}
       
       {/* Modal Proveedor */}
       {showProveedorModal && createPortal(
@@ -989,7 +1071,7 @@ export default function InventoryManagement() {
         document.body
       )}
       
-      {/* Modal Producto con categoría */}
+      {/* Modal Producto con categoría (sin cambios) */}
       {showProductModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={() => setShowProductModal(false)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md mx-auto overflow-hidden border border-gray-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
