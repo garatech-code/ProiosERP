@@ -5,10 +5,7 @@ from django.db import migrations, models
 
 def clean_orphans(apps, schema_editor):
     with schema_editor.connection.cursor() as cursor:
-        cursor.execute("""
-            DELETE FROM operaciones_operacion_operarios_asignados 
-            WHERE personalplantel_id NOT IN (SELECT id FROM usuarios_personalplantel)
-        """)
+        cursor.execute("DELETE FROM operaciones_operacion_operarios_asignados")
 
 class Migration(migrations.Migration):
 
