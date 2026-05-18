@@ -75,12 +75,28 @@ export default function OwnerDashboard() {
     const [selectedOperatorFilter, setSelectedOperatorFilter] = useState(user?.id || '');
     const [operators, setOperators] = useState([]);
     const [hasNewAgendaEvent, setHasNewAgendaEvent] = useState(false);
+    const [unreadEmailsCount, setUnreadEmailsCount] = useState(0);
 
     const [showDebugForm, setShowDebugForm] = useState(false);
+
+    const fetchUnreadEmails = async () => {
+        try {
+            const res = await axios.get('/correos/inbox/?unread=true');
+            if (res.data && Array.isArray(res.data)) {
+                const unread = res.data.filter(e => e.direction === 'inbound' && !e.is_read);
+                setUnreadEmailsCount(unread.length);
+            }
+        } catch(err) {
+            console.error(err);
+        }
+    };
 
     useEffect(() => {
         fetchData();
         fetchOperators();
+        fetchUnreadEmails();
+        const interval = setInterval(fetchUnreadEmails, 60000);
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
@@ -545,9 +561,9 @@ export default function OwnerDashboard() {
                             {isSidebarOpen && <span>Correo Central</span>}
                         </div>
                         {isSidebarOpen ? (
-                            <span className="bg-slate-700 text-slate-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Próx</span>
+                            unreadEmailsCount > 0 ? <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase animate-pulse">Nuevo</span> : null
                         ) : (
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-400 border-2 border-slate-900 rounded-full"></span>
+                            unreadEmailsCount > 0 ? <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-pulse"></span> : null
                         )}
                     </button>
                     <button title={!isSidebarOpen ? "Revisiones Pendientes" : ""} onClick={() => setActiveTab('approvals')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'approvals' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
@@ -650,7 +666,7 @@ export default function OwnerDashboard() {
                 </button>
                 <button onClick={() => setActiveTab('inbox')} className={`flex flex-col items-center p-2 ${activeTab === 'inbox' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi relative bi-envelope-open text-xl">
-                        {activeTab !== 'inbox' && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></span>}
+                        {unreadEmailsCount > 0 && activeTab !== 'inbox' && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>}
                     </i>
                 </button>
                 <button onClick={() => setActiveTab('approvals')} className={`flex flex-col items-center p-2 ${activeTab === 'approvals' ? 'text-indigo-600' : 'text-gray-400'}`}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from '../api/axios';
+import EmailTemplateManager from './EmailTemplateManager';
 
 export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, defaultOperacionId, defaultRecipient }) {
   const [formData, setFormData] = useState({
@@ -12,6 +13,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
   
   const [operations, setOperations] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
 
   useEffect(() => {
     // Load operations to allow linking the email
@@ -21,8 +23,14 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
 
     // If it's a reply, prefill data
     if (replyTo) {
+      const extractEmail = (address) => {
+        if (!address) return '';
+        const match = address.match(/<([^>]+)>/);
+        return match ? match[1].trim() : address.trim();
+      };
+
       setFormData({
-        recipient: replyTo.sender_address,
+        recipient: extractEmail(replyTo.sender_address),
         subject: replyTo.subject.startsWith('Re:') ? replyTo.subject : `Re: ${replyTo.subject}`,
         body: `\n\n--- En respuesta a ---\nFecha: ${new Date(replyTo.date_received).toLocaleString()}\nDe: ${replyTo.sender_address}\n\n${replyTo.body_text || '(Mensaje HTML original)'}`,
         operacion_id: replyTo.operacion || '',
@@ -171,10 +179,20 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
           <div className="flex-1 flex flex-col">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex justify-between items-end">
               <span>Mensaje *</span>
-              <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase">
-                <input type="checkbox" name="useTemplate" checked={formData.useTemplate} onChange={handleChange} className="rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800" />
-                Usar Plantilla ProIOS
-              </label>
+              <div className="flex gap-2 items-center">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateManager(true)}
+                  className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase shadow-sm"
+                >
+                  <i className="bi bi-file-earmark-text"></i>
+                  Insertar Plantilla
+                </button>
+                <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase">
+                  <input type="checkbox" name="useTemplate" checked={formData.useTemplate} onChange={handleChange} className="rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800" />
+                  Firma ProIOS
+                </label>
+              </div>
             </label>
             <textarea
               name="body"
@@ -217,6 +235,38 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
           </div>
         </form>
       </div>
+
+      {showTemplateManager && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
+          <EmailTemplateManager 
+            hideManageButton={true}
+            contextData={{
+              isReply: !!replyTo,
+              replyText: formData.body,
+              subject: formData.subject,
+              operationId: formData.operacion_id,
+              operations: operations,
+              senderName: replyTo ? (replyTo.sender_address.match(/([^<]+)</) ? replyTo.sender_address.match(/([^<]+)</)[1].replace(/"/g, '').trim() : '') : null
+            }}
+            onSelect={({ subject, body }) => {
+              setFormData(prev => {
+                const isReply = prev.body.includes('--- En respuesta a ---');
+                let newBody = body;
+                if (prev.body) {
+                  newBody = isReply ? body + '\n' + prev.body : prev.body + '\n\n' + body;
+                }
+                return {
+                  ...prev,
+                  subject: prev.subject || subject,
+                  body: newBody
+                };
+              });
+              setShowTemplateManager(false);
+            }}
+            onCancel={() => setShowTemplateManager(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ class OperacionAdmin(admin.ModelAdmin):
     list_display = ('id', 'cliente', 'ship', 'estado', 'eta')
     list_filter = ('estado', 'delivery_method')
     search_fields = ('cliente__name', 'ship__name')
-    filter_horizontal = ('operadores_asignados', 'contables_asignados', 'operarios_asignados')
+    filter_horizontal = ('operadores_asignados', 'contables_asignados', 'operarios_usuarios_asignados')
 
 admin.site.register(Operacion, OperacionAdmin)
 admin.site.register(Client)
