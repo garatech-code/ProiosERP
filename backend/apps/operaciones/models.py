@@ -20,13 +20,13 @@ class Client(models.Model):
 
 class Ship(models.Model):
     name = models.CharField(max_length=200)
-    imo = models.CharField(max_length=7, unique=True)
-    flag = models.CharField(max_length=50)
+    imo = models.CharField(max_length=7, blank=True, null=True)
+    flag = models.CharField(max_length=50, blank=True, null=True)
     call_sign = models.CharField(max_length=20, blank=True)
     gross_tonnage = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.name} (IMO: {self.imo})"
+        return f"{self.name} (IMO: {self.imo or 'N/A'})"
 
 
 class Port(models.Model):
@@ -85,21 +85,19 @@ class Operacion(models.Model):
     delivery_date = models.DateTimeField(null=True, blank=True)
     closed_date = models.DateTimeField(null=True, blank=True)
 
-    # Tipos de operación (incluye 'otros')
     TIPO_PRODUCTOS = 'productos'
     TIPO_QUIMICOS = 'quimicos'
     TIPO_SERVICIOS = 'servicios'
-    TIPO_OTROS = 'otros'                     # NUEVO
+    TIPO_OTROS = 'otros'
     TIPO_CHOICES = (
         (TIPO_PRODUCTOS, 'Productos'),
         (TIPO_QUIMICOS, 'Químicos'),
         (TIPO_SERVICIOS, 'Servicios'),
-        (TIPO_OTROS, 'Otros'),               # NUEVO
+        (TIPO_OTROS, 'Otros'),
     )
     tipo_operacion = models.CharField(max_length=20, choices=TIPO_CHOICES, default=TIPO_PRODUCTOS)
     aprobacion_requerida_owner = models.BooleanField(default=False)
 
-    # Campos específicos de servicios
     TIPO_COTIZACION_HORA_HOMBRE = 'hora_hombre'
     TIPO_COTIZACION_DIAS = 'dias'
     TIPO_COTIZACION_LUMPSUM = 'lumpsum'
@@ -112,7 +110,6 @@ class Operacion(models.Model):
     subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
 
-    # Archivos
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)
     rancho_file = models.FileField(upload_to='ranchos/', null=True, blank=True)
@@ -120,7 +117,6 @@ class Operacion(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
-    # Campos de revisión
     ESTADO_REVISION_NONE = 'none'
     ESTADO_REVISION_PENDING = 'pending'
     ESTADO_REVISION_APPROVED = 'approved'
@@ -151,15 +147,12 @@ class Operacion(models.Model):
     def __str__(self):
         return f"OP-{self.pk:05d} : {self.cliente} ({self.get_estado_display()})"
 
-    # Transiciones FSM
     @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_ARMADO_PACKING)
     def start_packing(self):
-        """Iniciar gestión de proveedores y armado de Packing List"""
         pass
 
     @transition(field=estado, source=ESTADO_ARMADO_PACKING, target=ESTADO_EN_ADUANA)
     def send_to_customs(self):
-        """Avanzar a etapa de aduana (requiere subir el packing list)"""
         ok, errores = self.verificar_stock()
         if not ok:
             raise ValidationError(f"Stock o productos insuficientes/incorrectos para proceder a Aduana: {errores}")
@@ -168,24 +161,20 @@ class Operacion(models.Model):
 
     @transition(field=estado, source=ESTADO_EN_ADUANA, target=ESTADO_LISTA_PARA_ENVIO)
     def finalize_customs(self):
-        """Aduana entrega el Rancho. Listo para logística."""
         pass
 
     @transition(field=estado, source=ESTADO_LISTA_PARA_ENVIO, target=ESTADO_REMITADA)
     def mark_delivered(self):
-        """Se ha gestionado la logística y se ha emitido el remito"""
         self.delivery_date = timezone.now()
         pass
 
     @transition(field=estado, source=ESTADO_REMITADA, target=ESTADO_ENTREGADA)
     def close(self):
-        """Cerrar operación y archivada"""
         self.closed_date = timezone.now()
         pass
 
     @transition(field=estado, source='*', target=ESTADO_CANCELADA)
     def cancel(self):
-        """Cancelar operación"""
         pass
 
     def verificar_stock(self):
@@ -253,3 +242,30 @@ class AgendaEvent(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.assigned_to})"
+
+
+class DocumentoAdjunto(models.Model):
+    TIPO_DELIVERY_NOTE = 'delivery_note'
+    TIPO_FACTURA_PROVEEDOR = 'factura_proveedor'
+    TIPO_HABILITACION_ADUANERA = 'habilitacion_aduanera'
+    TIPO_OTROS = 'otros'
+
+    TIPO_CHOICES = (
+        (TIPO_DELIVERY_NOTE, 'Delivery Note'),
+        (TIPO_FACTURA_PROVEEDOR, 'Factura a proveedor'),
+        (TIPO_HABILITACION_ADUANERA, 'Habilitación aduanera'),
+        (TIPO_OTROS, 'Otros'),
+    )
+
+    operacion = models.ForeignKey(Operacion, on_delete=models.CASCADE, related_name='documentos_adjuntos')
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES)
+    nombre_personalizado = models.CharField(max_length=200, blank=True, null=True, help_text="Usar si tipo es 'Otros'")
+    archivo = models.FileField(upload_to='operaciones/documentos/')
+    descripcion = models.TextField(blank=True, null=True)
+    fecha_subida = models.DateTimeField(auto_now_add=True)
+    subido_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        if self.tipo == self.TIPO_OTROS:
+            return f"{self.nombre_personalizado or 'Otro'} - OP{self.operacion.id}"
+        return f"{self.get_tipo_display()} - OP{self.operacion.id}"

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent
+from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto
 from apps.inventario.models import Articulo
 from apps.usuarios.models import User, PersonalPlantel
 import json
@@ -15,6 +15,11 @@ class ShipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ship
         fields = ['id', 'name', 'imo', 'flag', 'call_sign', 'gross_tonnage']
+        # Permitimos nulos y vacíos para compatibilidad con datos existentes
+        extra_kwargs = {
+            'imo': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'flag': {'required': False, 'allow_null': True, 'allow_blank': True},
+        }
 
 
 class PortSerializer(serializers.ModelSerializer):
@@ -66,35 +71,49 @@ class OperacionDetalleSerializer(serializers.ModelSerializer):
         return articulo.stock_actual >= obj.cantidad
 
 
+class DocumentoAdjuntoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DocumentoAdjunto
+        fields = ['id', 'tipo', 'nombre_personalizado', 'archivo', 'descripcion', 'fecha_subida', 'subido_por']
+        read_only_fields = ['id', 'fecha_subida', 'subido_por']
+
+
 class OperacionSerializer(serializers.ModelSerializer):
+    # Campos de solo lectura (relaciones)
     client_name = serializers.CharField(source='cliente.name', read_only=True)
     client_email = serializers.CharField(source='cliente.email', read_only=True)
     ship_name = serializers.CharField(source='ship.name', read_only=True)
     ship_flag = serializers.CharField(source='ship.flag', read_only=True)
     port_name = serializers.CharField(source='port.name', read_only=True)
     agency_name = serializers.CharField(source='agency.name', read_only=True)
+
+    # Nombres de operarios
     operarios_nombres = serializers.SerializerMethodField()
     operarios_usuarios_nombres = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField(read_only=True)
+
+    # Productos como JSON (input/output)
     products = serializers.JSONField(required=False)
 
+    # Transiciones
     can_confirm = serializers.SerializerMethodField()
     can_send_to_customs = serializers.SerializerMethodField()
     can_coordinate = serializers.SerializerMethodField()
     can_deliver = serializers.SerializerMethodField()
 
+    # Relaciones anidadas (solo lectura)
     detalles = OperacionDetalleSerializer(many=True, read_only=True)
+    documentos_adjuntos = DocumentoAdjuntoSerializer(many=True, read_only=True)
 
+    # Relaciones ManyToMany (escritura)
     operadores_id = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(),
         source='operadores_asignados', required=False
     )
-    operarios_id = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False
+    # Operarios de plantel (PersonalPlantel) - campo ManyToMany real
+    operarios_id = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=PersonalPlantel.objects.all(),
+        source='operarios_asignados', required=False
     )
-    plantel_asignado = serializers.JSONField(read_only=True)
     contables_id = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(),
         source='contables_asignados', required=False
@@ -104,17 +123,20 @@ class OperacionSerializer(serializers.ModelSerializer):
         source='operarios_usuarios_asignados', required=False
     )
 
+    # Snapshot de operarios (solo lectura, para compatibilidad con versiones anteriores)
+    plantel_asignado = serializers.JSONField(read_only=True)
+
     class Meta:
         model = Operacion
         fields = [
             'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'eta',
-            'delivery_method', 'status', 'products', 'detalles',
+            'delivery_method', 'status', 'products', 'detalles', 'documentos_adjuntos',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
             'packing_list_file', 'remito_file', 'rancho_file',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
-            'plantel_asignado', 'operarios_nombres', 'operarios_usuarios_nombres',
+            'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
@@ -133,8 +155,9 @@ class OperacionSerializer(serializers.ModelSerializer):
         }
         read_only_fields = ['estado_revision', 'mensaje_revision']
 
+    # Métodos auxiliares
     def get_operarios_nombres(self, obj):
-        return [f"{item.get('apellidos', '')}, {item.get('nombres', '')}".strip(', ') for item in obj.plantel_asignado] if obj.plantel_asignado else []
+        return [f"{s.apellidos}, {s.nombres}" for s in obj.operarios_asignados.all()]
 
     def get_operarios_usuarios_nombres(self, obj):
         return [u.username for u in obj.operarios_usuarios_asignados.all()]
@@ -154,11 +177,9 @@ class OperacionSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         ret['products'] = self.get_products(instance)
-        ret['operarios_id'] = [item.get('id') for item in instance.plantel_asignado] if instance.plantel_asignado else []
         return ret
 
     def get_products(self, obj):
-        # Usar detalles precargados (prefetch_related en view)
         detalles = obj.detalles.all()
         productos = []
         for detalle in detalles:
@@ -200,7 +221,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         return mapper.get(obj.estado, obj.estado)
 
     def _resolve_nested(self, data_dict, field, model_class, defaults):
-        """Resuelve campos anidados (solo para Client, Port, Agency) pero NO para Ship"""
+        """Resuelve campos anidados (solo para Client, Port, Agency) por nombre"""
         val = data_dict.get(field)
         if val and isinstance(val, str) and not str(val).isdigit():
             obj, _ = model_class.objects.get_or_create(name=val, defaults=defaults)
@@ -208,7 +229,6 @@ class OperacionSerializer(serializers.ModelSerializer):
         return val
 
     def to_internal_value(self, data):
-        import random
         mutable_data = data.copy() if hasattr(data, 'copy') else data
 
         # Cliente, puerto y agencia pueden crearse automáticamente (solo por nombre)
@@ -236,7 +256,6 @@ class OperacionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         products_data = validated_data.pop('products', None)
-        operarios_ids = validated_data.pop('operarios_id', [])
         if products_data is None:
             products_data = self.initial_data.get('products', [])
 
@@ -246,14 +265,19 @@ class OperacionSerializer(serializers.ModelSerializer):
             except ValueError:
                 products_data = []
 
+        # Crear la operación
         operation = super().create(validated_data)
+
+        # Manejar productos
         self._handle_products(operation, products_data)
-        self._handle_plantel(operation, operarios_ids)
+
+        # Actualizar snapshot de operarios (a partir de la relación ManyToMany)
+        self._update_plantel_snapshot(operation)
+
         return operation
 
     def update(self, instance, validated_data):
         products_data = validated_data.pop('products', None)
-        operarios_ids = validated_data.pop('operarios_id', None)
         if products_data is None:
             products_data = self.initial_data.get('products', [])
 
@@ -265,47 +289,29 @@ class OperacionSerializer(serializers.ModelSerializer):
 
         operation = super().update(instance, validated_data)
 
+        # Manejar productos
         if products_data is not None:
             operation.detalles.all().delete()
             self._handle_products(operation, products_data)
 
-        if operarios_ids is not None:
-            self._handle_plantel(operation, operarios_ids)
+        # Actualizar snapshot de operarios
+        self._update_plantel_snapshot(operation)
 
         return operation
 
-    def _handle_plantel(self, operation, operarios_ids):
-        operarios = PersonalPlantel.objects.filter(id__in=operarios_ids)
-        datos = []
-        for op in operarios:
-            datos.append({
-                'id': op.id,
-                'nombres': op.nombres,
-                'apellidos': op.apellidos,
-                'dni': op.dni,
-                'rol': op.rol
-            })
-        operation.plantel_asignado = datos
-        operation.save(update_fields=['plantel_asignado'])
-
     def _handle_products(self, operation, products):
-        """
-        Maneja productos de la operación.
-        IMPORTANTE: No crea artículos automáticamente. Solo acepta IDs numéricos existentes.
-        """
+        """Crea los detalles de productos para la operación"""
         for prod in products:
             p_val = prod.get('product')
             if not p_val:
                 continue
 
-            # Solo aceptar IDs numéricos
             if isinstance(p_val, str) and not p_val.isdigit():
                 raise serializers.ValidationError(
                     f"El producto '{p_val}' no es válido. Debe proporcionar un ID numérico de un artículo existente."
                 )
             articulo_id = int(p_val)
 
-            # Verificar que el artículo exista
             if not Articulo.objects.filter(id=articulo_id).exists():
                 raise serializers.ValidationError(
                     f"Artículo con ID {articulo_id} no existe en el inventario."
@@ -324,6 +330,22 @@ class OperacionSerializer(serializers.ModelSerializer):
                 precio_unitario=prod.get('unit_price', 0)
             )
 
+    def _update_plantel_snapshot(self, operation):
+        """Actualiza el campo JSON plantel_asignado basado en la relación ManyToMany operarios_asignados"""
+        operarios = operation.operarios_asignados.all()
+        datos = [
+            {
+                'id': op.id,
+                'nombres': op.nombres,
+                'apellidos': op.apellidos,
+                'dni': op.dni,
+                'rol': op.rol
+            }
+            for op in operarios
+        ]
+        operation.plantel_asignado = datos
+        operation.save(update_fields=['plantel_asignado'])
+
 
 class AgendaEventSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
@@ -336,4 +358,4 @@ class AgendaEventSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'assigned_to', 'assigned_to_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_by', 'created_at', 'updated_at']
+        read_only_fields = ['created_by', 'created_at', 'updated_at']

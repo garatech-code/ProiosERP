@@ -12,14 +12,14 @@ from openpyxl.utils import get_column_letter
 import io
 import logging
 
-from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent
+from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto
 from apps.usuarios.models import User
 from apps.operaciones.services import get_or_create_ship_from_imo, get_or_create_port_from_name
 
 from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
     PortSerializer, AgencySerializer, OperacionDetalleSerializer,
-    AgendaEventSerializer
+    AgendaEventSerializer, DocumentoAdjuntoSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Operacion.objects.all().select_related('cliente', 'ship', 'port', 'agency').prefetch_related('detalles')
+        qs = Operacion.objects.all().select_related('cliente', 'ship', 'port', 'agency').prefetch_related('detalles', 'documentos_adjuntos')
 
         if user.role in [User.Role.OWNER, User.Role.CONTABLE]:
             return qs
@@ -106,9 +106,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def confirm_operation(self, request, pk=None):
-        """
-        Pasa de Delivery Note Generado a Armado de Packing List.
-        """
         operacion = self.get_object()
 
         if operacion.estado != Operacion.ESTADO_SOLICITADA:
@@ -135,11 +132,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def start_coordination(self, request, pk=None):
-        """
-        Envía a aduanas y pasa a estado EN_ADUANA.
-        """
         op = self.get_object()
-        # Verificar que se haya subido un packing list
         if not op.packing_list_file:
             return Response({'error': 'Debe subir el Packing List estructurado antes de enviar a Aduanas'}, status=400)
 
@@ -155,9 +148,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def finalize_production(self, request, pk=None):
-        """
-        Aduana completada (Rancho fue subido). Pasa a LISTA_PARA_ENVIO.
-        """
         op = self.get_object()
         if not op.rancho_file:
             return Response({'error': 'Debe subir el Documento Rancho antes de aprobar aduanas'}, status=400)
@@ -334,26 +324,18 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='packing_list_excel')
     def packing_list_excel(self, request, pk=None):
-        """
-        Genera un archivo Excel con el formato de Packing List solicitado.
-        Acepta parámetros GET: ?proveedor=...&pais_destino=...
-        """
         try:
             op = self.get_object()
             from apps.inventario.models import Articulo
 
-            # Leer parámetros de la solicitud
             proveedor_seleccionado = request.query_params.get('proveedor', '')
-            pais_destino_seleccionado = request.query_params.get('pais_destino', 'argentina')  # 'argentina' o 'bandera'
+            pais_destino_seleccionado = request.query_params.get('pais_destino', 'argentina')
 
-            # Determinar el país de destino
             if pais_destino_seleccionado == 'argentina':
                 pais_destino_texto = 'Argentina'
             else:
-                # Usar la bandera del buque si está disponible, sino 'Extranjero'
                 pais_destino_texto = op.ship.flag if op.ship and op.ship.flag else 'Extranjero'
 
-            # Determinar el proveedor y su CUIT
             if proveedor_seleccionado == 'PROIOS SA':
                 proveedor_texto = 'PROIOS SA'
                 cuit_texto = '30-63661723-3'
@@ -379,7 +361,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     total_price += subtotal
                     total_qty += cantidad
                     peso_neto = float(articulo.peso_kg) if articulo.peso_kg is not None else 0.0
-                    peso_bruto = peso_neto * 1.1  # Ajustable
+                    peso_bruto = peso_neto * 1.1
                     total_weight_neto += cantidad * peso_neto
                     total_weight_bruto += cantidad * peso_bruto
                     productos.append({
@@ -399,7 +381,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
             ws = wb.active
             ws.title = "PACKING LIST"
 
-            # Estilos
             header_font = Font(bold=True, name='Arial')
             center_align = Alignment(horizontal='center', vertical='center')
             thin_border = Border(
@@ -410,7 +391,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
             orange_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
             gray_header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
 
-            # Encabezado (usando los valores seleccionados)
             encabezados = [
                 ("PROVEEDOR:", proveedor_texto),
                 ("CUIT:", cuit_texto),
@@ -425,7 +405,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 ws.cell(row=row, column=2, value=value)
                 row += 1
 
-            # Fila "ITEMS" verde
             row += 1
             ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
             items_cell = ws.cell(row=row, column=1, value="ITEMS")
@@ -433,7 +412,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
             items_cell.alignment = center_align
             items_cell.fill = green_fill
 
-            # Encabezados de tabla
             headers = ["DESCRIPCION", "QTY", "PESO NETO", "PESO BRUTO", "UN. VTA", "FOB UNITARIO", "FOB TOTAL"]
             row += 1
             for col, header in enumerate(headers, start=1):
@@ -442,7 +420,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 cell.alignment = center_align
                 cell.fill = gray_header_fill
 
-            # Datos
             for prod in productos:
                 row += 1
                 ws.cell(row=row, column=1, value=prod['descripcion'])
@@ -453,7 +430,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 ws.cell(row=row, column=6, value=round(prod['fob_unitario'], 2))
                 ws.cell(row=row, column=7, value=round(prod['fob_total'], 2))
 
-            # Fila de totales naranja
             row += 1
             ws.cell(row=row, column=1, value="TOTALES").font = Font(bold=True)
             ws.cell(row=row, column=2, value=total_qty)
@@ -467,12 +443,10 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 ws.cell(row=row, column=col).fill = orange_fill
                 ws.cell(row=row, column=col).alignment = center_align
 
-            # Bordes
             for r in range(1, row+1):
                 for c in range(1, 8):
                     ws.cell(row=r, column=c).border = thin_border
 
-            # Anchos de columna
             column_widths = [40, 8, 12, 12, 10, 15, 15]
             for i, width in enumerate(column_widths, start=1):
                 ws.column_dimensions[get_column_letter(i)].width = width
@@ -509,7 +483,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if user.role != User.Role.OWNER:
             return Response({'error': 'Solo el Owner puede resolver revisiones'}, status=403)
             
-        action = request.data.get('action') # 'approve' or 'reject'
+        action = request.data.get('action')
         mensaje = request.data.get('mensaje_revision', '')
         
         if action == 'approve':
@@ -524,9 +498,47 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if mensaje:
             op.mensaje_revision = mensaje
             
-            
         op.save()
         return Response({'status': 'review_resolved', 'action': action})
+
+    # ========== ACCIONES PARA DOCUMENTOS ADICIONALES ==========
+    @action(detail=True, methods=['post'], url_path='documentos')
+    def upload_documento(self, request, pk=None):
+        """Subir un documento adicional a la operación"""
+        operacion = self.get_object()
+        tipo = request.data.get('tipo')
+        archivo = request.FILES.get('archivo')
+        nombre_personalizado = request.data.get('nombre_personalizado', '')
+        descripcion = request.data.get('descripcion', '')
+
+        if not tipo or not archivo:
+            return Response({'error': 'Faltan campos obligatorios (tipo, archivo)'}, status=400)
+
+        if tipo == 'otros' and not nombre_personalizado:
+            return Response({'error': 'Para tipo "Otros" debe especificar un nombre personalizado'}, status=400)
+
+        documento = DocumentoAdjunto.objects.create(
+            operacion=operacion,
+            tipo=tipo,
+            nombre_personalizado=nombre_personalizado if tipo == 'otros' else '',
+            archivo=archivo,
+            descripcion=descripcion,
+            subido_por=request.user if request.user.is_authenticated else None
+        )
+        return Response(DocumentoAdjuntoSerializer(documento).data, status=201)
+
+    @action(detail=True, methods=['delete'], url_path='documentos/(?P<doc_id>[^/.]+)')
+    def delete_documento(self, request, pk=None, doc_id=None):
+        """Eliminar un documento adicional"""
+        operacion = self.get_object()
+        try:
+            documento = operacion.documentos_adjuntos.get(id=doc_id)
+            documento.archivo.delete()  # eliminar archivo físico
+            documento.delete()
+            return Response({'status': 'deleted'})
+        except DocumentoAdjunto.DoesNotExist:
+            return Response({'error': 'Documento no encontrado'}, status=404)
+
 
 class AgendaEventViewSet(viewsets.ModelViewSet):
     serializer_class = AgendaEventSerializer
@@ -559,4 +571,4 @@ class AgendaEventViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         logger.info(f"Evento de Agenda eliminado por {self.request.user.username}: {instance.title}")
-        instance.delete()
+        instance.delete()
