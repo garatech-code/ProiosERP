@@ -89,10 +89,12 @@ class OperacionSerializer(serializers.ModelSerializer):
         many=True, queryset=User.objects.all(),
         source='operadores_asignados', required=False
     )
-    operarios_id = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=PersonalPlantel.objects.all(),
-        source='operarios_asignados', required=False
+    operarios_id = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
     )
+    plantel_asignado = serializers.JSONField(read_only=True)
     contables_id = serializers.PrimaryKeyRelatedField(
         many=True, queryset=User.objects.all(),
         source='contables_asignados', required=False
@@ -112,7 +114,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'delivery_date', 'closed_date',
             'packing_list_file', 'remito_file', 'rancho_file',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
-            'operarios_nombres', 'operarios_usuarios_nombres',
+            'plantel_asignado', 'operarios_nombres', 'operarios_usuarios_nombres',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
@@ -132,7 +134,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         read_only_fields = ['estado_revision', 'mensaje_revision']
 
     def get_operarios_nombres(self, obj):
-        return [f"{s.apellidos}, {s.nombres}" for s in obj.operarios_asignados.all()]
+        return [f"{item.get('apellidos', '')}, {item.get('nombres', '')}".strip(', ') for item in obj.plantel_asignado] if obj.plantel_asignado else []
 
     def get_operarios_usuarios_nombres(self, obj):
         return [u.username for u in obj.operarios_usuarios_asignados.all()]
@@ -152,6 +154,7 @@ class OperacionSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         ret['products'] = self.get_products(instance)
+        ret['operarios_id'] = [item.get('id') for item in instance.plantel_asignado] if instance.plantel_asignado else []
         return ret
 
     def get_products(self, obj):
@@ -233,6 +236,7 @@ class OperacionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         products_data = validated_data.pop('products', None)
+        operarios_ids = validated_data.pop('operarios_id', [])
         if products_data is None:
             products_data = self.initial_data.get('products', [])
 
@@ -244,10 +248,12 @@ class OperacionSerializer(serializers.ModelSerializer):
 
         operation = super().create(validated_data)
         self._handle_products(operation, products_data)
+        self._handle_plantel(operation, operarios_ids)
         return operation
 
     def update(self, instance, validated_data):
         products_data = validated_data.pop('products', None)
+        operarios_ids = validated_data.pop('operarios_id', None)
         if products_data is None:
             products_data = self.initial_data.get('products', [])
 
@@ -263,7 +269,24 @@ class OperacionSerializer(serializers.ModelSerializer):
             operation.detalles.all().delete()
             self._handle_products(operation, products_data)
 
+        if operarios_ids is not None:
+            self._handle_plantel(operation, operarios_ids)
+
         return operation
+
+    def _handle_plantel(self, operation, operarios_ids):
+        operarios = PersonalPlantel.objects.filter(id__in=operarios_ids)
+        datos = []
+        for op in operarios:
+            datos.append({
+                'id': op.id,
+                'nombres': op.nombres,
+                'apellidos': op.apellidos,
+                'dni': op.dni,
+                'rol': op.rol
+            })
+        operation.plantel_asignado = datos
+        operation.save(update_fields=['plantel_asignado'])
 
     def _handle_products(self, operation, products):
         """

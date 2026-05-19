@@ -140,7 +140,7 @@ class Operacion(models.Model):
 
     operadores_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_asignadas', blank=True)
     contables_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_contables', blank=True)
-    operarios_asignados = models.ManyToManyField('usuarios.PersonalPlantel', related_name='operaciones_asociadas', blank=True)
+    plantel_asignado = models.JSONField(default=list, blank=True, help_text="Snapshot estático de los operarios asignados")
     operarios_usuarios_asignados = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='operaciones_como_operario', blank=True)
 
     class Meta:

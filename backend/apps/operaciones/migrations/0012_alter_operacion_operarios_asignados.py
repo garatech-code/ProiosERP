@@ -3,6 +3,10 @@
 from django.db import migrations, models
 
 
+def clean_orphans(apps, schema_editor):
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute("DELETE FROM operaciones_operacion_operarios_asignados")
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -11,6 +15,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(clean_orphans, reverse_code=migrations.RunPython.noop),
         migrations.AlterField(
             model_name='operacion',
             name='operarios_asignados',

@@ -44,3 +44,22 @@ class EmailAttachment(models.Model):
 
     def __str__(self):
         return f"Adjunto: {self.filename}"
+
+class EmailTemplate(models.Model):
+    IDIOMA_CHOICES = (
+        ('ES', 'Español'),
+        ('EN', 'Inglés'),
+    )
+    titulo = models.CharField(max_length=200)
+    asunto = models.CharField(max_length=500)
+    cuerpo = models.TextField()
+    idioma = models.CharField(max_length=2, choices=IDIOMA_CHOICES, default='ES')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['titulo']
+        verbose_name = "Plantilla de Correo"
+        verbose_name_plural = "Plantillas de Correo"
+
+    def __str__(self):
+        return f"[{self.idioma}] {self.titulo}"

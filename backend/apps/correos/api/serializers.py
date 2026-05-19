@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from apps.correos.models import EmailMessage, EmailAttachment
+from apps.correos.models import EmailMessage, EmailAttachment, EmailTemplate
+
+class EmailTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmailTemplate
+        fields = '__all__'
+        read_only_fields = ['creado_en']
 
 class EmailAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
