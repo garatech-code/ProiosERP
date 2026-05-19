@@ -561,7 +561,7 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
                       setFormData(p => ({ ...p, ship: i?.id || '' }));
                       if (i && i.flag) setAutoCompleteFlag(i.flag);
                     }}
-                    createFields={[{ name: 'imo', label: 'IMO *', required: true }, { name: 'flag', label: 'Bandera *', required: true }]}
+                    createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
                   />
                   {autoCompleteFlag && <p className="text-xs text-gray-500 mt-1 font-medium">Bandera: {autoCompleteFlag}</p>}
                 </div>

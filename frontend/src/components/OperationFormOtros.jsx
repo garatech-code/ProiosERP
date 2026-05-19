@@ -566,7 +566,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess }) {
                       setFormData(p => ({ ...p, ship: i?.id || '' }));
                       if (i && i.flag) setAutoCompleteFlag(i.flag);
                     }}
-                    createFields={[{ name: 'imo', label: 'IMO *', required: true }, { name: 'flag', label: 'Bandera *', required: true }]}
+                    createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
                   />
                   <div className="mt-2">
                     <label className="block text-xs font-medium text-gray-700">Bandera (autocompletada)</label>

@@ -2,13 +2,18 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
-from apps.inventario.models import Articulo, MovimientoStock, Proveedor
-from .serializers import ArticuloSerializer, MovimientoStockSerializer, ProveedorSerializer
+from django.core.paginator import Paginator
+from django.http import HttpResponse
+from apps.inventario.models import Articulo, MovimientoStock, Proveedor, ProductoLog
+from .serializers import ArticuloSerializer, MovimientoStockSerializer, ProveedorSerializer, ProductoLogSerializer
 import pandas as pd
 import re
 import logging
+from io import BytesIO
+import csv
 
 logger = logging.getLogger(__name__)
+
 
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
@@ -29,39 +34,29 @@ class ProveedorViewSet(viewsets.ModelViewSet):
         if not (nombre_archivo.endswith('.xlsx') or nombre_archivo.endswith('.xls')):
             return Response({'error': 'Formato no soportado. Use .xlsx o .xls'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Determinar el motor de lectura según la extensión real
         try:
             if nombre_archivo.endswith('.xlsx'):
                 engine = 'openpyxl'
             else:
-                # Para .xls necesitamos xlrd, pero puede fallar si no está instalado
                 try:
                     import xlrd
                     engine = 'xlrd'
                 except ImportError:
                     return Response({'error': 'Para archivos .xls es necesario instalar la librería "xlrd". Ejecute: pip install xlrd'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Leer el archivo con pandas
             df = pd.read_excel(file, engine=engine)
         except Exception as e:
-            # Mensaje de error más claro
             error_msg = str(e)
             if "zip file" in error_msg or "not a zip file" in error_msg:
                 error_msg = "El archivo no es un Excel válido. Asegúrese de que la extensión coincida con el formato real."
             return Response({'error': f'Error al leer el archivo: {error_msg}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Normalizar nombres de columnas
         df.columns = [str(col).strip().lower().replace(' ', '_') for col in df.columns]
-
-        # Columnas esperadas
         expected_columns = ['nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'condicion_pago']
         missing = [col for col in expected_columns if col not in df.columns]
         if missing:
             return Response({'error': f'Faltan columnas obligatorias: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Valores válidos para condicion_pago
         CONDICIONES_VALIDAS = dict(Proveedor.CONDICION_PAGO_CHOICES).keys()
-
         creados = 0
         actualizados = 0
         errores = []
@@ -95,10 +90,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
                     defaults['condicion_pago'] = condicion_pago
 
                 try:
-                    proveedor, created = Proveedor.objects.update_or_create(
-                        nombre=nombre,
-                        defaults=defaults
-                    )
+                    proveedor, created = Proveedor.objects.update_or_create(nombre=nombre, defaults=defaults)
                     if created:
                         creados += 1
                     else:
@@ -115,9 +107,6 @@ class ProveedorViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='template')
     def download_template(self, request):
-        """
-        Descarga una plantilla Excel con las columnas requeridas y datos de ejemplo.
-        """
         data = {
             'nombre': ['Proveedor Ejemplo S.A.', 'Otro Proveedor'],
             'contacto': ['Juan Pérez', 'María Gómez'],
@@ -145,7 +134,92 @@ class ProductViewSet(viewsets.ModelViewSet):
         categoria = self.request.query_params.get('categoria')
         if categoria:
             queryset = queryset.filter(categoria=categoria)
+        # ✅ Agregar filtro por búsqueda
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(nombre__icontains=search)
         return queryset
+
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def perform_update(self, serializer):
+        # Obtener la instancia anterior antes de guardar
+        producto = self.get_object()
+        old_stock = producto.stock_actual
+        
+        # Guardar el nuevo estado
+        producto = serializer.save()
+        
+        # Si el stock actual cambió, crear un movimiento de ajuste
+        if old_stock != producto.stock_actual:
+            from apps.inventario.models import MovimientoStock
+            diferencia = producto.stock_actual - old_stock
+            MovimientoStock.objects.create(
+                articulo=producto,
+                tipo='AJUSTE',
+                cantidad=abs(diferencia),
+                stock_resultante=producto.stock_actual,
+                razon=f'Ajuste manual de stock: {old_stock} → {producto.stock_actual}',
+                usuario=self.request.user if self.request.user.is_authenticated else None
+            )
+        
+        # Asignar usuario que modificó
+        if self.request.user.is_authenticated:
+            producto.modificado_por = self.request.user
+            producto.save(update_fields=['modificado_por'])
+        
+        # Log de cambios (código existente)
+        old_data = {
+            'nombre': producto.nombre,
+            'descripcion': producto.descripcion,
+            'presentacion': producto.presentacion,
+            'peso_kg': float(producto.peso_kg),
+            'stock_actual': float(old_stock),  # usar el anterior
+            'stock_minimo': float(producto.stock_minimo),
+            'stock_maximo': float(producto.stock_maximo) if hasattr(producto, 'stock_maximo') else 0,
+            'categoria': producto.categoria,
+            'proveedor_id': producto.proveedor_id
+        }
+        new_data = {
+            'nombre': producto.nombre,
+            'descripcion': producto.descripcion,
+            'presentacion': producto.presentacion,
+            'peso_kg': float(producto.peso_kg),
+            'stock_actual': float(producto.stock_actual),
+            'stock_minimo': float(producto.stock_minimo),
+            'stock_maximo': float(producto.stock_maximo) if hasattr(producto, 'stock_maximo') else 0,
+            'categoria': producto.categoria,
+            'proveedor_id': producto.proveedor_id
+        }
+        cambios = {}
+        for key in old_data:
+            if old_data[key] != new_data[key]:
+                cambios[key] = {'old': old_data[key], 'new': new_data[key]}
+        if cambios:
+            from apps.inventario.models import ProductoLog
+            ProductoLog.objects.create(
+                producto=producto,
+                accion='UPDATE',
+                campos_modificados=cambios,
+                usuario=self.request.user if self.request.user.is_authenticated else None,
+                ip=self.get_client_ip(self.request)
+            )
+
+    def perform_destroy(self, instance):
+        ProductoLog.objects.create(
+            producto=instance,
+            accion='DELETE',
+            campos_modificados={'nombre': instance.nombre, 'id': instance.id},
+            usuario=self.request.user if self.request.user.is_authenticated else None,
+            ip=self.get_client_ip(self.request)
+        )
+        instance.delete()
 
     @action(detail=False, methods=['post'])
     def movimiento(self, request):
@@ -153,26 +227,40 @@ class ProductViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         with transaction.atomic():
-            movimiento = serializer.save()
-            articulo = movimiento.articulo
+            # Obtener el artículo
+            articulo_id = serializer.validated_data['articulo'].id
+            articulo = Articulo.objects.select_for_update().get(id=articulo_id)
+            cantidad = serializer.validated_data['cantidad']
+            tipo = serializer.validated_data['tipo']
             
-            if movimiento.tipo == 'INGRESO':
-                nuevo_stock = articulo.stock_actual + movimiento.cantidad
-            elif movimiento.tipo == 'SALIDA':
-                if articulo.stock_actual < movimiento.cantidad:
+            # Calcular nuevo stock
+            if tipo == 'INGRESO':
+                nuevo_stock = articulo.stock_actual + cantidad
+            elif tipo == 'SALIDA':
+                if articulo.stock_actual < cantidad:
                     return Response(
                         {'error': f'Stock insuficiente. Disponible: {articulo.stock_actual}'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                nuevo_stock = articulo.stock_actual - movimiento.cantidad
-            else:
-                nuevo_stock = movimiento.cantidad
+                nuevo_stock = articulo.stock_actual - cantidad
+            else:  # AJUSTE
+                nuevo_stock = cantidad
             
+            # Ahora crear el movimiento con stock_resultante ya calculado
+            movimiento = MovimientoStock.objects.create(
+                articulo=articulo,
+                tipo=tipo,
+                cantidad=cantidad,
+                stock_resultante=nuevo_stock,
+                operacion_id=serializer.validated_data.get('operacion_id'),
+                razon=serializer.validated_data['razon'],
+                usuario=request.user if request.user.is_authenticated else None
+            )
+            
+            # Actualizar el stock del artículo
             articulo.stock_actual = nuevo_stock
+            articulo.modificado_por = request.user if request.user.is_authenticated else None
             articulo.save()
-            
-            movimiento.stock_resultante = nuevo_stock
-            movimiento.save(update_fields=['stock_resultante'])
         
         return Response(MovimientoStockSerializer(movimiento).data, status=status.HTTP_201_CREATED)
 
@@ -199,6 +287,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                     'presentacion': articulo.presentacion,
                     'stock_actual': articulo.stock_actual,
                     'stock_minimo': articulo.stock_minimo,
+                    'stock_maximo': getattr(articulo, 'stock_maximo', 0),
                     'cantidad_necesaria': cantidad,
                     'disponible': disponible
                 })
@@ -209,9 +298,151 @@ class ProductViewSet(viewsets.ModelViewSet):
         
         return Response(resultados)
 
-    # ------------------------------------------------------------
-    # FUNCIÓN AUXILIAR PARA ESTIMAR PESO SEGÚN TIPO Y CALIBRE
-    # ------------------------------------------------------------
+    @action(detail=False, methods=['get'], url_path='movimientos')
+    def listar_movimientos(self, request):
+        from django.core.paginator import Paginator
+        from django.http import HttpResponse
+        import csv
+        from io import BytesIO
+        import pandas as pd
+
+        queryset = MovimientoStock.objects.select_related('articulo', 'usuario').order_by('-fecha')
+        
+        # Filtros (igual que antes)
+        articulo_id = request.query_params.get('articulo_id')
+        if articulo_id:
+            queryset = queryset.filter(articulo_id=articulo_id)
+        
+        tipo = request.query_params.get('tipo')
+        if tipo:
+            queryset = queryset.filter(tipo=tipo)
+        
+        fecha_desde = request.query_params.get('fecha_desde')
+        if fecha_desde:
+            queryset = queryset.filter(fecha__date__gte=fecha_desde)
+        
+        fecha_hasta = request.query_params.get('fecha_hasta')
+        if fecha_hasta:
+            queryset = queryset.filter(fecha__date__lte=fecha_hasta)
+        
+        operacion_id = request.query_params.get('operacion_id')
+        if operacion_id:
+            queryset = queryset.filter(operacion_id=operacion_id)
+        
+        # Exportación
+        export = request.query_params.get('export')
+        if export in ['csv', 'excel']:
+            data = []
+            for mov in queryset:
+                data.append({
+                    'Fecha': mov.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+                    'Producto': mov.articulo.nombre,
+                    'Usuario': mov.usuario.username if mov.usuario else 'Sistema',
+                    'Tipo': mov.get_tipo_display(),
+                    'Cantidad': float(mov.cantidad),
+                    'Stock resultante': float(mov.stock_resultante),
+                    'Operación ID': mov.operacion_id or '',
+                    'Razón': mov.razon,
+                })
+            if export == 'csv':
+                response = HttpResponse(content_type='text/csv')
+                response['Content-Disposition'] = 'attachment; filename="movimientos_stock.csv"'
+                writer = csv.DictWriter(response, fieldnames=data[0].keys())
+                writer.writeheader()
+                writer.writerows(data)
+                return response
+            else:
+                df = pd.DataFrame(data)
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Movimientos')
+                output.seek(0)
+                response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                response['Content-Disposition'] = 'attachment; filename="movimientos_stock.xlsx"'
+                return response
+        
+        # Paginación
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 50))
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+        
+        serializer = MovimientoStockSerializer(page_obj, many=True)
+        return Response({
+            'results': serializer.data,
+            'total': paginator.count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': paginator.num_pages
+        })
+
+    # ========== LOGS DE PRODUCTOS ==========
+    @action(detail=False, methods=['get'], url_path='logs')
+    def listar_logs(self, request):
+        """
+        Lista logs de cambios de productos.
+        Parámetro: producto_id (opcional)
+        """
+        from .serializers import ProductoLogSerializer
+        producto_id = request.query_params.get('producto_id')
+        queryset = ProductoLog.objects.select_related('producto', 'usuario').order_by('-fecha')
+        if producto_id:
+            queryset = queryset.filter(producto_id=producto_id)
+        serializer = ProductoLogSerializer(queryset[:200], many=True)
+        return Response(serializer.data)
+    def _export_movimientos(self, queryset, export_format):
+        data = []
+        for mov in queryset:
+            data.append({
+                'Fecha': mov.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+                'Producto': mov.articulo.nombre,
+                'Tipo': mov.get_tipo_display(),
+                'Cantidad': float(mov.cantidad),
+                'Stock resultante': float(mov.stock_resultante),
+                'Operación ID': mov.operacion_id or '',
+                'Razón': mov.razon,
+            })
+        
+        if not data:
+            if export_format == 'csv':
+                response = HttpResponse(content_type='text/csv')
+                response['Content-Disposition'] = 'attachment; filename="movimientos_stock.csv"'
+                response.write('No hay datos para exportar')
+                return response
+            else:
+                response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                response['Content-Disposition'] = 'attachment; filename="movimientos_stock.xlsx"'
+                return response
+        
+        if export_format == 'csv':
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="movimientos_stock.csv"'
+            writer = csv.DictWriter(response, fieldnames=data[0].keys())
+            writer.writeheader()
+            writer.writerows(data)
+            return response
+        
+        elif export_format == 'excel':
+            df = pd.DataFrame(data)
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Movimientos')
+            output.seek(0)
+            response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="movimientos_stock.xlsx"'
+            return response
+
+    # ========== LOGS DE PRODUCTOS ==========
+    @action(detail=False, methods=['get'], url_path='logs')
+    def listar_logs(self, request):
+        producto_id = request.query_params.get('producto_id')
+        queryset = ProductoLog.objects.select_related('producto', 'usuario')
+        if producto_id:
+            queryset = queryset.filter(producto_id=producto_id)
+        serializer = ProductoLogSerializer(queryset[:200], many=True)
+        return Response(serializer.data)
+
+    # ========== FUNCIÓN AUXILIAR PARA ESTIMAR PESO (se mantiene igual) ==========
     def _estimar_peso_cadena(self, tipo_producto, calibre):
         calibre = float(calibre) if calibre else 0
         tipo = tipo_producto.lower()
@@ -231,9 +462,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         else:
             return 1.0
 
-    # ------------------------------------------------------------
-    # CARGA DE EXCEL CON SOPORTE MEJORADO PARA CADENAS
-    # ------------------------------------------------------------
+    # ========== CARGA DE EXCEL (UPLOAD) ==========
     @action(detail=False, methods=['post'], url_path='upload_excel')
     def upload_excel(self, request):
         file = request.FILES.get('file')
@@ -251,27 +480,16 @@ class ProductViewSet(viewsets.ModelViewSet):
             logger.error(f"Error al leer Excel: {e}")
             return Response({'error': f'Error al leer el archivo: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ---------- Detección automática del formato ----------
-        # Limpiar y normalizar primeras filas para buscar encabezados
+        # Detectar formato (cadenas, anclas, insumos, quimicos, generic_two_column)
         header_row_idx = None
         detected_format = None
         column_mapping = {}
 
-        # Lista de posibles palabras clave para identificar fila de encabezado
-        keywords = {
-            'cadenas': ['productos', 'calibre', 'producto', 'tipo'],
-            'anclas': ['kg', 'num serie', 'numero', 'peso'],
-            'insumos': ['nombre', 'cantidad', 'estado', 'observaciones', 'ubicación'],
-            'quimicos': ['producto', 'cantidad', 'stock']
-        }
-
         for idx, row in df.iterrows():
             row_lower = [str(cell).lower().strip() for cell in row if pd.notna(cell)]
-            # Buscar formato Cadenas
             if any('productos' in cell for cell in row_lower) and any('calibre' in cell for cell in row_lower):
                 header_row_idx = idx
                 detected_format = 'cadenas'
-                # Mapear índices de columnas según el texto exacto
                 for col_idx, val in enumerate(row):
                     if pd.notna(val):
                         val_low = str(val).lower().strip()
@@ -284,7 +502,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                         elif 'set' in val_low:
                             column_mapping['set'] = col_idx
                 break
-            # Buscar formato Anclas (columnas 'kg' o 'num serie')
             if any('kg' in cell for cell in row_lower) or any('num serie' in cell for cell in row_lower):
                 header_row_idx = idx
                 detected_format = 'anclas'
@@ -296,9 +513,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                         elif 'num serie' in val_low or 'numero' in val_low:
                             column_mapping['serie'] = col_idx
                         elif 'numero' == val_low:
-                            column_mapping['numero'] = col_idx  # columna de número de ítem, opcional
+                            column_mapping['numero'] = col_idx
                 break
-            # Buscar formato Insumos (Nombre, Cantidad, Estado...)
             if any('nombre' in cell for cell in row_lower) and any('cantidad' in cell for cell in row_lower):
                 header_row_idx = idx
                 detected_format = 'insumos'
@@ -316,7 +532,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                         elif 'ubicación' in val_low:
                             column_mapping['ubicacion'] = col_idx
                 break
-            # Buscar formato Químicos (Producto, Cantidad)
             if any('producto' in cell for cell in row_lower) and any('cantidad' in cell for cell in row_lower):
                 header_row_idx = idx
                 detected_format = 'quimicos'
@@ -329,13 +544,10 @@ class ProductViewSet(viewsets.ModelViewSet):
                             column_mapping['cantidad'] = col_idx
                 break
 
-        # Si no se detectó un formato conocido, usar lógica genérica de dos columnas (primera columna = nombre, segunda = cantidad)
         if detected_format is None:
-            # Buscar una fila que tenga al menos dos celdas no vacías y que no sea encabezado evidente
             for idx, row in df.iterrows():
                 non_null = [cell for cell in row if pd.notna(cell) and str(cell).strip()]
                 if len(non_null) >= 2:
-                    # Si la primera celda tiene palabras como "stock", "producto", saltar (posible encabezado)
                     first = str(row.iloc[0]).lower().strip()
                     if first in ['stock', 'producto', 'nombre', 'descripción', '']:
                         continue
@@ -344,18 +556,15 @@ class ProductViewSet(viewsets.ModelViewSet):
                     column_mapping = {0: 'nombre', 1: 'cantidad'}
                     break
             else:
-                # Si no se encuentra, asumir que los datos empiezan en fila 0
                 header_row_idx = -1
                 detected_format = 'generic_two_column'
                 column_mapping = {0: 'nombre', 1: 'cantidad'}
 
-        # ---------- Procesamiento según formato detectado ----------
         productos_creados = 0
         productos_actualizados = 0
         errores = []
 
         if detected_format == 'cadenas':
-            # Lógica similar a la original pero con columnas dinámicas
             start_row = header_row_idx + 1
             for idx, row in df.iloc[start_row:].iterrows():
                 producto_raw = str(row.iloc[column_mapping.get('producto', 0)]).strip() if column_mapping.get('producto') is not None and pd.notna(row.iloc[column_mapping['producto']]) else ''
@@ -366,10 +575,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 if not producto_raw or producto_raw.lower() in ['', 'nan', 'none']:
                     continue
 
-                # Limpiar calibre (extraer número)
                 calibre_num = ''
                 if calibre_raw and calibre_raw not in ['nan', 'none']:
-                    import re
                     match = re.search(r'(\d+(?:\.\d+)?)', calibre_raw)
                     if match:
                         calibre_num = match.group(1)
@@ -386,7 +593,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 if cantidad <= 0:
                     continue
 
-                # Determinar presentación y categoría
                 if 'cadena' in producto_raw.lower():
                     presentacion = f"Cadena calibre {calibre_num}" if calibre_num else "Cadena de acero"
                     categoria = 'cadenas'
@@ -413,6 +619,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'peso_kg': peso_estimado,
                             'stock_actual': cantidad,
                             'stock_minimo': 0,
+                            'stock_maximo': 0,
                             'descripcion': f'Importado desde Excel de cadenas. Calibre: {calibre_num}, SET: {set_raw}, Cantidad original: {cantidad_raw}',
                             'categoria': categoria,
                         }
@@ -425,18 +632,15 @@ class ProductViewSet(viewsets.ModelViewSet):
                     errores.append(f'Error guardando "{nombre_producto}": {str(e)}')
 
         elif detected_format == 'anclas':
-            # Agrupar por peso (kg)
             start_row = header_row_idx + 1
             kg_counts = {}
-            kg_series = {}  # guardar números de serie opcionales
+            kg_series = {}
             for idx, row in df.iloc[start_row:].iterrows():
                 kg_val = ''
                 if column_mapping.get('kg') is not None and pd.notna(row.iloc[column_mapping['kg']]):
                     kg_val = str(row.iloc[column_mapping['kg']]).strip()
                 if not kg_val or kg_val.lower() in ['', 'nan', 'none']:
                     continue
-                # Extraer número del kg
-                import re
                 match = re.search(r'(\d+(?:\.\d+)?)', kg_val)
                 if not match:
                     continue
@@ -444,7 +648,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 serie = ''
                 if column_mapping.get('serie') is not None and pd.notna(row.iloc[column_mapping['serie']]):
                     serie = str(row.iloc[column_mapping['serie']]).strip()
-                # Contar
                 if kg_num not in kg_counts:
                     kg_counts[kg_num] = 0
                     kg_series[kg_num] = []
@@ -457,7 +660,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 presentacion = f"Ancla de {kg} kg"
                 descripcion = f"Peso unitario: {kg} kg. Números de serie: {', '.join(kg_series[kg]) if kg_series[kg] else 'No registrados'}"
                 categoria = 'anclas'
-                peso_unitario = kg  # en kg
+                peso_unitario = kg
                 try:
                     articulo, created = Articulo.objects.update_or_create(
                         nombre=nombre_producto,
@@ -466,6 +669,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'peso_kg': peso_unitario,
                             'stock_actual': count,
                             'stock_minimo': 0,
+                            'stock_maximo': 0,
                             'descripcion': descripcion,
                             'categoria': categoria,
                         }
@@ -489,15 +693,12 @@ class ProductViewSet(viewsets.ModelViewSet):
                 cantidad_raw = ''
                 if column_mapping.get('cantidad') is not None and pd.notna(row.iloc[column_mapping['cantidad']]):
                     cantidad_raw = str(row.iloc[column_mapping['cantidad']]).strip()
-                # Extraer cantidad numérica
-                import re
                 match = re.search(r'(\d+(?:\.\d+)?)', cantidad_raw.replace(',', '.'))
                 if not match:
                     errores.append(f'Producto "{nombre}": cantidad no válida "{cantidad_raw}"')
                     continue
                 cantidad = float(match.group(1))
 
-                # Obtener estado y observaciones
                 estado = ''
                 if column_mapping.get('estado') is not None and pd.notna(row.iloc[column_mapping['estado']]):
                     estado = str(row.iloc[column_mapping['estado']]).strip()
@@ -528,9 +729,10 @@ class ProductViewSet(viewsets.ModelViewSet):
                         nombre=nombre,
                         defaults={
                             'presentacion': presentacion,
-                            'peso_kg': 1.0,  # por defecto, se puede ajustar manualmente si se necesita
+                            'peso_kg': 1.0,
                             'stock_actual': cantidad,
                             'stock_minimo': 0,
+                            'stock_maximo': 0,
                             'descripcion': descripcion,
                             'categoria': categoria,
                         }
@@ -557,15 +759,12 @@ class ProductViewSet(viewsets.ModelViewSet):
                 if not cantidad_raw or cantidad_raw.lower() in ['', 'nan', 'none']:
                     continue
 
-                # Extraer número y unidad
-                import re
                 match_num = re.search(r'(\d+(?:\.\d+)?)', cantidad_raw.replace(',', '.'))
                 if not match_num:
                     errores.append(f'Producto "{producto}": cantidad no válida "{cantidad_raw}"')
                     continue
                 cantidad = float(match_num.group(1))
 
-                # Detectar unidad
                 presentacion = ''
                 if 'l' in cantidad_raw.lower():
                     presentacion = 'Líquido (Litros)'
@@ -587,6 +786,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'peso_kg': 1.0,
                             'stock_actual': cantidad,
                             'stock_minimo': 0,
+                            'stock_maximo': 0,
                             'descripcion': descripcion,
                             'categoria': categoria,
                         }
@@ -607,7 +807,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 if not nombre or nombre.lower() in ['', 'nan', 'none']:
                     continue
 
-                import re
                 match = re.search(r'(\d+(?:\.\d+)?)', cantidad_raw.replace(',', '.'))
                 if not match:
                     errores.append(f'Producto "{nombre}": cantidad no válida "{cantidad_raw}"')
@@ -635,6 +834,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                             'peso_kg': 1.0,
                             'stock_actual': cantidad,
                             'stock_minimo': 0,
+                            'stock_maximo': 0,
                             'descripcion': descripcion,
                             'categoria': categoria,
                         }

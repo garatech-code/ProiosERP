@@ -1,13 +1,13 @@
-// src/components/OperationDetail.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import OperarioActionPanel from './OperarioActionPanel';
 import OperationTracker from './OperationTracker';
-import ProductSearchCards from './ProductSearchCards'; // NUEVO COMPONENTE
-import OperationEmails from './OperationEmails'; // COMPONENTE DE CORREOS
+import ProductSearchCards from './ProductSearchCards';
+import OperationEmails from './OperationEmails';
 import LogoSpinner from './LogoSpinner';
+import OperationDocuments from './OperationDocuments';
 import * as XLSX from 'xlsx';
 
 export default function OperationDetail() {
@@ -26,20 +26,19 @@ export default function OperationDetail() {
   const [previewFile, setPreviewFile] = useState(null);
   const [excelPreviewHtml, setExcelPreviewHtml] = useState(null);
   const [showExcelModal, setShowExcelModal] = useState(false);
+  const [documentos, setDocumentos] = useState([]);
   const [packingData, setPackingData] = useState({
     operation_id: '', client: '', ship: '', port: '', eta: '', products: [], total_weight: 0, total_price: 0
-  }); // Evitamos undefined
+  });
 
   // Estados del workflow de revisión Operador <-> Owner
   const [mensajeRevision, setMensajeRevision] = useState('');
   const [revisionActionLoading, setRevisionActionLoading] = useState(false);
   const isOperador = user?.role === 'OPERADOR';
 
-  // Nuevos estados para los desplegables del packing list
-  const [proveedor, setProveedor] = useState('PROIOS SA'); // opción por defecto
-  const [paisDestino, setPaisDestino] = useState('argentina'); // 'argentina' o 'bandera'
+  const [proveedor, setProveedor] = useState('PROIOS SA');
+  const [paisDestino, setPaisDestino] = useState('argentina');
 
-  // Edit nombre inline
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
 
@@ -74,29 +73,23 @@ export default function OperationDetail() {
     let parsedProducts = [];
     let idCounter = 1;
 
-    // Diferentes "modelos" o patrones de heurística Regex para procesar el texto plano
     const patterns = [
-      // Modelo 1: Producto - Cantidad: X [Unidad]
       {
         regex: /(.+?)[–\-:]\s*(?:Cant(?:idad|\.)?)\s*(?::)?\s*(\d+)\s*(.*)/i,
         extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
       },
-      // Modelo 2: X [Unidad] de Producto
       {
         regex: /^(\d+)\s+([a-zA-Z]+)?\s*(?:de|del)?\s+(.+)$/i,
         extract: (m) => ({ nombre: m[3], cantidad: m[1], unidad: m[2] })
       },
-      // Modelo 3: Producto x X [Unidad]
       {
         regex: /(.+?)\s+x\s*(\d+)\s*(.*)/i,
         extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
       },
-      // Modelo 4: Producto (X [Unidad])
       {
         regex: /(.+?)\s*\((\d+)\s*([a-zA-Z]+)?\)/i,
         extract: (m) => ({ nombre: m[1], cantidad: m[2], unidad: m[3] })
       },
-      // Modelo 5: QTY: X - Producto
       {
         regex: /(?:Qty|Cantidad)(?::)?\s*(\d+)\s*([a-zA-Z]+)?\s*[\-\|]\s*(.+)/i,
         extract: (m) => ({ nombre: m[3], cantidad: m[1], unidad: m[2] })
@@ -105,17 +98,14 @@ export default function OperationDetail() {
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
-      if (!trimmedLine || trimmedLine.length < 3) return; // Ignorar líneas muy cortas o vacías
+      if (!trimmedLine || trimmedLine.length < 3) return;
 
       let matched = false;
 
-      // Evaluar cada line en orden secuencial según el banco de patrones
       for (const pattern of patterns) {
         const match = trimmedLine.match(pattern.regex);
         if (match) {
           const { nombre, cantidad, unidad } = pattern.extract(match);
-
-          // Prevenir falsos positivos filtrando nombres inusualmente largos o vacíos
           const safeName = nombre ? nombre.trim().replace(/^[\-\:]|[\-\:]$/g, '').trim() : '';
 
           if (safeName && safeName.length > 2 && safeName.length < 80) {
@@ -126,7 +116,7 @@ export default function OperationDetail() {
               unidad: unidad ? unidad.trim() : 'unidades'
             });
             matched = true;
-            break; // Si un modelo procesó la línea con éxito, no evalúa más modelos para esta línea
+            break;
           }
         }
       }
@@ -149,6 +139,7 @@ export default function OperationDetail() {
     try {
       const res = await axios.get(`/operaciones/operations/${id}/`);
       setOperation(res.data);
+      setDocumentos(res.data.documentos_adjuntos || []);
       setError(null);
     } catch (err) {
       console.error(err);
@@ -265,7 +256,6 @@ export default function OperationDetail() {
 
   const downloadPackingListExcel = async () => {
     try {
-      // Construir URL con parámetros
       let url = `/operaciones/operations/${id}/packing_list_excel/`;
       const params = new URLSearchParams();
       params.append('proveedor', proveedor);
@@ -313,6 +303,10 @@ export default function OperationDetail() {
     }
   };
 
+  const refreshDocuments = () => {
+    fetchOperation();
+  };
+
   const statusBadge = (status) => {
     const colors = {
       solicitada: 'bg-yellow-100 text-yellow-800',
@@ -356,7 +350,6 @@ export default function OperationDetail() {
   if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
   if (!operation) return <div className="text-center mt-10">No se encontró la operación</div>;
 
-  // Obtener bandera del buque para mostrar en el select de país destino (si aplica)
   const shipFlag = operation.ship_flag || (operation.ship ? operation.ship.flag : '');
 
   return (
@@ -511,12 +504,6 @@ export default function OperationDetail() {
                         {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
                       </dd>
                     </div>
-                    {operation.tipo_operacion === 'servicios' && operation.subtipo_servicio && (
-                      <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-amber-50/20 dark:bg-amber-900/10">
-                        <dt className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Especialidad</dt>
-                        <dd className="text-sm font-black text-amber-700 dark:text-amber-300">{operation.subtipo_servicio}</dd>
-                      </div>
-                    )}
                     <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
                       <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Notas</dt>
                       <dd className="text-sm font-medium text-slate-600 dark:text-slate-300 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
@@ -528,19 +515,13 @@ export default function OperationDetail() {
                       <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
                         <i className="bi bi-people-fill"></i> Personal de Misión Asignado
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
-                        <div className="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
-                          <p className="text-slate-400 uppercase font-black mb-1">Logística</p>
-                          <p className="font-bold">{operation.operadores_id?.length || 0} Asignados</p>
-                        </div>
-                        <div className="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
-                          <p className="text-slate-400 uppercase font-black mb-1">Operarios (App)</p>
-                          <p className="font-bold">{operation.operarios_usuarios_nombres?.length > 0 ? operation.operarios_usuarios_nombres.join(', ') : 'Ninguno'}</p>
-                        </div>
-                        <div className="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
-                          <p className="text-slate-400 uppercase font-black mb-1">Plantel (Staff)</p>
-                          <p className="font-bold">{operation.operarios_nombres?.length > 0 ? operation.operarios_nombres.join(', ') : 'Ninguno'}</p>
-                        </div>
+                      <div className="flex gap-4 text-xs">
+                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                          Operadores (Oficina): {operation.operadores_id?.length || 0}
+                        </span>
+                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                          Operarios (Planta): {operation.operarios_id?.length || 0}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -639,7 +620,6 @@ export default function OperationDetail() {
                     {operation.texto_pedido}
                   </div>
 
-                  {/* COMPONENTE DE TARJETAS DE BUSQUEDA INYECTADO AQUÍ */}
                   {(!isOperario) && (
                     <div className="px-4 py-4 sm:px-6 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                       <ProductSearchCards initialProducts={detectedProducts} />
@@ -648,7 +628,6 @@ export default function OperationDetail() {
                 </div>
               )}
 
-              {/* NUEVO BLOQUE: Opciones para el Packing List */}
               <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
                   <div className="flex justify-between items-center">
@@ -768,12 +747,18 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              {/* INTEGRACIÓN DEL NUEVO COMPONENTE DE CORREOS */}
+              {/* DOCUMENTOS ADICIONALES (NUEVO) */}
+              <OperationDocuments
+                operacionId={operation.id}
+                documentos={documentos}
+                onDocumentChange={refreshDocuments}
+              />
+
               <div className="mt-8 mb-8">
-                <OperationEmails operacionId={id} defaultRecipient={operation.client_email} />
+                <OperationEmails operacionId={id} />
               </div>
 
-              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-white w-full sm:w-auto text-center sm:text-left">
                   <h4 className="font-black text-lg">Controles Operativos</h4>
                   <p className="text-xs text-slate-400 font-medium">Avanza la operación a la siguiente fase.</p>
@@ -795,7 +780,6 @@ export default function OperationDetail() {
                     </button>
                   )}
 
-                  {/* BLOQUE DE FLUJO DE REVISIONES Y CORTES CONDICIONALES PARA OPERADORES */}
                   {isOperador && operation.estado_revision !== 'approved' && operation.estado_revision !== 'pending' && operation.estado !== 'entregada' && operation.estado !== 'cancelada' && (
                     <div className="w-full bg-slate-700/50 p-4 rounded-xl border border-slate-600 mt-2 sm:mt-0 sm:max-w-sm sm:ml-auto">
                       <h5 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2"><i className="bi bi-shield-check"></i> Solicitar Revisión</h5>
@@ -965,23 +949,13 @@ export default function OperationDetail() {
                 <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i>
                 Vista previa del Packing List (Excel)
               </h3>
-              <button
-                onClick={() => setShowExcelModal(false)}
-                className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"
-              >
-                <i className="bi bi-x-lg"></i>
-              </button>
+              <button onClick={() => setShowExcelModal(false)} className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"><i className="bi bi-x-lg"></i></button>
             </div>
             <div className="flex-1 overflow-auto bg-white p-4">
               <div dangerouslySetInnerHTML={{ __html: excelPreviewHtml }} className="excel-preview" />
             </div>
             <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setShowExcelModal(false)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm"
-              >
-                Cerrar
-              </button>
+              <button onClick={() => setShowExcelModal(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>
           </div>
         </div>
@@ -996,71 +970,33 @@ export default function OperationDetail() {
                 <i className="bi bi-file-earmark-text-fill text-indigo-500"></i>
                 Vista previa del documento
               </h3>
-              <button
-                onClick={() => setPreviewFile(null)}
-                className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"
-              >
-                <i className="bi bi-x-lg"></i>
-              </button>
+              <button onClick={() => setPreviewFile(null)} className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"><i className="bi bi-x-lg"></i></button>
             </div>
             <div className="flex-1 overflow-auto bg-slate-100 p-2 flex justify-center items-center">
               {previewFile.type === 'pdf' && (
-                <iframe
-                  src={previewFile.url}
-                  className="w-full h-full min-h-[80vh] border-0 rounded-lg"
-                  title="Vista previa PDF"
-                />
+                <iframe src={previewFile.url} className="w-full h-full min-h-[80vh] border-0 rounded-lg" title="Vista previa PDF" />
               )}
               {previewFile.type === 'image' && (
-                <img
-                  src={previewFile.url}
-                  alt="Vista previa"
-                  className="max-w-full max-h-[85vh] object-contain shadow-lg rounded-lg"
-                />
+                <img src={previewFile.url} alt="Vista previa" className="max-w-full max-h-[85vh] object-contain shadow-lg rounded-lg" />
               )}
               {previewFile.type === 'excel' && (
                 <div className="text-center p-8 bg-white rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-spreadsheet text-5xl text-emerald-500 mb-3 block"></i>
                   <p className="text-slate-600">Para ver el contenido del Excel, usa el botón "Vista Previa" específico.</p>
-                  <a
-                    href={previewFile.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 inline-block bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold"
-                  >
-                    Descargar archivo
-                  </a>
+                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">Descargar archivo</a>
                 </div>
               )}
               {previewFile.type === 'unknown' && (
                 <div className="text-center p-8 bg-white rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-excel text-5xl text-amber-500 mb-3 block"></i>
                   <p className="text-slate-600">No se puede previsualizar este tipo de archivo.</p>
-                  <a
-                    href={previewFile.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold"
-                  >
-                    Descargar archivo
-                  </a>
+                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">Descargar archivo</a>
                 </div>
               )}
             </div>
             <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
-              <a
-                href={previewFile.url}
-                download
-                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-100 font-medium text-sm"
-              >
-                <i className="bi bi-download me-1"></i> Descargar
-              </a>
-              <button
-                onClick={() => setPreviewFile(null)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm"
-              >
-                Cerrar
-              </button>
+              <a href={previewFile.url} download className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-100 font-medium text-sm"><i className="bi bi-download me-1"></i> Descargar</a>
+              <button onClick={() => setPreviewFile(null)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>
           </div>
         </div>

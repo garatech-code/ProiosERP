@@ -589,7 +589,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                       setFormData(p => ({ ...p, ship: i?.id || '' }));
                       if (i && i.flag) setAutoCompleteFlag(i.flag);
                     }}
-                    createFields={[{ name: 'imo', label: 'IMO *', required: true }, { name: 'flag', label: 'Bandera *', required: true }]}
+                    createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
                   />
                   {/* Mostrar la bandera del buque seleccionado */}
                   <div className="mt-2">

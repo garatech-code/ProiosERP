@@ -6,7 +6,7 @@ import OperationTypeSelector from '../components/OperationTypeSelector';
 import OperationFormProductos from '../components/OperationFormProductos';
 import OperationFormQuimicos from '../components/OperationFormQuimicos';
 import OperationFormServicios from '../components/OperationFormServicios';
-import OperationFormOtros from '../components/OperationFormOtros'; // NUEVO
+import OperationFormOtros from '../components/OperationFormOtros';
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
 import StaffManagement from '../components/StaffManagement';
@@ -14,6 +14,7 @@ import DebugFeedback from '../components/DebugFeedback';
 import AgendaEventModal from '../components/AgendaEventModal';
 import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
+import StockMovements from '../components/StockMovements'; // NUEVO
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -430,7 +431,7 @@ export default function OwnerDashboard() {
                         <option value="productos">■ Productos</option>
                         <option value="quimicos">■ Químicos</option>
                         <option value="servicios">■ Servicios</option>
-                        <option value="otros">■ Otros</option> {/* NUEVO */}
+                        <option value="otros">■ Otros</option>
                     </select>
 
                     <select
@@ -519,7 +520,7 @@ export default function OwnerDashboard() {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200">
-            {/* Sidebar Desktop (sin cambios relevantes) */}
+            {/* Sidebar Desktop */}
             <aside className={`relative bg-slate-900 text-white flex-col hidden md:flex h-screen sticky top-0 shadow-xl z-20 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20 items-center'}`}>
                 <button
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -590,6 +591,11 @@ export default function OwnerDashboard() {
                         <i className="bi bi-people-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Plantel Operarios</span>}
                     </button>
+                    {/* NUEVO: Botón Movimientos Stock */}
+                    <button title={!isSidebarOpen ? "Movimientos Stock" : ""} onClick={() => setActiveTab('stockMovements')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'stockMovements' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-boxes text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Movimientos Stock</span>}
+                    </button>
                 </div>
 
                 <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
@@ -627,7 +633,7 @@ export default function OwnerDashboard() {
                 </div>
             </aside>
 
-            {/* Navbar Mobile (sin cambios) */}
+            {/* Navbar Mobile */}
             <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
@@ -648,7 +654,7 @@ export default function OwnerDashboard() {
                 </div>
             </div>
 
-            {/* Mobile Bottom Tabs (sin cambios) */}
+            {/* Mobile Bottom Tabs */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 z-30 flex justify-around p-2 pb-safe">
                 <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center p-2 ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-pie-chart-fill text-xl"></i>
@@ -679,6 +685,11 @@ export default function OwnerDashboard() {
                     <i className="bi bi-people-fill text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Plantel</span>
                 </button>
+                {/* NUEVO: Botón móvil para Movimientos Stock */}
+                <button onClick={() => setActiveTab('stockMovements')} className={`flex flex-col items-center p-2 ${activeTab === 'stockMovements' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-boxes text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Stock</span>
+                </button>
             </div>
 
             {/* Main Content Area */}
@@ -693,12 +704,17 @@ export default function OwnerDashboard() {
                             {activeTab === 'approvals' && 'Revisiones de Operaciones'}
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
                             {activeTab === 'staff' && 'Personal de Plantel'}
+                            {activeTab === 'stockMovements' && 'Movimientos de Stock'} {/* NUEVO */}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
-                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' : 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : 
+                             activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : 
+                             activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' :
+                             activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' : // NUEVO
+                             'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
-                    {activeTab !== 'inventory' && activeTab !== 'staff' && (
+                    {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && ( // NUEVO: ocultar botón en stockMovements
                         <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                             <i className="bi bi-plus-lg text-lg"></i>
                             Nueva Operación
@@ -726,6 +742,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'inbox' && renderInbox()}
                             {activeTab === 'inventory' && <InventoryManagement />}
                             {activeTab === 'staff' && <StaffManagement />}
+                            {activeTab === 'stockMovements' && <StockMovements />} {/* NUEVO */}
                         </>
                     )}
                 </div>
@@ -759,7 +776,7 @@ export default function OwnerDashboard() {
                     onSuccess={handleFormSuccess}
                 />
             )}
-            {operationModalState.isOpen && operationModalState.type === 'otros' && (   // NUEVO
+            {operationModalState.isOpen && operationModalState.type === 'otros' && (
                 <OperationFormOtros
                     id={operationModalState.id}
                     onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
