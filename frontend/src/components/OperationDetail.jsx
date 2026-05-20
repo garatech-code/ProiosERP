@@ -419,10 +419,10 @@ export default function OperationDetail() {
           {/* BANNER DE REVISIÓN */}
           {operation.estado_revision === 'pending' && (
             <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
-              <i className="bi bi-clock-history text-amber-500 text-xl mt-0.5"></i>
+              <i className="bi bi-info-circle-fill text-amber-500 text-xl mt-0.5"></i>
               <div>
-                <h4 className="text-amber-800 font-bold">Esta operación está en Revisión</h4>
-                <p className="text-amber-700 text-sm">{isOwner ? 'El Operador ha solicitado revisión. Por favor verifica antes de continuar.' : 'Has solicitado una revisión. Funciones bloqueadas temporalmente.'}</p>
+                <h4 className="text-amber-800 font-bold">Notificación a Gerencia</h4>
+                <p className="text-amber-700 text-sm">{isOwner ? 'Un operador ha generado actividad reciente en esta operación.' : 'El administrador ha sido notificado del progreso de esta operación.'}</p>
                 {operation.mensaje_revision && (
                   <div className="mt-2 p-2 bg-white/60 rounded text-amber-900 text-xs shadow-sm italic">
                     "{operation.mensaje_revision}"
@@ -700,9 +700,9 @@ export default function OperationDetail() {
                       >
                         <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
                       </button>
-                      <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                         <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
                       </label>
                     </div>
                   </div>
@@ -720,9 +720,9 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                       <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
                     </label>
                   </div>
 
@@ -739,9 +739,9 @@ export default function OperationDetail() {
                         </button>
                       )}
                     </div>
-                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'pending') ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                       <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'pending')} />
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
                     </label>
                   </div>
                 </div>
@@ -801,35 +801,16 @@ export default function OperationDetail() {
                   )}
 
                   {isOwner && operation.estado_revision === 'pending' && (
-                    <div className="w-full bg-amber-900/30 p-4 rounded-xl border border-amber-500/30 mt-2 sm:mt-0 sm:max-w-sm sm:ml-auto text-amber-100">
-                      <h5 className="text-xs font-bold uppercase tracking-widest mb-2"><i className="bi bi-check-all"></i> Responder a Revisión</h5>
-                      <textarea
-                        value={mensajeRevision}
-                        onChange={(e) => setMensajeRevision(e.target.value)}
-                        placeholder="Escribe tu feedback de aprobación/rechazo..."
-                        className="w-full text-sm bg-slate-800 text-white border-slate-600 rounded-lg p-2 focus:ring-amber-500 focus:border-amber-500 mb-2 placeholder-slate-400"
-                        rows="2"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleResolveReview('reject')}
-                          disabled={revisionActionLoading}
-                          className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-all"
-                        >
-                          Rechazar
-                        </button>
-                        <button
-                          onClick={() => handleResolveReview('approve')}
-                          disabled={revisionActionLoading}
-                          className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all"
-                        >
-                          Aprobar
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => handleResolveReview('approve')}
+                      disabled={revisionActionLoading}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-black rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      {revisionActionLoading ? 'Procesando...' : <><i className="bi bi-check-all text-lg leading-none"></i> Marcar como Visto</>}
+                    </button>
                   )}
 
-                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_confirm && !isOperario && (
+                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
                     <button
                       onClick={() => handleAction('confirm_operation', '¿Declarar Delivery Note ingresado y pasar al estado de Armado de Packing List?')}
                       disabled={actionLoading}
@@ -838,7 +819,7 @@ export default function OperationDetail() {
                       {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
                     </button>
                   )}
-                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_send_to_customs && !isOperario && (
+                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_send_to_customs && !isOperario && (
                     <button
                       onClick={() => handleAction('start_coordination', '¿Enviar Packing List a Aduanas? Esto consumirá el stock del inventario.')}
                       disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
@@ -850,17 +831,25 @@ export default function OperationDetail() {
                       {actionLoading ? 'Procesando...' : <><i className="bi bi-building-check"></i> Enviar a Aduanas</>}
                     </button>
                   )}
-                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_coordinate && !isOperario && (
-                    <button onClick={() => handleAction('finalize_production', '¿Aduana dio el Rancho? Pasar a logística.')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 hover:bg-purple-400 text-white text-sm font-black rounded-xl shadow-lg shadow-purple-500/30 transition-all text-center">
-                      {actionLoading ? 'Procesando...' : 'Autorizar Logística'}
+                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_coordinate && !isOperario && (
+                    <button
+                      onClick={() => handleAction('finalize_production', '¿Aduanas aprobó el despacho (Rancho)? Pasar a lista para envío.')}
+                      disabled={actionLoading}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-white hover:bg-amber-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-truck"></i> Despacho de Aduana Listo</>}
                     </button>
                   )}
-                  {(!isOperador || operation.estado_revision === 'approved') && operation.can_deliver && !isOperario && (
-                    <button onClick={() => handleAction('mark_delivered', '¿Emitir el remito de entrega final?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 hover:bg-blue-400 text-white text-sm font-black rounded-xl shadow-lg shadow-blue-500/30 transition-all text-center">
-                      {actionLoading ? 'Procesando...' : 'Emitir Remito'}
+                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_deliver && !isOperario && (
+                    <button
+                      onClick={() => handleAction('mark_delivered', '¿Marcar como remitada? Se asume que la logística ya fue gestionada.')}
+                      disabled={actionLoading}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                      {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
                     </button>
                   )}
-                  {(!isOperador || operation.estado_revision === 'approved') && operation.estado === 'remitada' && !isOperario && (
+                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
                     <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
                       {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
                     </button>

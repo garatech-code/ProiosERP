@@ -4,6 +4,11 @@ import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
+import OperationTypeSelector from '../components/OperationTypeSelector';
+import OperationFormProductos from '../components/OperationFormProductos';
+import OperationFormQuimicos from '../components/OperationFormQuimicos';
+import OperationFormServicios from '../components/OperationFormServicios';
+import OperationFormOtros from '../components/OperationFormOtros';
 import DebugFeedback from '../components/DebugFeedback';
 import AgendaEventModal from '../components/AgendaEventModal';
 import { useTheme } from '../context/ThemeContext';
@@ -49,6 +54,14 @@ export default function OperadorDashboard() {
     const [calView, setCalView] = useState('week');
     const [calDate, setCalDate] = useState(new Date());
 
+    const [operationModalState, setOperationModalState] = useState(() => {
+        const saved = localStorage.getItem('operadorDashboard_operationModalState');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { }
+        }
+        return { isOpen: false, type: null, id: null };
+    });
+
     const [showDebugForm, setShowDebugForm] = useState(false);
 
     // Eventos de Agenda
@@ -78,6 +91,10 @@ export default function OperadorDashboard() {
     useEffect(() => {
         localStorage.setItem('operadorDashboard_agendaEventModalState', JSON.stringify(agendaEventModalState));
     }, [agendaEventModalState]);
+
+    useEffect(() => {
+        localStorage.setItem('operadorDashboard_operationModalState', JSON.stringify(operationModalState));
+    }, [operationModalState]);
 
     const fetchAgendaEvents = async () => {
         try {
@@ -231,6 +248,11 @@ export default function OperadorDashboard() {
 
         return [...evts, ...holEvts, ...agendaEvts];
     }, [operations, holidays, agendaEvents]);
+
+    const handleFormSuccess = () => {
+        setOperationModalState({ isOpen: false, type: null, id: null });
+        fetchData();
+    };
 
     const eventStyleGetter = (event) => {
         if (event.type === 'holiday') {
@@ -501,6 +523,10 @@ export default function OperadorDashboard() {
                     >
                         <i className="bi bi-bug-fill"></i>
                     </button>
+                    <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded-lg text-white shadow-sm font-bold text-sm flex items-center gap-1">
+                        <i className="bi bi-plus-lg"></i>
+                        Añadir
+                    </button>
                 </div>
             </div>
 
@@ -537,6 +563,12 @@ export default function OperadorDashboard() {
                             {activeTab === 'operations' ? 'Gestiona la logística y cumplimiento de las operaciones.' : 'Bandeja de gestión de oficina.'}
                         </p>
                     </div>
+                    {activeTab !== 'inventory' && (
+                        <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                            <i className="bi bi-plus-lg text-lg"></i>
+                            Nueva Operación
+                        </button>
+                    )}
                 </header>
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
@@ -562,6 +594,42 @@ export default function OperadorDashboard() {
                     )}
                 </div>
             </main>
+
+            {/* Modal de Creación / Selector */}
+            {operationModalState.isOpen && operationModalState.type === 'selector' && (
+                <OperationTypeSelector
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSelect={(type) => setOperationModalState({ isOpen: true, type, id: null })}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'productos' && (
+                <OperationFormProductos
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'quimicos' && (
+                <OperationFormQuimicos
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'servicios' && (
+                <OperationFormServicios
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
+            {operationModalState.isOpen && operationModalState.type === 'otros' && (
+                <OperationFormOtros
+                    id={operationModalState.id}
+                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onSuccess={handleFormSuccess}
+                />
+            )}
 
             {/* MODAL DE DEBUG & SUGERENCIAS */}
             {showDebugForm && (

@@ -94,7 +94,8 @@ class OperacionSerializer(serializers.ModelSerializer):
     # Productos como JSON (input/output)
     products = serializers.JSONField(required=False)
 
-    # Transiciones
+    # Transiciones y estados calculados
+    status = serializers.SerializerMethodField()
     can_confirm = serializers.SerializerMethodField()
     can_send_to_customs = serializers.SerializerMethodField()
     can_coordinate = serializers.SerializerMethodField()

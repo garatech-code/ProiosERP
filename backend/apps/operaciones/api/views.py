@@ -60,6 +60,22 @@ class OperacionViewSet(viewsets.ModelViewSet):
             Q(contables_asignados=user)
         ).distinct()
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        operation = serializer.save(creado_por=user)
+        
+        # Si el usuario no es Owner ni Contable, se auto-asigna y se envía a revisión
+        if user.role not in [User.Role.OWNER, User.Role.CONTABLE]:
+            if user.role == User.Role.OPERADOR:
+                operation.operadores_asignados.add(user)
+            elif user.role == User.Role.OPERARIO:
+                operation.operarios_usuarios_asignados.add(user)
+                
+            # Marcar para revisión del Owner automáticamente
+            operation.estado_revision = Operacion.ESTADO_REVISION_PENDING
+            operation.mensaje_revision = f"Operación iniciada por {user.username} ({user.role}) el {timezone.now().strftime('%d/%m/%Y a las %H:%M')}"
+            operation.save()
+
     @action(detail=False, methods=['get'])
     def dashboard_metrics(self, request):
         user = request.user

@@ -37,8 +37,8 @@ const AppRoutes = () => {
         const now = Date.now();
 
 
-        // Para volver a 5 minutos, cambiar este valor a: 5 * 60 * 1000
-        const timeoutMs = 5 * 60 * 1000;
+        // Timeout a 15 minutos
+        const timeoutMs = 15 * 60 * 1000;
 
         if (now - lastActivity > timeoutMs) {
           // Si expira, redirigir guardando la URL actual usando un param GET si es posible,
