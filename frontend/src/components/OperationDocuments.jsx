@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
-export default function OperationDocuments({ operacionId, documentos, onDocumentChange }) {
+export default function OperationDocuments({ operacionId, documentos, onDocumentChange, openPreview, selectedDocs = [], toggleSelectDoc }) {
     const { user } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [tipoSeleccionado, setTipoSeleccionado] = useState('delivery_note');
@@ -11,7 +11,7 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
     const [archivo, setArchivo] = useState(null);
 
     const tipos = [
-        { value: 'delivery_note', label: 'Delivery Note' },
+        { value: 'delivery_note', label: 'Preparación' },
         { value: 'factura_proveedor', label: 'Factura a proveedor' },
         { value: 'habilitacion_aduanera', label: 'Habilitación aduanera' },
         { value: 'otros', label: 'Otros' },
@@ -126,20 +126,72 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
             {documentos.length === 0 ? (
                 <p className="text-gray-500 dark:text-slate-400 text-sm">No hay documentos adicionales.</p>
             ) : (
-                <div className="space-y-2">
-                    {documentos.map(doc => (
-                        <div key={doc.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                            <div>
-                                <p className="font-medium text-gray-800 dark:text-white">{getTipoLabel(doc.tipo, doc.nombre_personalizado)}</p>
-                                {doc.descripcion && <p className="text-sm text-gray-500">{doc.descripcion}</p>}
-                                <p className="text-xs text-gray-400">Subido: {new Date(doc.fecha_subida).toLocaleString()}</p>
-                                <a href={doc.archivo} target="_blank" rel="noopener noreferrer" className="text-indigo-600 text-sm hover:underline">Ver archivo</a>
+                <div className="space-y-3">
+                    {documentos.map(doc => {
+                        const isImage = doc.archivo?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
+                        const isPdf = doc.archivo?.match(/\.pdf$/i);
+                        const isExcel = doc.archivo?.match(/\.xlsx?$/i);
+                        
+                        let iconClass = "bi-file-earmark-fill text-slate-400";
+                        if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
+                        else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
+                        else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
+                        
+                        const isSelected = selectedDocs.includes(doc.id);
+                        
+                        return (
+                            <div key={doc.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {toggleSelectDoc && (
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggleSelectDoc(doc.id)}
+                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
+                                        />
+                                    )}
+                                    <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
+                                        <i className={`bi ${iconClass} text-xl`}></i>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-bold text-slate-800 dark:text-white truncate">
+                                            {getTipoLabel(doc.tipo, doc.nombre_personalizado)}
+                                        </p>
+                                        {doc.descripcion && <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{doc.descripcion}</p>}
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                            Subido: {new Date(doc.fecha_subida).toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 dark:border-slate-700/50">
+                                    {openPreview && (
+                                        <button
+                                            type="button"
+                                            onClick={() => openPreview(doc.archivo)}
+                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
+                                        >
+                                            <i className="bi bi-eye-fill"></i> Ver
+                                        </button>
+                                    )}
+                                    <a
+                                        href={doc.archivo}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
+                                    >
+                                        <i className="bi bi-download"></i> Descargar
+                                    </a>
+                                    <button 
+                                        onClick={() => handleDelete(doc.id)} 
+                                        className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                    >
+                                        <i className="bi bi-trash text-base"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <button onClick={() => handleDelete(doc.id)} className="text-red-500 hover:text-red-700">
-                                <i className="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

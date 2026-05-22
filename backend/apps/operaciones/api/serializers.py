@@ -131,7 +131,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         model = Operacion
         fields = [
             'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'eta',
-            'delivery_method', 'status', 'products', 'detalles', 'documentos_adjuntos',
+            'delivery_method', 'status', 'estado', 'products', 'detalles', 'documentos_adjuntos',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
@@ -186,6 +186,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         for detalle in detalles:
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
+                suficiente = True if not articulo.controlar_stock else (articulo.stock_actual >= detalle.cantidad)
                 productos.append({
                     "product": detalle.articulo_id,
                     "product_name": articulo.nombre,
@@ -194,7 +195,8 @@ class OperacionSerializer(serializers.ModelSerializer):
                     "weight_kg": float(articulo.peso_kg) if articulo.peso_kg else None,
                     "presentation": articulo.presentacion,
                     "stock_actual": float(articulo.stock_actual),
-                    "suficiente": articulo.stock_actual >= detalle.cantidad
+                    "suficiente": suficiente,
+                    "controlar_stock": articulo.controlar_stock
                 })
             except Articulo.DoesNotExist:
                 productos.append({
@@ -205,7 +207,8 @@ class OperacionSerializer(serializers.ModelSerializer):
                     "weight_kg": None,
                     "presentation": "",
                     "stock_actual": 0,
-                    "suficiente": False
+                    "suficiente": False,
+                    "controlar_stock": True
                 })
         return productos
 

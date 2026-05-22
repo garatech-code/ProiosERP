@@ -26,3 +26,9 @@ urlpatterns = [
     path('api/produccion/', include('apps.produccion.api.urls')),
     # path('api/documentos/', include('apps.documentos.api.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

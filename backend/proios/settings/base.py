@@ -94,6 +94,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_MANIFEST_STRICT = False
 
+# Configuración de archivos media (subidas de usuario)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # Configuración Regional (Importante para las fechas de los correos)
 LANGUAGE_CODE = "es-es"
 TIME_ZONE = "America/Argentina/Buenos_Aires"

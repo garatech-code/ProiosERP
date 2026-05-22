@@ -31,6 +31,7 @@ class Articulo(models.Model):
     CATEGORIA_CHOICES = (
         ('quimicos', 'Químicos'),
         ('otros', 'Otros'),
+        ('insumos', 'Insumos'),
     )
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)
@@ -40,6 +41,10 @@ class Articulo(models.Model):
     stock_minimo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Stock mínimo para alerta (amarillo)")
     stock_maximo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Stock máximo (opcional)")
     categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='otros')
+    controlar_stock = models.BooleanField(
+        default=True,
+        help_text="Si se desmarca, el artículo no requerirá stock en inventario y no bloqueará confirmaciones."
+    )
     proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='articulos')
     ultima_modificacion = models.DateTimeField(auto_now=True)
     modificado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)

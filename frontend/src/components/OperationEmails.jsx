@@ -12,7 +12,7 @@ const getEmailPreview = (htmlOrText) => {
     return text.length > 120 ? text.slice(0, 120) + '...' : text;
 };
 
-export default function OperationEmails({ operacionId, defaultRecipient }) {
+export default function OperationEmails({ operacionId, defaultRecipient, openPreview }) {
     const { user } = useAuth(); // Obtenemos el usuario para el modal
     const [emails, setEmails] = useState([]);
     const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -112,6 +112,7 @@ export default function OperationEmails({ operacionId, defaultRecipient }) {
                     email={readEmail}
                     onClose={() => setReadEmail(null)}
                     onReply={(email) => handleReply(email)}
+                    openPreview={openPreview}
                 />
             )}
 

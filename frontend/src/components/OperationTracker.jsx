@@ -27,7 +27,7 @@ export default function OperationTracker({ currentState }) {
     const isCancelled = activeStep === -1;
 
     const steps = [
-        { num: 1, label: 'Delivery Note', icon: 'bi-file-earmark-text', desc: 'Orden ingresada' },
+        { num: 1, label: 'Preparación', icon: 'bi-file-earmark-text', desc: 'Orden ingresada' },
         { num: 2, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
         { num: 3, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
         { num: 4, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },

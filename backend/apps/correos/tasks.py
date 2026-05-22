@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
+from django.core.files.base import ContentFile
 from apps.correos.models import EmailMessage, EmailAttachment
 from apps.operaciones.models import Operacion
 
@@ -74,11 +75,11 @@ def sync_outlook_inbox():
         mail.select('inbox')
 
         now = timezone.now()
-        yesterday_str = (now - timedelta(days=1)).strftime('%d-%b-%Y')
-        twelve_hours_ago = now - timedelta(hours=12)
+        since_date_str = (now - timedelta(days=7)).strftime('%d-%b-%Y')
+        since_date = now - timedelta(days=7)
 
-        # Buscar emails con la flag UNSEEN desde ayer
-        status, messages = mail.search(None, f'(UNSEEN SINCE "{yesterday_str}")')
+        # Buscar todos los emails de los últimos 7 días
+        status, messages = mail.search(None, f'(SINCE "{since_date_str}")')
         if status != 'OK' or not messages[0]:
             mail.logout()
             return "No messages found or error."
@@ -105,8 +106,8 @@ def sync_outlook_inbox():
                     
                     date_tuple = parsedate_to_datetime(msg.get('Date'))
                     
-                    # Filtro estricto local: solo últimas 12 horas
-                    if date_tuple < twelve_hours_ago:
+                    # Filtro local: solo últimos 7 días
+                    if date_tuple < since_date:
                         continue
                     
                     body_text, body_html = extract_body(msg)
@@ -138,21 +139,31 @@ def sync_outlook_inbox():
                         for part in msg.walk():
                             if part.get_content_maintype() == 'multipart':
                                 continue
-                            if part.get('Content-Disposition') is None:
-                                continue
                             
                             filename = part.get_filename()
+                            if not filename:
+                                # Fallback to Content-Type name parameter
+                                name_param = part.get_param('name', header='content-type')
+                                if name_param:
+                                    if isinstance(name_param, tuple):
+                                        from email.utils import collapse_rfc2231_value
+                                        filename = collapse_rfc2231_value(name_param).strip()
+                                    else:
+                                        filename = str(name_param).strip()
+                            
                             if filename:
                                 filename = clean_header(filename)
                                 file_data = part.get_payload(decode=True)
-                                # TODO: Guardar archivo real adjunto si hiciera falta.
-                                # Por ahora guardamos solo la referencia al tamaño.
+                                if not file_data:
+                                    continue
                                 EmailAttachment.objects.create(
                                     email=email_inst,
                                     filename=filename,
                                     content_type=part.get_content_type(),
-                                    size=len(file_data)
+                                    size=len(file_data),
+                                    file=ContentFile(file_data, name=filename)
                                 )
+
                                 
         mail.close()
         mail.logout()

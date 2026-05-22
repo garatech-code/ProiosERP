@@ -34,7 +34,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         <AutocompleteCreate
           label="Producto *"
           // CORRECCIÓN RUTAS: Quitamos la barra inicial
-          endpoint="/inventario/products/?categoria=otros"
+          endpoint="/inventario/products/?categoria=otros,insumos"
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
@@ -639,7 +639,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
 
             <div>
               <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
-              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Pegue aquí el contenido del correo o pedido original del cliente. Se usará para generar el Delivery Note.</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Pegue aquí el contenido del correo o pedido original del cliente. Se usará para generar la Preparación.</p>
               <textarea
                 name="texto_pedido"
                 value={formData.texto_pedido}

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.produccion.models import FormulaBOM, ComponenteBOM
+from apps.produccion.models import FormulaBOM, ComponenteBOM, OrdenFabricacion
 from apps.inventario.models import Articulo
 
 class ComponenteBOMSerializer(serializers.ModelSerializer):
@@ -57,3 +57,34 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
                 ComponenteBOM.objects.create(formula=instance, **comp_data)
                 
         return instance
+
+class OrdenFabricacionSerializer(serializers.ModelSerializer):
+    formula_nombre = serializers.SerializerMethodField()
+    articulo_final_nombre = serializers.SerializerMethodField()
+    operacion_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrdenFabricacion
+        fields = [
+            'id', 'operacion_id', 'formula', 'formula_nombre', 
+            'articulo_final_nombre', 'operacion_nombre', 
+            'cantidad_a_producir', 'completada', 'fecha_solicitud'
+        ]
+
+    def get_formula_nombre(self, obj):
+        return obj.formula.nombre
+
+    def get_articulo_final_nombre(self, obj):
+        try:
+            return Articulo.objects.get(id=obj.formula.articulo_final_id).nombre
+        except Articulo.DoesNotExist:
+            return "Artículo Eliminado"
+
+    def get_operacion_nombre(self, obj):
+        from apps.operaciones.models import Operacion
+        try:
+            op = Operacion.objects.get(id=obj.operacion_id)
+            return str(op)
+        except Operacion.DoesNotExist:
+            return f"OP-{obj.operacion_id:05d}"
+

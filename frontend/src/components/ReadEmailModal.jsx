@@ -1,7 +1,7 @@
 import React from 'react';
 import DOMPurify from 'dompurify';
 
-export default function ReadEmailModal({ email, onClose, onReply }) {
+export default function ReadEmailModal({ email, onClose, onReply, openPreview }) {
   if (!email) return null;
 
   return (
@@ -52,6 +52,56 @@ export default function ReadEmailModal({ email, onClose, onReply }) {
             <div className="whitespace-pre-wrap font-sans">{email.body_text}</div>
           )}
         </div>
+
+        {/* Attachments Section */}
+        {email.adjuntos && email.adjuntos.length > 0 && (
+          <div className="px-4 py-3 sm:px-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/20 shrink-0">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <i className="bi bi-paperclip text-indigo-500"></i> Archivos Adjuntos ({email.adjuntos.length})
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {email.adjuntos.map((adj) => {
+                const isImage = adj.content_type?.startsWith('image/') || adj.filename?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
+                const isPdf = adj.content_type === 'application/pdf' || adj.filename?.match(/\.pdf$/i);
+                const isExcel = adj.content_type?.includes('spreadsheet') || adj.content_type?.includes('excel') || adj.filename?.match(/\.xlsx?$/i);
+                
+                let iconClass = "bi-file-earmark-fill text-slate-400";
+                if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
+                else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
+                else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
+                
+                return (
+                  <div key={adj.id} className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:shadow transition-shadow max-w-[250px]">
+                    <i className={`bi ${iconClass} text-base shrink-0`}></i>
+                    <span className="truncate text-slate-700 dark:text-slate-300" title={adj.filename}>{adj.filename}</span>
+                    <div className="flex items-center gap-2 ml-auto shrink-0">
+                      {openPreview && (
+                        <button
+                          type="button"
+                          onClick={() => openPreview(adj.file)}
+                          className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-400 p-0.5"
+                          title="Previsualizar"
+                        >
+                          <i className="bi bi-eye-fill"></i>
+                        </button>
+                      )}
+                      <a 
+                        href={adj.file} 
+                        download
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                        title="Descargar"
+                      >
+                        <i className="bi bi-download"></i>
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Footer (Mobile Reply Button) */}
         <div className="sm:hidden p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 shrink-0">

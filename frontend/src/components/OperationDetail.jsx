@@ -8,6 +8,7 @@ import ProductSearchCards from './ProductSearchCards';
 import OperationEmails from './OperationEmails';
 import LogoSpinner from './LogoSpinner';
 import OperationDocuments from './OperationDocuments';
+import AutocompleteCreate from './AutocompleteCreate';
 import * as XLSX from 'xlsx';
 
 export default function OperationDetail() {
@@ -30,6 +31,16 @@ export default function OperationDetail() {
   const [packingData, setPackingData] = useState({
     operation_id: '', client: '', ship: '', port: '', eta: '', products: [], total_weight: 0, total_price: 0
   });
+  const [isEditingPacking, setIsEditingPacking] = useState(false);
+  const [editPackingProducts, setEditPackingProducts] = useState([]);
+
+  const editTotalWeight = useMemo(() => {
+    return editPackingProducts.reduce((sum, p) => sum + ((p.quantity || 0) * (p.unit_weight || 0)), 0);
+  }, [editPackingProducts]);
+
+  const editTotalPrice = useMemo(() => {
+    return editPackingProducts.reduce((sum, p) => sum + ((p.quantity || 0) * (p.unit_price || 0)), 0);
+  }, [editPackingProducts]);
 
   // Estados del workflow de revisión Operador <-> Owner
   const [mensajeRevision, setMensajeRevision] = useState('');
@@ -42,11 +53,90 @@ export default function OperationDetail() {
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
 
+  const [emails, setEmails] = useState([]);
+  const [productionOrders, setProductionOrders] = useState([]);
+  const [generatingProduction, setGeneratingProduction] = useState(false);
+  const [completingProduction, setCompletingProduction] = useState({});
+
+  // Estados de selección múltiple de adjuntos
+  const [selectedDocs, setSelectedDocs] = useState([]);
+  const [selectedEmailAtts, setSelectedEmailAtts] = useState([]);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+
+  const emailAttachments = useMemo(() => {
+    const list = [];
+    emails.forEach(email => {
+      if (email.adjuntos && email.adjuntos.length > 0) {
+        email.adjuntos.forEach(adj => {
+          list.push({
+            ...adj,
+            emailSubject: email.subject,
+            emailSender: email.sender_address,
+            emailDate: email.date_received
+          });
+        });
+      }
+    });
+    return list;
+  }, [emails]);
+
+  const fetchEmails = async () => {
+    try {
+      const res = await axios.get(`/correos/inbox/?operacion_id=${id}`);
+      setEmails(res.data);
+    } catch (err) {
+      console.error("Error fetching emails:", err);
+    }
+  };
+
+  const fetchProductionOrders = async () => {
+    try {
+      const res = await axios.get(`/operaciones/operations/${id}/ordenes_produccion/`);
+      setProductionOrders(res.data);
+    } catch (err) {
+      console.error("Error fetching production orders:", err);
+    }
+  };
+
+  const handleGenerateProductionOrders = async () => {
+    setGeneratingProduction(true);
+    try {
+      const res = await axios.post(`/operaciones/operations/${id}/generar_ordenes_produccion/`);
+      showToast(`Órdenes de producción generadas: ${res.data.created_count}`, 'success');
+      fetchProductionOrders();
+      checkStock();
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || 'Error al generar órdenes de producción';
+      showToast(errMsg, 'error');
+    } finally {
+      setGeneratingProduction(false);
+    }
+  };
+
+  const handleCompleteProductionOrder = async (orderId) => {
+    setCompletingProduction(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await axios.post(`/produccion/ordenes/${orderId}/completar/`);
+      showToast(res.data.message || 'Orden de producción completada con éxito', 'success');
+      fetchProductionOrders();
+      fetchOperation();
+      checkStock();
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || 'Error al completar producción';
+      showToast(errMsg, 'error');
+    } finally {
+      setCompletingProduction(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
   useEffect(() => {
     if (operation) {
       setTempName(operation.nombre || '');
     }
   }, [operation]);
+
 
   const handleSaveName = async () => {
     try {
@@ -127,11 +217,15 @@ export default function OperationDetail() {
 
   useEffect(() => {
     fetchOperation();
+    fetchEmails();
   }, [id]);
 
   useEffect(() => {
-    if (operation && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing')) {
-      checkStock();
+    if (operation) {
+      fetchProductionOrders();
+      if (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') {
+        checkStock();
+      }
     }
   }, [operation]);
 
@@ -163,7 +257,7 @@ export default function OperationDetail() {
 
   const handleAction = async (action, confirmMessage) => {
     if (action === 'start_coordination') {
-      if (!stockVerification?.todo_suficiente) {
+      if (operation?.tipo_operacion === 'productos' && stockVerification && !stockVerification.todo_suficiente) {
         showToast('No se puede confirmar: Hay productos sin stock suficiente.', 'error');
         return;
       }
@@ -244,14 +338,79 @@ export default function OperationDetail() {
     }
   };
 
+  const previewExcelFile = async (url) => {
+    try {
+      const response = await axios.get(url, {
+        responseType: 'blob',
+      });
+      const data = await response.data.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const html = XLSX.utils.sheet_to_html(firstSheet, { editable: false });
+      setExcelPreviewHtml(html);
+      setShowExcelModal(true);
+    } catch (error) {
+      console.error("Error previsualizando Excel:", error);
+      showToast('Error al previsualizar el archivo Excel', 'error');
+    }
+  };
+
   const openPreview = (url) => {
     if (!url) return;
+    if (url.match(/\.xlsx?$/i)) {
+      previewExcelFile(url);
+      return;
+    }
     let type = 'pdf';
     if (url.match(/\.(jpe?g|png|gif|bmp|webp)$/i)) type = 'image';
     else if (url.match(/\.pdf$/i)) type = 'pdf';
-    else if (url.match(/\.xlsx?$/i)) type = 'excel';
     else type = 'unknown';
     setPreviewFile({ url, type });
+  };
+
+  const toggleSelectDoc = (docId) => {
+    setSelectedDocs(prev => 
+      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const toggleSelectEmailAtt = (attId) => {
+    setSelectedEmailAtts(prev => 
+      prev.includes(attId) ? prev.filter(id => id !== attId) : [...prev, attId]
+    );
+  };
+
+  const handleDownloadZip = async () => {
+    if (selectedDocs.length === 0 && selectedEmailAtts.length === 0) return;
+    setDownloadingZip(true);
+    try {
+      const response = await axios.post(`/operaciones/operations/${id}/descargar_zip/`, {
+        documento_ids: selectedDocs,
+        adjunto_ids: selectedEmailAtts
+      }, {
+        responseType: 'blob'
+      });
+      
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `operacion_${id}_archivos.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      showToast('Descarga ZIP completada exitosamente', 'success');
+      
+      setSelectedDocs([]);
+      setSelectedEmailAtts([]);
+    } catch (err) {
+      console.error("Error descargando ZIP:", err);
+      showToast('Error al descargar los archivos agrupados en ZIP', 'error');
+    } finally {
+      setSelectedDocs([]);
+      setSelectedEmailAtts([]);
+      setDownloadingZip(false);
+    }
   };
 
   const downloadPackingListExcel = async () => {
@@ -303,6 +462,151 @@ export default function OperationDetail() {
     }
   };
 
+  const handleOpenPackingModal = () => {
+    if (!operation) return;
+    
+    const productsMapped = (operation.products || []).map(p => ({
+      product: p.product,
+      name: p.product_name,
+      quantity: p.quantity,
+      presentation: p.presentation || '',
+      unit_weight: p.weight_kg || 0,
+      total_weight: (p.quantity || 0) * (p.weight_kg || 0),
+      unit_price: p.unit_price || 0,
+      subtotal: (p.quantity || 0) * (p.unit_price || 0)
+    }));
+
+    const totalWeight = productsMapped.reduce((sum, p) => sum + p.total_weight, 0);
+    const totalPrice = productsMapped.reduce((sum, p) => sum + p.subtotal, 0);
+
+    setPackingData({
+      operation_id: operation.id,
+      client: operation.client_name,
+      ship: operation.ship_name,
+      port: operation.port_name,
+      eta: operation.eta,
+      products: productsMapped,
+      total_weight: totalWeight,
+      total_price: totalPrice
+    });
+
+    setIsEditingPacking(false);
+    setShowPackingModal(true);
+  };
+
+  const handleStartEditPacking = () => {
+    setEditPackingProducts([...packingData.products]);
+    setIsEditingPacking(true);
+  };
+
+  const handleUpdateEditRow = (idx, field, val) => {
+    setEditPackingProducts(prev => {
+      const copy = [...prev];
+      const row = { ...copy[idx] };
+      
+      if (field === 'quantity') {
+        row.quantity = parseInt(val) || 0;
+        row.total_weight = row.quantity * row.unit_weight;
+        row.subtotal = row.quantity * row.unit_price;
+      } else if (field === 'unit_price') {
+        row.unit_price = parseFloat(val) || 0;
+        row.subtotal = row.quantity * row.unit_price;
+      }
+      
+      copy[idx] = row;
+      return copy;
+    });
+  };
+
+  const handleRemoveEditRow = (idx) => {
+    setEditPackingProducts(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddProductToPacking = (item) => {
+    if (!item) return;
+    if (editPackingProducts.some(p => String(p.product) === String(item.id))) {
+      showToast('El producto ya está en la lista', 'error');
+      return;
+    }
+    
+    const unitWeight = parseFloat(item.peso_kg || item.weight_kg) || 0;
+    const newProduct = {
+      product: item.id,
+      name: item.nombre || item.name,
+      quantity: 1,
+      presentation: item.presentacion || item.presentation || '',
+      unit_weight: unitWeight,
+      total_weight: unitWeight,
+      unit_price: 0,
+      subtotal: 0
+    };
+    
+    setEditPackingProducts(prev => [...prev, newProduct]);
+  };
+
+  const handleSavePacking = async () => {
+    if (editPackingProducts.length === 0) {
+      alert('Debe haber al menos un producto en el packing list.');
+      return;
+    }
+    for (const p of editPackingProducts) {
+      if (p.quantity <= 0) {
+        alert(`La cantidad para ${p.name} debe ser mayor a 0.`);
+        return;
+      }
+    }
+    
+    setActionLoading(true);
+    try {
+      const payload = {
+        products: editPackingProducts.map(p => ({
+          product: p.product,
+          quantity: p.quantity,
+          unit_price: p.unit_price
+        }))
+      };
+      
+      const res = await axios.patch(`/operaciones/operations/${id}/`, payload);
+      showToast('Packing list guardado y actualizado con éxito', 'success');
+      
+      setOperation(res.data);
+      
+      const productsMapped = (res.data.products || []).map(p => ({
+        product: p.product,
+        name: p.product_name,
+        quantity: p.quantity,
+        presentation: p.presentation || '',
+        unit_weight: p.weight_kg || 0,
+        total_weight: (p.quantity || 0) * (p.weight_kg || 0),
+        unit_price: p.unit_price || 0,
+        subtotal: (p.quantity || 0) * (p.unit_price || 0)
+      }));
+
+      const totalWeight = productsMapped.reduce((sum, p) => sum + p.total_weight, 0);
+      const totalPrice = productsMapped.reduce((sum, p) => sum + p.subtotal, 0);
+
+      setPackingData({
+        operation_id: res.data.id,
+        client: res.data.client_name,
+        ship: res.data.ship_name,
+        port: res.data.port_name,
+        eta: res.data.eta,
+        products: productsMapped,
+        total_weight: totalWeight,
+        total_price: totalPrice
+      });
+
+      setIsEditingPacking(false);
+      checkStock();
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || 'Error al guardar el packing list';
+      alert(errMsg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const refreshDocuments = () => {
     fetchOperation();
   };
@@ -318,7 +622,7 @@ export default function OperationDetail() {
       cancelada: 'bg-red-100 text-red-800',
     };
     const labels = {
-      solicitada: 'Delivery Note',
+      solicitada: 'Preparación',
       armado_packing: 'Suministros',
       en_aduana: 'Aduanas',
       lista_para_envio: 'Logística',
@@ -566,9 +870,9 @@ export default function OperationDetail() {
                                 </td>
                                 <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
                                 <td className="px-6 py-4 text-center">
-                                  {prod.stock_actual >= prod.quantity ? (
+                                  {isSuficiente ? (
                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
-                                      <i className="bi bi-check-circle-fill"></i> OK ({prod.stock_actual?.toFixed(0)})
+                                      <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase">
@@ -609,11 +913,85 @@ export default function OperationDetail() {
                 )}
               </div>
 
+              {(!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing' || productionOrders.length > 0)) && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex justify-between items-center">
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-gear-fill text-indigo-500"></i> Órdenes de Fabricación (BOM)
+                    </h3>
+                    {(operation.estado === 'solicitada' || operation.estado === 'armado_packing') && stockVerification && !stockVerification.todo_suficiente && (
+                      <button
+                        onClick={handleGenerateProductionOrders}
+                        disabled={generatingProduction}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                      >
+                        {generatingProduction ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                        ) : (
+                          <i className="bi bi-plus-circle-fill"></i>
+                        )}
+                        Generar Órdenes de Producción
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-4 sm:p-6 space-y-4">
+                    {productionOrders.length === 0 ? (
+                      <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
+                        No hay órdenes de fabricación generadas para esta operación.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                        {productionOrders.map((order) => (
+                          <div key={order.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-slate-800 dark:text-white truncate">
+                                {order.articulo_final_nombre}
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                Fórmula: {order.formula_nombre} • Cantidad: <span className="font-bold text-slate-700 dark:text-slate-300">{parseFloat(order.cantidad_a_producir).toFixed(2)}</span>
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                Solicitado: {new Date(order.fecha_solicitud).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              {order.completada ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
+                                  <i className="bi bi-check-circle-fill"></i> Completada
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-amber-50 text-amber-600 border border-amber-200 uppercase">
+                                    <i className="bi bi-hourglass-split"></i> Pendiente
+                                  </span>
+                                  <button
+                                    onClick={() => handleCompleteProductionOrder(order.id)}
+                                    disabled={completingProduction[order.id]}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 animate-pulse"
+                                  >
+                                    {completingProduction[order.id] ? (
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    ) : (
+                                      <i className="bi bi-play-fill text-sm"></i>
+                                    )}
+                                    Completar Producción
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {operation.texto_pedido && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
                   <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
                     <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-chat-left-text-fill text-indigo-500"></i> Delivery Note Original
+                      <i className="bi bi-chat-left-text-fill text-indigo-500"></i> Pedido Original (Preparación)
                     </h3>
                   </div>
                   <div className="p-4 sm:p-6 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
@@ -689,6 +1067,12 @@ export default function OperationDetail() {
                     </div>
                     <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
                       <button
+                        onClick={handleOpenPackingModal}
+                        className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <i className="bi bi-pencil-square"></i> Ver/Editar (HTML)
+                      </button>
+                      <button
                         onClick={previewPackingListExcel}
                         className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                       >
@@ -752,10 +1136,87 @@ export default function OperationDetail() {
                 operacionId={operation.id}
                 documentos={documentos}
                 onDocumentChange={refreshDocuments}
+                openPreview={openPreview}
+                selectedDocs={selectedDocs}
+                toggleSelectDoc={toggleSelectDoc}
               />
 
+              {/* ADJUNTOS DE LA CADENA DE CORREOS */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <i className="bi bi-paperclip text-indigo-500"></i> Adjuntos de la Cadena de Correos
+                  </h3>
+                  <span className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-1 rounded-full font-bold">
+                    {emailAttachments.length} {emailAttachments.length === 1 ? 'archivo' : 'archivos'}
+                  </span>
+                </div>
+                {emailAttachments.length === 0 ? (
+                  <p className="text-gray-500 dark:text-slate-400 text-sm">No hay archivos adjuntos en la cadena de correos de esta operación.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {emailAttachments.map((adj) => {
+                      const isImage = adj.content_type?.startsWith('image/') || adj.filename?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
+                      const isPdf = adj.content_type === 'application/pdf' || adj.filename?.match(/\.pdf$/i);
+                      const isExcel = adj.content_type?.includes('spreadsheet') || adj.content_type?.includes('excel') || adj.filename?.match(/\.xlsx?$/i);
+                      
+                      let iconClass = "bi-file-earmark-fill text-slate-400";
+                      if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
+                      else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
+                      else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
+                      
+                      return (
+                        <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedEmailAtts.includes(adj.id)}
+                              onChange={() => toggleSelectEmailAtt(adj.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0 mt-2.5"
+                            />
+                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
+                              <i className={`bi ${iconClass} text-xl`}></i>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate animate-pulse" title={adj.filename}>
+                                {adj.filename}
+                              </h4>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                                <span className="font-bold text-slate-600 dark:text-slate-300">De:</span> {adj.emailSender} <br />
+                                <span className="font-bold text-slate-600 dark:text-slate-300">Asunto:</span> "{adj.emailSubject}"
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                {new Date(adj.emailDate).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
+                            <button
+                              onClick={() => openPreview(adj.file)}
+                              className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver
+                            </button>
+                            <a
+                              href={adj.file}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
+                            >
+                              <i className="bi bi-download"></i> Descargar
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-8 mb-8">
-                <OperationEmails operacionId={id} />
+                <OperationEmails operacionId={id} openPreview={openPreview} />
               </div>
 
               <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -767,7 +1228,7 @@ export default function OperationDetail() {
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto sm:justify-end">
                   {isOwner && operation.status !== 'closed' && operation.estado !== 'entregada' && operation.status !== 'cancelled' && operation.estado !== 'cancelada' && (
                     <button
-                      onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock retenido (si lo hay) no regresará automáticamente en esta versión beta.')}
+                      onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock consumido se devolverá automáticamente al inventario.')}
                       disabled={actionLoading}
                       className="w-full sm:w-auto px-4 py-2 border-2 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
@@ -812,7 +1273,7 @@ export default function OperationDetail() {
 
                   {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
                     <button
-                      onClick={() => handleAction('confirm_operation', '¿Declarar Delivery Note ingresado y pasar al estado de Armado de Packing List?')}
+                      onClick={() => handleAction('confirm_operation', '¿Confirmar etapa de Preparación y pasar al estado de Suministros (Armado de Packing List)?')}
                       disabled={actionLoading}
                       className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                     >
@@ -865,27 +1326,41 @@ export default function OperationDetail() {
         </div>
       </div>
 
-      {/* Modal de Packing List (vista previa HTML) */}
+      {/* Modal de Packing List (vista previa HTML y Edición) */}
       {showPackingModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="text-lg leading-6 font-black text-slate-800 flex items-center gap-2">
-                <i className="bi bi-file-earmark-text-fill text-indigo-500"></i> Packing List - #{packingData.operation_id}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <h3 className="text-lg leading-6 font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-file-earmark-text-fill text-indigo-500"></i> Packing List - #{packingData.operation_id} {isEditingPacking && '(Modo Edición)'}
               </h3>
-              <button onClick={() => setShowPackingModal(false)} className="text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm"><i className="bi bi-x-lg"></i></button>
+              <button onClick={() => { setShowPackingModal(false); setIsEditingPacking(false); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
+                <i className="bi bi-x-lg"></i>
+              </button>
             </div>
-            <div className="p-4 sm:p-6 overflow-y-auto w-full custom-scrollbar bg-white">
-              <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.client}</p></div>
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Buque</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.ship}</p></div>
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Puerto</p><p className="text-sm font-semibold text-slate-800 truncate">{packingData.port}</p></div>
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ETA</p><p className="text-sm font-semibold text-indigo-600">{new Date(packingData.eta).toLocaleString()}</p></div>
+            <div className="p-4 sm:p-6 overflow-y-auto w-full custom-scrollbar bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+              <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Cliente</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{packingData.client}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Buque</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{packingData.ship}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Puerto</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{packingData.port}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">ETA</p>
+                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{new Date(packingData.eta).toLocaleString()}</p>
+                </div>
               </div>
-              <div className="overflow-hidden border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr className="uppercase tracking-wider text-[10px] font-black text-slate-500">
+              <div className="overflow-hidden border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                  <thead className="bg-slate-50 dark:bg-slate-900/50">
+                    <tr className="uppercase tracking-wider text-[10px] font-black text-slate-500 dark:text-slate-400">
                       <th className="px-4 py-3 text-left">Producto</th>
                       <th className="px-4 py-3 text-center">Cant.</th>
                       <th className="px-4 py-3 text-left">Pres.</th>
@@ -893,37 +1368,120 @@ export default function OperationDetail() {
                       <th className="px-4 py-3 text-right">Peso Total</th>
                       <th className="px-4 py-3 text-right">Precio Unit.</th>
                       <th className="px-4 py-3 text-right">Total</th>
+                      {isEditingPacking && <th className="px-4 py-3 text-center">Acción</th>}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-slate-100">
-                    {packingData.products.map((prod, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 text-sm font-bold text-slate-800 whitespace-nowrap">{prod.name}</td>
-                        <td className="px-4 py-3 text-sm text-center font-bold text-slate-600">{prod.quantity}</td>
-                        <td className="px-4 py-3 text-xs font-medium text-slate-500 whitespace-nowrap">{prod.presentation}</td>
-                        <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{prod.unit_weight} kg</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-slate-800 whitespace-nowrap">{prod.total_weight} kg</td>
-                        <td className="px-4 py-3 text-sm text-right text-slate-500 whitespace-nowrap">${prod.unit_price}</td>
-                        <td className="px-4 py-3 text-sm text-right font-black text-indigo-700 whitespace-nowrap">${prod.subtotal}</td>
+                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+                    {(isEditingPacking ? editPackingProducts : packingData.products).map((prod, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <td className="px-4 py-3 text-sm font-bold text-slate-800 dark:text-white whitespace-nowrap">{prod.name}</td>
+                        <td className="px-4 py-3 text-sm text-center font-bold text-slate-600 dark:text-slate-300">
+                          {isEditingPacking ? (
+                            <input
+                              type="number"
+                              min="1"
+                              value={prod.quantity}
+                              onChange={(e) => handleUpdateEditRow(idx, 'quantity', e.target.value)}
+                              className="w-20 text-center border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-800 dark:text-white px-1 py-0.5"
+                            />
+                          ) : (
+                            prod.quantity
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">{prod.presentation}</td>
+                        <td className="px-4 py-3 text-sm text-right text-slate-600 dark:text-slate-300 whitespace-nowrap">{prod.unit_weight} kg</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-slate-800 dark:text-white whitespace-nowrap">{prod.total_weight?.toFixed(2) || '0.00'} kg</td>
+                        <td className="px-4 py-3 text-sm text-right text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                          {isEditingPacking ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={prod.unit_price}
+                              onChange={(e) => handleUpdateEditRow(idx, 'unit_price', e.target.value)}
+                              className="w-28 text-right border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-800 dark:text-white px-1 py-0.5"
+                            />
+                          ) : (
+                            `$${prod.unit_price}`
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-black text-indigo-700 dark:text-indigo-400 whitespace-nowrap">${prod.subtotal?.toFixed(2) || '0.00'}</td>
+                        {isEditingPacking && (
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditRow(idx)}
+                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                              title="Eliminar fila"
+                            >
+                              <i className="bi bi-trash-fill"></i>
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
-                    <tr className="bg-indigo-50/50">
-                      <td colSpan="4" className="px-4 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Totales de Carga</td>
-                      <td className="px-4 py-4 text-right text-sm font-black text-indigo-800 whitespace-nowrap">{packingData.total_weight} kg</td>
+                    {isEditingPacking && (
+                      <tr>
+                        <td colSpan="8" className="px-4 py-4 bg-slate-50/50 dark:bg-slate-900/20">
+                          <div className="max-w-md">
+                            <AutocompleteCreate
+                              label="Agregar Producto al Packing List"
+                              endpoint="/inventario/products/?categoria=otros,insumos"
+                              value=""
+                              onSelect={handleAddProductToPacking}
+                              createFields={[
+                                { name: 'presentacion', label: 'Presentación', required: true },
+                                { name: 'peso_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
+                              ]}
+                              extraCreateData={{ categoria: 'otros' }}
+                              nameField="nombre"
+                              placeholder="Buscar producto para agregar..."
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    <tr className="bg-indigo-50/50 dark:bg-indigo-950/40">
+                      <td colSpan="4" className="px-4 py-4 text-right text-xs font-black text-indigo-400 dark:text-indigo-300 uppercase tracking-widest">Totales de Carga</td>
+                      <td className="px-4 py-4 text-right text-sm font-black text-indigo-800 dark:text-indigo-200 whitespace-nowrap">
+                        {(isEditingPacking ? editTotalWeight : packingData.total_weight)?.toFixed(2)} kg
+                      </td>
                       <td></td>
-                      <td className="px-4 py-4 text-right text-lg font-black text-indigo-700 whitespace-nowrap">${packingData.total_price.toFixed(2)}</td>
+                      <td className="px-4 py-4 text-right text-lg font-black text-indigo-700 dark:text-indigo-400 whitespace-nowrap">
+                        ${(isEditingPacking ? editTotalPrice : packingData.total_price)?.toFixed(2)}
+                      </td>
+                      {isEditingPacking && <td></td>}
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
-            <div className="bg-slate-50 px-4 py-4 border-t border-slate-200 sm:px-6 sm:flex sm:flex-row-reverse shrink-0 gap-2">
-              <button type="button" className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors shadow-sm flex justify-center items-center gap-2" onClick={() => window.print()}>
-                <i className="bi bi-printer-fill"></i> Imprimir Documento
-              </button>
-              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white text-slate-700 font-bold text-sm border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPackingModal(false)}>
-                Cerrar
-              </button>
+            <div className="bg-slate-50 dark:bg-slate-900/50 px-4 py-4 border-t border-slate-200 dark:border-slate-700 sm:px-6 sm:flex sm:flex-row-reverse shrink-0 gap-2">
+              {isEditingPacking ? (
+                <>
+                  <button type="button" className="w-full sm:w-auto px-6 py-2 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 transition-colors shadow-sm flex justify-center items-center gap-2" onClick={handleSavePacking} disabled={actionLoading}>
+                    {actionLoading ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> : <i className="bi bi-check-circle-fill"></i>}
+                    Guardar Cambios
+                  </button>
+                  <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm" onClick={() => setIsEditingPacking(false)}>
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors shadow-sm flex justify-center items-center gap-2" onClick={() => window.print()}>
+                    <i className="bi bi-printer-fill"></i> Imprimir Documento
+                  </button>
+                  {!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                    <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl transition-colors shadow-sm flex justify-center items-center gap-2" onClick={handleStartEditPacking}>
+                      <i className="bi bi-pencil-fill"></i> Editar Packing List
+                    </button>
+                  )}
+                  <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPackingModal(false)}>
+                    Cerrar
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -931,19 +1489,21 @@ export default function OperationDetail() {
 
       {/* Modal para vista previa de Excel */}
       {showExcelModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i>
                 Vista previa del Packing List (Excel)
               </h3>
-              <button onClick={() => setShowExcelModal(false)} className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"><i className="bi bi-x-lg"></i></button>
+              <button onClick={() => setShowExcelModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
+                <i className="bi bi-x-lg"></i>
+              </button>
             </div>
-            <div className="flex-1 overflow-auto bg-white p-4">
-              <div dangerouslySetInnerHTML={{ __html: excelPreviewHtml }} className="excel-preview" />
+            <div className="flex-1 overflow-auto bg-white dark:bg-slate-900 p-4">
+              <div dangerouslySetInnerHTML={{ __html: excelPreviewHtml }} className="excel-preview text-slate-800 dark:text-slate-100" />
             </div>
-            <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
+            <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
               <button onClick={() => setShowExcelModal(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>
           </div>
@@ -952,16 +1512,18 @@ export default function OperationDetail() {
 
       {/* Modal para vista previa de PDF / Imagen / Otros */}
       {previewFile && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <i className="bi bi-file-earmark-text-fill text-indigo-500"></i>
                 Vista previa del documento
               </h3>
-              <button onClick={() => setPreviewFile(null)} className="text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 border border-slate-200 shadow-sm"><i className="bi bi-x-lg"></i></button>
+              <button onClick={() => setPreviewFile(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
+                <i className="bi bi-x-lg"></i>
+              </button>
             </div>
-            <div className="flex-1 overflow-auto bg-slate-100 p-2 flex justify-center items-center">
+            <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900 p-2 flex justify-center items-center">
               {previewFile.type === 'pdf' && (
                 <iframe src={previewFile.url} className="w-full h-full min-h-[80vh] border-0 rounded-lg" title="Vista previa PDF" />
               )}
@@ -969,38 +1531,128 @@ export default function OperationDetail() {
                 <img src={previewFile.url} alt="Vista previa" className="max-w-full max-h-[85vh] object-contain shadow-lg rounded-lg" />
               )}
               {previewFile.type === 'excel' && (
-                <div className="text-center p-8 bg-white rounded-xl shadow-md">
+                <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-spreadsheet text-5xl text-emerald-500 mb-3 block"></i>
-                  <p className="text-slate-600">Para ver el contenido del Excel, usa el botón "Vista Previa" específico.</p>
-                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">Descargar archivo</a>
+                  <p className="text-slate-600 dark:text-slate-300">Para ver el contenido del Excel, usa el botón "Vista Previa" específico.</p>
+                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">
+                    <i className="bi bi-download me-1"></i> Descargar archivo
+                  </a>
                 </div>
               )}
               {previewFile.type === 'unknown' && (
-                <div className="text-center p-8 bg-white rounded-xl shadow-md">
+                <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-excel text-5xl text-amber-500 mb-3 block"></i>
-                  <p className="text-slate-600">No se puede previsualizar este tipo de archivo.</p>
-                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">Descargar archivo</a>
+                  <p className="text-slate-600 dark:text-slate-300">No se puede previsualizar este tipo de archivo.</p>
+                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">
+                    <i className="bi bi-download me-1"></i> Descargar archivo
+                  </a>
                 </div>
               )}
             </div>
-            <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0">
-              <a href={previewFile.url} download className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-100 font-medium text-sm"><i className="bi bi-download me-1"></i> Descargar</a>
+            <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
+              <a href={previewFile.url} download className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
+                <i className="bi bi-download me-1"></i> Descargar
+              </a>
               <button onClick={() => setPreviewFile(null)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Barra flotante para descarga en ZIP (Glassmorphism premium) */}
+      {(selectedDocs.length > 0 || selectedEmailAtts.length > 0) && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-2xl border border-slate-200/80 dark:border-slate-700 px-6 py-4 rounded-2xl flex items-center justify-between gap-6 w-full max-w-2xl animate-slideUpZip">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl text-indigo-600 dark:text-indigo-400">
+              <i className="bi bi-file-zip text-2xl"></i>
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-slate-800 dark:text-white">Selección Múltiple</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                {selectedDocs.length + selectedEmailAtts.length} archivos seleccionados
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setSelectedDocs([]);
+                setSelectedEmailAtts([]);
+              }}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDownloadZip}
+              disabled={downloadingZip}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2"
+            >
+              {downloadingZip ? (
+                <>
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                  Descargando...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-cloud-arrow-down-fill"></i>
+                  Descargar (.zip)
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{
         __html: `
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes slideUpZip {
+          from { opacity: 0; transform: translate(-50%, 20px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .animate-slideUpZip { animation: slideUpZip 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
         .excel-preview table { border-collapse: collapse; width: 100%; }
         .excel-preview th, .excel-preview td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         .excel-preview th { background-color: #f2f2f2; font-weight: bold; }
+        
+        /* Dark Mode overrides for Excel previews */
+        .dark .excel-preview th {
+          background: #1e293b !important;
+          background-color: #1e293b !important;
+          color: #f1f5f9 !important;
+          border-color: #334155 !important;
+        }
+        .dark .excel-preview td {
+          background: #0f172a !important;
+          background-color: #0f172a !important;
+          color: #e2e8f0 !important;
+          border-color: #334155 !important;
+        }
+        .dark .excel-preview tr {
+          background: #0f172a !important;
+          background-color: #0f172a !important;
+          color: #e2e8f0 !important;
+        }
+        .dark .excel-preview table {
+          background: #0f172a !important;
+          background-color: #0f172a !important;
+          color: #e2e8f0 !important;
+          border-color: #334155 !important;
+        }
+        /* Override specifically generated inner cell elements */
+        .dark .excel-preview td * {
+          background: transparent !important;
+          background-color: transparent !important;
+          color: #e2e8f0 !important;
+        }
+        .dark .excel-preview th * {
+          background: transparent !important;
+          background-color: transparent !important;
+          color: #f1f5f9 !important;
+        }
         `,
       }} />
     </div>

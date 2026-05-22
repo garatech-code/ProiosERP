@@ -114,11 +114,13 @@ class OperacionViewSet(viewsets.ModelViewSet):
     def cancel_operation(self, request, pk=None):
         op = self.get_object()
         try:
-            op.cancel()
-            op.save()
+            with transaction.atomic():
+                op.cancel()
+                op.save()
             return Response({'status': 'cancelled'})
         except Exception as e:
             return Response({'error': str(e)}, status=400)
+
 
     @action(detail=True, methods=['post'])
     def confirm_operation(self, request, pk=None):
@@ -278,6 +280,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
             from apps.inventario.models import Articulo
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
+                suficiente = True if not articulo.controlar_stock else (articulo.stock_actual >= detalle.cantidad)
                 detalles_data.append({
                     'id': detalle.id,
                     'articulo_id': detalle.articulo_id,
@@ -285,7 +288,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     'presentacion': articulo.presentacion,
                     'cantidad_necesaria': detalle.cantidad,
                     'stock_actual': float(articulo.stock_actual),
-                    'suficiente': articulo.stock_actual >= detalle.cantidad,
+                    'suficiente': suficiente,
+                    'controlar_stock': articulo.controlar_stock,
                     'error': None
                 })
             except Articulo.DoesNotExist:
@@ -297,6 +301,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     'cantidad_necesaria': detalle.cantidad,
                     'stock_actual': 0,
                     'suficiente': False,
+                    'controlar_stock': True,
                     'error': "Producto no existe en inventario"
                 })
 
@@ -554,6 +559,105 @@ class OperacionViewSet(viewsets.ModelViewSet):
             return Response({'status': 'deleted'})
         except DocumentoAdjunto.DoesNotExist:
             return Response({'error': 'Documento no encontrado'}, status=404)
+
+    @action(detail=True, methods=['post'], url_path='descargar_zip')
+    def descargar_zip(self, request, pk=None):
+        """Descargar múltiples archivos de la operación agrupados en un archivo ZIP"""
+        operacion = self.get_object()
+        documento_ids = request.data.get('documento_ids', [])
+        adjunto_ids = request.data.get('adjunto_ids', [])
+
+        import zipfile
+        import io
+        from apps.correos.models import EmailAttachment
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Documentos adicionales
+            if documento_ids:
+                docs = operacion.documentos_adjuntos.filter(id__in=documento_ids)
+                for doc in docs:
+                    if doc.archivo:
+                        filename = doc.archivo.name.split('/')[-1]
+                        try:
+                            doc.archivo.open('rb')
+                            zip_file.writestr(f"documentos/{filename}", doc.archivo.read())
+                            doc.archivo.close()
+                        except Exception as e:
+                            logger.error(f"Error agregando documento {doc.id} al zip: {e}")
+
+            # Adjuntos de la cadena de correos
+            if adjunto_ids:
+                adjuntos = EmailAttachment.objects.filter(id__in=adjunto_ids, email__operacion=operacion)
+                for adj in adjuntos:
+                    if adj.file:
+                        filename = adj.filename or adj.file.name.split('/')[-1]
+                        try:
+                            adj.file.open('rb')
+                            zip_file.writestr(f"adjuntos_correos/{filename}", adj.file.read())
+                            adj.file.close()
+                        except Exception as e:
+                            logger.error(f"Error agregando adjunto {adj.id} al zip: {e}")
+
+        zip_buffer.seek(0)
+        response = HttpResponse(zip_buffer.getvalue(), content_type='application/x-zip-compressed')
+        response['Content-Disposition'] = f'attachment; filename="operacion_{operacion.id}_archivos.zip"'
+        return response
+
+    @action(detail=True, methods=['post'], url_path='generar_ordenes_produccion')
+    def generar_ordenes_produccion(self, request, pk=None):
+        if request.user.role == User.Role.OPERARIO:
+            return Response({'error': 'No autorizado para generar órdenes de producción'}, status=status.HTTP_403_FORBIDDEN)
+            
+        op = self.get_object()
+        from apps.produccion.models import FormulaBOM, OrdenFabricacion
+        from apps.inventario.models import Articulo
+        
+        ordenes_creadas = []
+        with transaction.atomic():
+            for detalle in op.detalles.all():
+                try:
+                    articulo = Articulo.objects.select_for_update().get(id=detalle.articulo_id)
+                except Articulo.DoesNotExist:
+                    continue
+                
+                # Check active FormulaBOM for this article
+                formula = FormulaBOM.objects.filter(articulo_final_id=articulo.id, activa=True).first()
+                if not formula:
+                    continue
+                
+                # Stock insufficient
+                shortage = detalle.cantidad - articulo.stock_actual
+                if shortage > 0:
+                    # Check if there is already an uncompleted production order for this formula and operation
+                    if not OrdenFabricacion.objects.filter(operacion_id=op.id, formula=formula, completada=False).exists():
+                        orden = OrdenFabricacion.objects.create(
+                            operacion_id=op.id,
+                            formula=formula,
+                            cantidad_a_producir=shortage,
+                            completada=False
+                        )
+                        ordenes_creadas.append(orden)
+        
+        from apps.produccion.api.serializers import OrdenFabricacionSerializer
+        return Response({
+            'status': 'success',
+            'created_count': len(ordenes_creadas),
+            'ordenes': OrdenFabricacionSerializer(ordenes_creadas, many=True).data
+        })
+
+    @action(detail=True, methods=['get'], url_path='ordenes_produccion')
+    def ordenes_produccion(self, request, pk=None):
+        if request.user.role == User.Role.OPERARIO:
+            return Response({'error': 'No autorizado para ver órdenes de producción'}, status=status.HTTP_403_FORBIDDEN)
+            
+        op = self.get_object()
+        from apps.produccion.models import OrdenFabricacion
+        from apps.produccion.api.serializers import OrdenFabricacionSerializer
+        
+        ordenes = OrdenFabricacion.objects.filter(operacion_id=op.id)
+        return Response(OrdenFabricacionSerializer(ordenes, many=True).data)
+
 
 
 class AgendaEventViewSet(viewsets.ModelViewSet):

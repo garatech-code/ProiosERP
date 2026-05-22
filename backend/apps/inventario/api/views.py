@@ -133,7 +133,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         queryset = Articulo.objects.all()
         categoria = self.request.query_params.get('categoria')
         if categoria:
-            queryset = queryset.filter(categoria=categoria)
+            categorias = [c.strip() for c in categoria.split(',') if c.strip()]
+            queryset = queryset.filter(categoria__in=categorias)
         # ✅ Agregar filtro por búsqueda
         search = self.request.query_params.get('search')
         if search:

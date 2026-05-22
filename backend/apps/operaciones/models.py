@@ -59,7 +59,7 @@ class Operacion(models.Model):
     ESTADO_CANCELADA = 'cancelada'
 
     ESTADOS_CHOICES = (
-        (ESTADO_SOLICITADA, 'Generada / Pendiente Packing'),
+        (ESTADO_SOLICITADA, 'Preparación'),
         (ESTADO_ARMADO_PACKING, 'En Gestión (Armado del Packing List)'),
         (ESTADO_EN_ADUANA, 'En Aduana (Esperando Rancho)'),
         (ESTADO_LISTA_PARA_ENVIO, 'Logística (Despacho y Remito)'),
@@ -176,7 +176,32 @@ class Operacion(models.Model):
 
     @transition(field=estado, source='*', target=ESTADO_CANCELADA)
     def cancel(self):
-        pass
+        self.restituir_stock()
+
+    def restituir_stock(self):
+        from apps.inventario.models import Articulo, MovimientoStock
+        if not self.stock_consumido:
+            return
+        for detalle in self.detalles.all():
+            try:
+                articulo = Articulo.objects.select_for_update().get(id=detalle.articulo_id)
+                if not articulo.controlar_stock:
+                    continue
+                MovimientoStock.objects.create(
+                    articulo=articulo,
+                    tipo='INGRESO',
+                    cantidad=detalle.cantidad,
+                    stock_resultante=articulo.stock_actual + detalle.cantidad,
+                    operacion_id=self.id,
+                    razon=f"Devolución de stock por cancelación de operación {self.id}"
+                )
+                articulo.stock_actual += detalle.cantidad
+                articulo.save()
+            except Articulo.DoesNotExist:
+                pass
+        self.stock_consumido = False
+        self.save(update_fields=['stock_consumido'])
+
 
     def verificar_stock(self):
         from apps.inventario.models import Articulo
@@ -184,6 +209,8 @@ class Operacion(models.Model):
         for detalle in self.detalles.all():
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
+                if not articulo.controlar_stock:
+                    continue
                 if articulo.stock_actual < detalle.cantidad:
                     errores.append({
                         'articulo_id': detalle.articulo_id,
@@ -206,17 +233,22 @@ class Operacion(models.Model):
         if not ok:
             raise ValueError(f"Stock insuficiente: {errores}")
         for detalle in self.detalles.all():
-            articulo = Articulo.objects.select_for_update().get(id=detalle.articulo_id)
-            MovimientoStock.objects.create(
-                articulo=articulo,
-                tipo='SALIDA',
-                cantidad=detalle.cantidad,
-                stock_resultante=articulo.stock_actual - detalle.cantidad,
-                operacion_id=self.id,
-                razon=f"Consumo por operación {self.id} - {self.cliente.name}"
-            )
-            articulo.stock_actual -= detalle.cantidad
-            articulo.save()
+            try:
+                articulo = Articulo.objects.select_for_update().get(id=detalle.articulo_id)
+                if not articulo.controlar_stock:
+                    continue
+                MovimientoStock.objects.create(
+                    articulo=articulo,
+                    tipo='SALIDA',
+                    cantidad=detalle.cantidad,
+                    stock_resultante=articulo.stock_actual - detalle.cantidad,
+                    operacion_id=self.id,
+                    razon=f"Consumo por operación {self.id} - {self.cliente.name}"
+                )
+                articulo.stock_actual -= detalle.cantidad
+                articulo.save()
+            except Articulo.DoesNotExist:
+                pass
         self.stock_consumido = True
         self.save(update_fields=['stock_consumido'])
 
@@ -252,7 +284,7 @@ class DocumentoAdjunto(models.Model):
     TIPO_OTROS = 'otros'
 
     TIPO_CHOICES = (
-        (TIPO_DELIVERY_NOTE, 'Delivery Note'),
+        (TIPO_DELIVERY_NOTE, 'Preparación'),
         (TIPO_FACTURA_PROVEEDOR, 'Factura a proveedor'),
         (TIPO_HABILITACION_ADUANERA, 'Habilitación aduanera'),
         (TIPO_OTROS, 'Otros'),
