@@ -344,3 +344,141 @@ def get_or_create_port_from_name(port_name):
         port.save(update_fields=['country'])
     
     return port
+
+
+def generar_y_guardar_packing_list(op, proveedor="PROIOS SA", pais_destino="argentina"):
+    """
+    Genera el archivo Excel de Packing List para una operación y lo guarda en su campo packing_list_file.
+    """
+    from apps.inventario.models import Articulo
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.core.files.base import ContentFile
+    import io
+
+    if pais_destino == 'argentina':
+        pais_destino_texto = 'Argentina'
+    else:
+        pais_destino_texto = op.ship.flag if op.ship and op.ship.flag else 'Extranjero'
+
+    if proveedor == 'PROIOS SA':
+        proveedor_texto = 'PROIOS SA'
+        cuit_texto = '30-63661723-3'
+    elif proveedor == 'PROIOS SALVAGE SA':
+        proveedor_texto = 'PROIOS SALVAGE SA'
+        cuit_texto = '33-71087653-9'
+    else:
+        proveedor_texto = proveedor or ''
+        cuit_texto = ''
+
+    productos = []
+    total_price = 0.0
+    total_weight_neto = 0.0
+    total_weight_bruto = 0.0
+    total_qty = 0
+
+    for detalle in op.detalles.all():
+        try:
+            articulo = Articulo.objects.get(id=detalle.articulo_id)
+            cantidad = detalle.cantidad
+            precio = float(detalle.precio_unitario) if detalle.precio_unitario else 0.0
+            subtotal = cantidad * precio
+            total_price += subtotal
+            total_qty += cantidad
+            peso_neto = float(articulo.peso_kg) if articulo.peso_kg is not None else 0.0
+            peso_bruto = peso_neto * 1.1
+            total_weight_neto += cantidad * peso_neto
+            total_weight_bruto += cantidad * peso_bruto
+            productos.append({
+                'descripcion': articulo.nombre,
+                'qty': cantidad,
+                'peso_neto': peso_neto,
+                'peso_bruto': peso_bruto,
+                'un_vta': articulo.presentacion or 'Kg',
+                'fob_unitario': precio,
+                'fob_total': subtotal,
+            })
+        except Articulo.DoesNotExist:
+            continue
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "PACKING LIST"
+
+    header_font = Font(bold=True, name='Arial')
+    center_align = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    green_fill = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+    orange_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+    gray_header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+
+    encabezados = [
+        ("PROVEEDOR:", proveedor_texto),
+        ("CUIT:", cuit_texto),
+        ("PAÍS DE DESTINO DE LA FACTURA:", pais_destino_texto),
+        ("BANDERA:", op.ship.flag if op.ship else ""),
+        ("EMPRESA A FACTURAR:", op.cliente.name if op.cliente else ""),
+        ("BUQUE:", op.ship.name if op.ship else "")
+    ]
+    row = 1
+    for label, value in encabezados:
+        ws.cell(row=row, column=1, value=label).font = header_font
+        ws.cell(row=row, column=2, value=value)
+        row += 1
+
+    row += 1
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+    items_cell = ws.cell(row=row, column=1, value="ITEMS")
+    items_cell.font = Font(bold=True, size=12)
+    items_cell.alignment = center_align
+    items_cell.fill = green_fill
+
+    headers = ["DESCRIPCION", "QTY", "PESO NETO", "PESO BRUTO", "UN. VTA", "FOB UNITARIO", "FOB TOTAL"]
+    row += 1
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.alignment = center_align
+        cell.fill = gray_header_fill
+
+    for prod in productos:
+        row += 1
+        ws.cell(row=row, column=1, value=prod['descripcion'])
+        ws.cell(row=row, column=2, value=prod['qty'])
+        ws.cell(row=row, column=3, value=round(prod['peso_neto'], 2))
+        ws.cell(row=row, column=4, value=round(prod['peso_bruto'], 2))
+        ws.cell(row=row, column=5, value=prod['un_vta'])
+        ws.cell(row=row, column=6, value=round(prod['fob_unitario'], 2))
+        ws.cell(row=row, column=7, value=round(prod['fob_total'], 2))
+
+    row += 1
+    ws.cell(row=row, column=1, value="TOTALES").font = Font(bold=True)
+    ws.cell(row=row, column=2, value=total_qty)
+    ws.cell(row=row, column=3, value=round(total_weight_neto, 2))
+    ws.cell(row=row, column=4, value=round(total_weight_bruto, 2))
+    ws.cell(row=row, column=5, value="")
+    ws.cell(row=row, column=6, value=f"USD {round(total_price, 2)}")
+    ws.cell(row=row, column=7, value=f"USD {round(total_price, 2)}")
+
+    for col in range(1, 8):
+        ws.cell(row=row, column=col).fill = orange_fill
+        ws.cell(row=row, column=col).alignment = center_align
+
+    for r in range(1, row+1):
+        for c in range(1, 8):
+            ws.cell(row=r, column=c).border = thin_border
+
+    column_widths = [40, 8, 12, 12, 10, 15, 15]
+    for i, width in enumerate(column_widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    filename = f"packing_list_{op.id}.xlsx"
+    op.packing_list_file.save(filename, ContentFile(output.getvalue()), save=True)

@@ -86,6 +86,7 @@ class OperacionSerializer(serializers.ModelSerializer):
     ship_flag = serializers.CharField(source='ship.flag', read_only=True)
     port_name = serializers.CharField(source='port.name', read_only=True)
     agency_name = serializers.CharField(source='agency.name', read_only=True)
+    agency_email = serializers.CharField(source='agency.email', read_only=True)
 
     # Nombres de operarios
     operarios_nombres = serializers.SerializerMethodField()
@@ -130,7 +131,7 @@ class OperacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Operacion
         fields = [
-            'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'eta',
+            'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'agency_email', 'eta',
             'delivery_method', 'status', 'estado', 'products', 'detalles', 'documentos_adjuntos',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',

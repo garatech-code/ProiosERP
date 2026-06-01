@@ -2,14 +2,25 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import EmailTemplateManager from './EmailTemplateManager';
 
-export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, defaultOperacionId, defaultRecipient }) {
+export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, defaultOperacionId, defaultRecipient, initialSubject, initialBody, initialAttachments }) {
   const [formData, setFormData] = useState({
     recipient: defaultRecipient || '',
-    subject: '',
-    body: '',
-    operacion_id: '',
+    subject: initialSubject || '',
+    body: initialBody || '',
+    operacion_id: defaultOperacionId || '',
     useTemplate: true, // Checkbox to use institutional template
   });
+
+  const [attachments, setAttachments] = useState(initialAttachments || []);
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    setAttachments(prev => [...prev, ...files]);
+  };
+
+  const handleRemoveAttachment = (idx) => {
+    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  };
   
   const [operations, setOperations] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,11 +117,19 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     const plainText = formData.body + `\n\n--\n${user?.first_name} ${user?.last_name || user?.username}\n${user?.role || ''}\nProIOS`;
 
     try {
-      await axios.post('/correos/inbox/send_email/', {
-        recipient: formData.recipient,
-        subject: formData.subject,
-        body: buildHtmlBody(), // We'll pass HTML down.
-        operacion_id: formData.operacion_id || null,
+      const formDataToSend = new FormData();
+      formDataToSend.append('recipient', formData.recipient);
+      formDataToSend.append('subject', formData.subject);
+      formDataToSend.append('body', buildHtmlBody());
+      if (formData.operacion_id) {
+        formDataToSend.append('operacion_id', formData.operacion_id);
+      }
+      attachments.forEach((file) => {
+        formDataToSend.append('attachments', file);
+      });
+
+      await axios.post('/correos/inbox/send_email/', formDataToSend, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       onSuccess();
     } catch (err) {
@@ -206,6 +225,33 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
             <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
               * La firma se añadirá automáticamente al final del mensaje con tus datos: <b>{user?.first_name} {user?.last_name || user?.username} ({user?.role})</b>.
             </p>
+            
+            {/* Sección de Adjuntos */}
+            <div className="mt-4 border-t border-slate-100 dark:border-slate-700/50 pt-4">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between">
+                <span>Archivos Adjuntos</span>
+                <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase shadow-sm">
+                  <i className="bi bi-paperclip"></i> Adjuntar Archivo
+                  <input type="file" multiple onChange={handleFileChange} className="hidden" />
+                </label>
+              </label>
+              
+              {attachments.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {attachments.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-600">
+                      <i className="bi bi-file-earmark-fill text-indigo-500 dark:text-indigo-400"></i>
+                      <span className="truncate max-w-[150px]" title={file.name}>{file.name}</span>
+                      <button type="button" onClick={() => handleRemoveAttachment(idx)} className="text-slate-400 hover:text-red-500 font-bold ml-1 transition-colors">
+                        <i className="bi bi-x-lg text-[10px]"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400 italic">No hay archivos adjuntos</span>
+              )}
+            </div>
           </div>
 
           <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 shrink-0">

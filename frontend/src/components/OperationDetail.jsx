@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import ComposeEmailModal from './ComposeEmailModal';
 import OperarioActionPanel from './OperarioActionPanel';
 import OperationTracker from './OperationTracker';
 import ProductSearchCards from './ProductSearchCards';
@@ -62,6 +63,11 @@ export default function OperationDetail() {
   const [selectedDocs, setSelectedDocs] = useState([]);
   const [selectedEmailAtts, setSelectedEmailAtts] = useState([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
+
+  // Estados para el flujo de Enviar a Aduanas
+  const [showAduanasEmailModal, setShowAduanasEmailModal] = useState(false);
+  const [aduanasEmailAttachment, setAduanasEmailAttachment] = useState(null);
+  const [fetchingAduanasFile, setFetchingAduanasFile] = useState(false);
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -459,6 +465,52 @@ export default function OperationDetail() {
     } catch (error) {
       console.error(error);
       showToast('Error al previsualizar el archivo', 'error');
+    }
+  };
+
+  const handleEnviarAduanasClick = async () => {
+    setFetchingAduanasFile(true);
+    try {
+      let url = `/operaciones/operations/${id}/packing_list_excel/`;
+      const params = new URLSearchParams();
+      params.append('proveedor', proveedor);
+      params.append('pais_destino', paisDestino);
+      url += `?${params.toString()}`;
+
+      const response = await axios.get(url, {
+        responseType: 'blob',
+      });
+      const file = new File([response.data], `packing_list_${id}.xlsx`, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      setAduanasEmailAttachment(file);
+      setShowAduanasEmailModal(true);
+    } catch (error) {
+      console.error(error);
+      showToast('Error al preparar el packing list para adjuntar', 'error');
+    } finally {
+      setFetchingAduanasFile(false);
+    }
+  };
+
+  const handleAduanasEmailSuccess = async () => {
+    setShowAduanasEmailModal(false);
+    showToast('Correo de Aduanas encolado. Transicionando operación...', 'success');
+    
+    setActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/start_coordination/`, {
+        proveedor,
+        pais_destino: paisDestino
+      });
+      showToast('Operación enviada a Aduanas correctamente.', 'success');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || 'Error al transicionar la operación a aduana';
+      showToast(errMsg, 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1070,7 +1122,7 @@ export default function OperationDetail() {
                         onClick={handleOpenPackingModal}
                         className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                       >
-                        <i className="bi bi-pencil-square"></i> Ver/Editar (HTML)
+                        <i className="bi bi-pencil-square"></i> Editar
                       </button>
                       <button
                         onClick={previewPackingListExcel}
@@ -1282,14 +1334,21 @@ export default function OperationDetail() {
                   )}
                   {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_send_to_customs && !isOperario && (
                     <button
-                      onClick={() => handleAction('start_coordination', '¿Enviar Packing List a Aduanas? Esto consumirá el stock del inventario.')}
-                      disabled={actionLoading || (stockVerification && !stockVerification.todo_suficiente)}
+                      onClick={handleEnviarAduanasClick}
+                      disabled={actionLoading || fetchingAduanasFile || (stockVerification && !stockVerification.todo_suficiente)}
                       className={`w-full sm:w-auto px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${(stockVerification && !stockVerification.todo_suficiente)
                         ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
                         : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
                         }`}
                     >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-building-check"></i> Enviar a Aduanas</>}
+                      {actionLoading || fetchingAduanasFile ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Procesando...
+                        </>
+                      ) : (
+                        <><i className="bi bi-building-check"></i> Enviar a Aduanas</>
+                      )}
                     </button>
                   )}
                   {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_coordinate && !isOperario && (
@@ -1325,6 +1384,30 @@ export default function OperationDetail() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Enviar a Aduanas */}
+      {showAduanasEmailModal && (
+        <ComposeEmailModal
+          onClose={() => setShowAduanasEmailModal(false)}
+          onSuccess={handleAduanasEmailSuccess}
+          user={user}
+          defaultOperacionId={id}
+          defaultRecipient={operation.agency_email || operation.client_email || ''}
+          initialSubject={`Packing List - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
+          initialBody={`Estimados,
+
+Adjuntamos el Packing List correspondiente a la operación en curso:
+
+• Cliente: ${operation.client_name}
+• Buque: ${operation.ship_name}
+• Puerto: ${operation.port_name}
+
+Quedamos a la espera de su confirmación para proceder.
+
+Saludos cordiales.`}
+          initialAttachments={[aduanasEmailAttachment]}
+        />
+      )}
 
       {/* Modal de Packing List (vista previa HTML y Edición) */}
       {showPackingModal && (

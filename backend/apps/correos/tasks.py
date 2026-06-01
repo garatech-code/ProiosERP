@@ -179,60 +179,84 @@ EMAIL_SMTP_SERVER = 'smtp.gmail.com'
 EMAIL_SMTP_PORT = 587
 
 @shared_task
-def send_outlook_email(recipient, subject, text_body, html_body=None, operacion_id=None):
+def send_outlook_email(email_message_id):
     if EMAIL_IMAP_PASS == 'COMPLETAR_AQUI':
         return "Credentials missing. Skipping email send."
         
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-    
-    msg = MIMEMultipart("alternative")
+    from email.mime.base import MIMEBase
+    from email import encoders
+    import logging
+    import re
+    from apps.correos.models import EmailMessage
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        email_msg = EmailMessage.objects.get(id=email_message_id)
+    except EmailMessage.DoesNotExist:
+        return f"Email message ID {email_message_id} not found."
+
+    msg = MIMEMultipart("mixed")
     
     # Asunto con Tracking
-    if operacion_id:
-        msg["Subject"] = f"[OP-{operacion_id}] {subject}"
-    else:
-        msg["Subject"] = subject
-        
-    msg["From"] = EMAIL_IMAP_USER
-    msg["To"] = recipient
+    subject = email_msg.subject
+    if email_msg.operacion_id and not subject.startswith(f"[OP-{email_msg.operacion_id}]"):
+        subject = f"[OP-{email_msg.operacion_id}] {subject}"
+        email_msg.subject = subject
+        email_msg.save(update_fields=['subject'])
 
-    part1 = MIMEText(text_body, "plain")
-    msg.attach(part1)
+    msg["Subject"] = subject
+    msg["From"] = EMAIL_IMAP_USER
+    msg["To"] = email_msg.recipient_address
     
-    if html_body:
-        part2 = MIMEText(html_body, "html")
-        msg.attach(part2)
-        
+    if email_msg.cc_address:
+        msg["Cc"] = email_msg.cc_address
+
+    # Body
+    body_multipart = MIMEMultipart("alternative")
+    text_body = email_msg.body_text or "Este es un correo institucional de ProIOS Logistics."
+    html_body = email_msg.body_html or text_body
+    
+    part1 = MIMEText(text_body, "plain")
+    part2 = MIMEText(html_body, "html")
+    body_multipart.attach(part1)
+    body_multipart.attach(part2)
+    msg.attach(body_multipart)
+
+    # Attachments
+    for attachment in email_msg.adjuntos.all():
+        part = MIMEBase('application', 'octet-stream')
+        try:
+            attachment.file.open('rb')
+            part.set_payload(attachment.file.read())
+            attachment.file.close()
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename="{attachment.filename}"'
+            )
+            msg.attach(part)
+        except Exception as e:
+            logger.error(f"Error attaching file {attachment.filename}: {e}")
+
     try:
         server = smtplib.SMTP(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
         server.starttls()
         server.login(EMAIL_IMAP_USER, EMAIL_IMAP_PASS)
-        server.sendmail(EMAIL_IMAP_USER, recipient, msg.as_string())
+        
+        # Build recipients list
+        recipients = [email_msg.recipient_address]
+        if email_msg.cc_address:
+            cc_list = [c.strip() for c in re.split(r'[,;]', email_msg.cc_address) if c.strip()]
+            recipients.extend(cc_list)
+
+        server.sendmail(EMAIL_IMAP_USER, recipients, msg.as_string())
         server.quit()
-        
-        # Registrar copia local Outbound
-        op_inst = None
-        if operacion_id:
-            op_inst = Operacion.objects.filter(id=operacion_id).first()
-            
-        from django.utils import timezone
-        import uuid
-        
-        EmailMessage.objects.create(
-            message_id=f"LOCAL-{uuid.uuid4()}",
-            subject=msg["Subject"],
-            sender_address=EMAIL_IMAP_USER,
-            recipient_address=recipient,
-            date_received=timezone.now(),
-            body_text=text_body,
-            body_html=html_body or "",
-            direction='outbound',
-            is_read=True,
-            operacion=op_inst
-        )
         
         return "Email sent successfully."
     except Exception as e:
+        logger.exception("SMTP Send Error")
         return f"SMTP Send Error: {str(e)}"

@@ -152,7 +152,14 @@ class OperacionViewSet(viewsets.ModelViewSet):
     def start_coordination(self, request, pk=None):
         op = self.get_object()
         if not op.packing_list_file:
-            return Response({'error': 'Debe subir el Packing List estructurado antes de enviar a Aduanas'}, status=400)
+            proveedor = request.data.get('proveedor', 'PROIOS SA')
+            pais_destino = request.data.get('pais_destino', 'argentina')
+            from apps.operaciones.services import generar_y_guardar_packing_list
+            try:
+                generar_y_guardar_packing_list(op, proveedor=proveedor, pais_destino=pais_destino)
+            except Exception as e:
+                logger.exception("Error generando y guardando packing list automáticamente")
+                return Response({'error': f'No se pudo autogenerar el Packing List: {str(e)}'}, status=400)
 
         with transaction.atomic():
             try:

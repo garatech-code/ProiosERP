@@ -59,23 +59,52 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='send_email')
     def send_email(self, request):
-        # Lógica de envío SMTP se implementará en la siguiente tarea
         subject = request.data.get('subject')
         body = request.data.get('body')
         recipient = request.data.get('recipient')
         operacion_id = request.data.get('operacion_id')
         
-        # Validación básica por ahora
+        if operacion_id == '':
+            operacion_id = None
+            
+        # Validación básica
         if not all([subject, body, recipient]):
             return Response({'error': 'Faltan campos obligatorios'}, status=status.HTTP_400_BAD_REQUEST)
             
+        attachments = request.FILES.getlist('attachments')
+        
+        import uuid
+        from django.utils import timezone
+        from django.db import transaction
+        from apps.correos.models import EmailMessage, EmailAttachment
         from apps.correos.tasks import send_outlook_email
-        send_outlook_email.delay(  # type: ignore
-            recipient=recipient,
-            subject=subject,
-            text_body=body,
-            html_body=body, # Para simplificar
-            operacion_id=operacion_id
-        )
+        
+        full_subject = subject
+        if operacion_id and not full_subject.startswith(f"[OP-{operacion_id}]"):
+            full_subject = f"[OP-{operacion_id}] {full_subject}"
+
+        with transaction.atomic():
+            email_msg = EmailMessage.objects.create(
+                message_id=f"OUT-{uuid.uuid4()}",
+                subject=full_subject,
+                sender_address='demomailproios@gmail.com',
+                recipient_address=recipient,
+                date_received=timezone.now(),
+                body_text=body,
+                body_html=body,
+                direction='outbound',
+                is_read=True,
+                operacion_id=operacion_id
+            )
+            for f in attachments:
+                EmailAttachment.objects.create(
+                    email=email_msg,
+                    filename=f.name,
+                    content_type=f.content_type,
+                    size=f.size,
+                    file=f
+                )
+                
+        send_outlook_email.delay(email_msg.id)
         
         return Response({'status': 'Correo encolado exitosamente para envío...'}, status=status.HTTP_202_ACCEPTED)
