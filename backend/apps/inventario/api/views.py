@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.http import HttpResponse
-from apps.inventario.models import Articulo, MovimientoStock, Proveedor, ProductoLog
-from .serializers import ArticuloSerializer, MovimientoStockSerializer, ProveedorSerializer, ProductoLogSerializer
+from apps.inventario.models import Articulo, MovimientoStock, Proveedor, ProductoLog, StockItem
+from .serializers import ArticuloSerializer, MovimientoStockSerializer, ProveedorSerializer, ProductoLogSerializer, StockItemSerializer
 import pandas as pd
 import re
 import logging
@@ -22,10 +22,6 @@ class ProveedorViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='upload_excel')
     def upload_excel(self, request):
-        """
-        Carga masiva de proveedores desde un archivo Excel.
-        Soporta .xlsx (openpyxl) y .xls (xlrd).
-        """
         file = request.FILES.get('file')
         if not file:
             return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
@@ -135,7 +131,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         if categoria:
             categorias = [c.strip() for c in categoria.split(',') if c.strip()]
             queryset = queryset.filter(categoria__in=categorias)
-        # ✅ Agregar filtro por búsqueda
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(nombre__icontains=search)
@@ -150,14 +145,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ip
 
     def perform_update(self, serializer):
-        # Obtener la instancia anterior antes de guardar
         producto = self.get_object()
         old_stock = producto.stock_actual
-        
-        # Guardar el nuevo estado
         producto = serializer.save()
-        
-        # Si el stock actual cambió, crear un movimiento de ajuste
         if old_stock != producto.stock_actual:
             from apps.inventario.models import MovimientoStock
             diferencia = producto.stock_actual - old_stock
@@ -169,19 +159,16 @@ class ProductViewSet(viewsets.ModelViewSet):
                 razon=f'Ajuste manual de stock: {old_stock} → {producto.stock_actual}',
                 usuario=self.request.user if self.request.user.is_authenticated else None
             )
-        
-        # Asignar usuario que modificó
         if self.request.user.is_authenticated:
             producto.modificado_por = self.request.user
             producto.save(update_fields=['modificado_por'])
-        
-        # Log de cambios (código existente)
+
         old_data = {
             'nombre': producto.nombre,
             'descripcion': producto.descripcion,
             'presentacion': producto.presentacion,
             'peso_kg': float(producto.peso_kg),
-            'stock_actual': float(old_stock),  # usar el anterior
+            'stock_actual': float(old_stock),
             'stock_minimo': float(producto.stock_minimo),
             'stock_maximo': float(producto.stock_maximo) if hasattr(producto, 'stock_maximo') else 0,
             'categoria': producto.categoria,
@@ -226,15 +213,11 @@ class ProductViewSet(viewsets.ModelViewSet):
     def movimiento(self, request):
         serializer = MovimientoStockSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
         with transaction.atomic():
-            # Obtener el artículo
             articulo_id = serializer.validated_data['articulo'].id
             articulo = Articulo.objects.select_for_update().get(id=articulo_id)
             cantidad = serializer.validated_data['cantidad']
             tipo = serializer.validated_data['tipo']
-            
-            # Calcular nuevo stock
             if tipo == 'INGRESO':
                 nuevo_stock = articulo.stock_actual + cantidad
             elif tipo == 'SALIDA':
@@ -246,8 +229,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 nuevo_stock = articulo.stock_actual - cantidad
             else:  # AJUSTE
                 nuevo_stock = cantidad
-            
-            # Ahora crear el movimiento con stock_resultante ya calculado
             movimiento = MovimientoStock.objects.create(
                 articulo=articulo,
                 tipo=tipo,
@@ -257,25 +238,20 @@ class ProductViewSet(viewsets.ModelViewSet):
                 razon=serializer.validated_data['razon'],
                 usuario=request.user if request.user.is_authenticated else None
             )
-            
-            # Actualizar el stock del artículo
             articulo.stock_actual = nuevo_stock
             articulo.modificado_por = request.user if request.user.is_authenticated else None
             articulo.save()
-        
         return Response(MovimientoStockSerializer(movimiento).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'])
     def disponibilidad(self, request):
         productos_ids = request.query_params.get('productos', '').split(',')
         cantidades = request.query_params.get('cantidades', '').split(',')
-        
         if not productos_ids or not cantidades or len(productos_ids) != len(cantidades):
             return Response(
                 {'error': 'Parámetros productos y cantidades deben tener la misma longitud'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
         resultados = []
         for pid, cant_str in zip(productos_ids, cantidades):
             try:
@@ -296,41 +272,27 @@ class ProductViewSet(viewsets.ModelViewSet):
                 resultados.append({'producto_id': pid, 'error': 'Producto no existe'})
             except ValueError:
                 resultados.append({'producto_id': pid, 'error': 'Cantidad inválida'})
-        
         return Response(resultados)
 
     @action(detail=False, methods=['get'], url_path='movimientos')
     def listar_movimientos(self, request):
-        from django.core.paginator import Paginator
-        from django.http import HttpResponse
-        import csv
-        from io import BytesIO
-        import pandas as pd
-
         queryset = MovimientoStock.objects.select_related('articulo', 'usuario').order_by('-fecha')
-        
-        # Filtros (igual que antes)
         articulo_id = request.query_params.get('articulo_id')
         if articulo_id:
             queryset = queryset.filter(articulo_id=articulo_id)
-        
         tipo = request.query_params.get('tipo')
         if tipo:
             queryset = queryset.filter(tipo=tipo)
-        
         fecha_desde = request.query_params.get('fecha_desde')
         if fecha_desde:
             queryset = queryset.filter(fecha__date__gte=fecha_desde)
-        
         fecha_hasta = request.query_params.get('fecha_hasta')
         if fecha_hasta:
             queryset = queryset.filter(fecha__date__lte=fecha_hasta)
-        
         operacion_id = request.query_params.get('operacion_id')
         if operacion_id:
             queryset = queryset.filter(operacion_id=operacion_id)
-        
-        # Exportación
+
         export = request.query_params.get('export')
         if export in ['csv', 'excel']:
             data = []
@@ -361,13 +323,11 @@ class ProductViewSet(viewsets.ModelViewSet):
                 response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 response['Content-Disposition'] = 'attachment; filename="movimientos_stock.xlsx"'
                 return response
-        
-        # Paginación
+
         page = int(request.query_params.get('page', 1))
         page_size = int(request.query_params.get('page_size', 50))
         paginator = Paginator(queryset, page_size)
         page_obj = paginator.get_page(page)
-        
         serializer = MovimientoStockSerializer(page_obj, many=True)
         return Response({
             'results': serializer.data,
@@ -377,77 +337,18 @@ class ProductViewSet(viewsets.ModelViewSet):
             'total_pages': paginator.num_pages
         })
 
-    # ========== LOGS DE PRODUCTOS ==========
     @action(detail=False, methods=['get'], url_path='logs')
     def listar_logs(self, request):
-        """
-        Lista logs de cambios de productos.
-        Parámetro: producto_id (opcional)
-        """
-        from .serializers import ProductoLogSerializer
         producto_id = request.query_params.get('producto_id')
         queryset = ProductoLog.objects.select_related('producto', 'usuario').order_by('-fecha')
         if producto_id:
             queryset = queryset.filter(producto_id=producto_id)
         serializer = ProductoLogSerializer(queryset[:200], many=True)
         return Response(serializer.data)
-    def _export_movimientos(self, queryset, export_format):
-        data = []
-        for mov in queryset:
-            data.append({
-                'Fecha': mov.fecha.strftime('%Y-%m-%d %H:%M:%S'),
-                'Producto': mov.articulo.nombre,
-                'Tipo': mov.get_tipo_display(),
-                'Cantidad': float(mov.cantidad),
-                'Stock resultante': float(mov.stock_resultante),
-                'Operación ID': mov.operacion_id or '',
-                'Razón': mov.razon,
-            })
-        
-        if not data:
-            if export_format == 'csv':
-                response = HttpResponse(content_type='text/csv')
-                response['Content-Disposition'] = 'attachment; filename="movimientos_stock.csv"'
-                response.write('No hay datos para exportar')
-                return response
-            else:
-                response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                response['Content-Disposition'] = 'attachment; filename="movimientos_stock.xlsx"'
-                return response
-        
-        if export_format == 'csv':
-            response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="movimientos_stock.csv"'
-            writer = csv.DictWriter(response, fieldnames=data[0].keys())
-            writer.writeheader()
-            writer.writerows(data)
-            return response
-        
-        elif export_format == 'excel':
-            df = pd.DataFrame(data)
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, sheet_name='Movimientos')
-            output.seek(0)
-            response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            response['Content-Disposition'] = 'attachment; filename="movimientos_stock.xlsx"'
-            return response
 
-    # ========== LOGS DE PRODUCTOS ==========
-    @action(detail=False, methods=['get'], url_path='logs')
-    def listar_logs(self, request):
-        producto_id = request.query_params.get('producto_id')
-        queryset = ProductoLog.objects.select_related('producto', 'usuario')
-        if producto_id:
-            queryset = queryset.filter(producto_id=producto_id)
-        serializer = ProductoLogSerializer(queryset[:200], many=True)
-        return Response(serializer.data)
-
-    # ========== FUNCIÓN AUXILIAR PARA ESTIMAR PESO (se mantiene igual) ==========
     def _estimar_peso_cadena(self, tipo_producto, calibre):
         calibre = float(calibre) if calibre else 0
         tipo = tipo_producto.lower()
-        
         if 'cadena' in tipo:
             pesos_por_calibre = {89: 12.5, 78: 9.8, 42: 3.2, 38: 2.6, 25: 1.2, 127: 24.0, 112: 19.0, 98: 14.5, 92: 12.0}
             return pesos_por_calibre.get(calibre, 1.0)
@@ -463,7 +364,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         else:
             return 1.0
 
-    # ========== CARGA DE EXCEL (UPLOAD) ==========
     @action(detail=False, methods=['post'], url_path='upload_excel')
     def upload_excel(self, request):
         file = request.FILES.get('file')
@@ -853,3 +753,102 @@ class ProductViewSet(viewsets.ModelViewSet):
             'actualizados': productos_actualizados,
             'errores': errores
         }, status=status.HTTP_200_OK)
+
+
+# ================= NUEVO VIEWSET: Stock General =================
+class StockItemViewSet(viewsets.ModelViewSet):
+    queryset = StockItem.objects.all().order_by('nombre')
+    serializer_class = StockItemSerializer
+    filterset_fields = ['categoria', 'ubicacion', 'estado']
+
+    @action(detail=False, methods=['post'], url_path='upload_excel')
+    def upload_excel(self, request):
+        """
+        Importa stock desde un Excel ESTÁNDAR.
+        Columnas EXACTAS: nombre, categoria, cantidad, unidad, ubicacion, estado, serie_lote, observaciones
+        """
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No se proporcionó archivo'}, status=status.HTTP_400_BAD_REQUEST)
+        if not file.name.endswith(('.xlsx', '.xls')):
+            return Response({'error': 'Solo archivos .xlsx o .xls'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            df = pd.read_excel(file, engine='openpyxl' if file.name.endswith('.xlsx') else 'xlrd')
+        except Exception as e:
+            return Response({'error': f'Error al leer Excel: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Limpiar nombres de columnas
+        df.columns = [str(col).strip().lower().replace(' ', '_') for col in df.columns]
+
+        columnas_requeridas = ['nombre', 'categoria', 'cantidad', 'unidad', 'ubicacion', 'estado', 'serie_lote', 'observaciones']
+        missing = [col for col in columnas_requeridas if col not in df.columns]
+        if missing:
+            return Response({'error': f'Faltan columnas: {missing}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        creados = 0
+        actualizados = 0
+        errores = []
+
+        for idx, row in df.iterrows():
+            nombre = str(row['nombre']).strip() if pd.notna(row['nombre']) else ''
+            if not nombre:
+                errores.append(f"Fila {idx+2}: nombre vacío")
+                continue
+
+            categoria = row['categoria']
+            if categoria not in dict(StockItem.CATEGORIA_CHOICES):
+                errores.append(f"Fila {idx+2}: categoria '{categoria}' no válida")
+                continue
+
+            unidad = row['unidad']
+            if unidad not in dict(StockItem.UNIDAD_CHOICES):
+                errores.append(f"Fila {idx+2}: unidad '{unidad}' no válida")
+                continue
+
+            ubicacion = row['ubicacion']
+            if ubicacion not in dict(StockItem.UBICACION_CHOICES):
+                errores.append(f"Fila {idx+2}: ubicacion '{ubicacion}' no válida")
+                continue
+
+            estado = row['estado']
+            if estado not in dict(StockItem.ESTADO_CHOICES):
+                errores.append(f"Fila {idx+2}: estado '{estado}' no válido")
+                continue
+
+            try:
+                cantidad = float(row['cantidad'])
+                if cantidad < 0:
+                    errores.append(f"Fila {idx+2}: cantidad negativa")
+                    continue
+            except:
+                errores.append(f"Fila {idx+2}: cantidad no numérica")
+                continue
+
+            serie_lote = str(row['serie_lote']).strip() if pd.notna(row['serie_lote']) else None
+            observaciones = str(row['observaciones']).strip() if pd.notna(row['observaciones']) else None
+
+            defaults = {
+                'categoria': categoria,
+                'cantidad': cantidad,
+                'unidad': unidad,
+                'ubicacion': ubicacion,
+                'estado': estado,
+                'serie_lote': serie_lote,
+                'observaciones': observaciones,
+            }
+
+            obj, created = StockItem.objects.update_or_create(
+                nombre=nombre,
+                defaults=defaults
+            )
+            if created:
+                creados += 1
+            else:
+                actualizados += 1
+
+        return Response({
+            'creados': creados,
+            'actualizados': actualizados,
+            'errores': errores[:20]
+        })

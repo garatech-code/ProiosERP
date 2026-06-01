@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.inventario.models import Articulo, MovimientoStock, Proveedor, ProductoLog
+from apps.inventario.models import Articulo, MovimientoStock, Proveedor, ProductoLog, StockItem
 
 
 class ProveedorSerializer(serializers.ModelSerializer):
@@ -51,3 +51,11 @@ class DisponibilidadSerializer(serializers.Serializer):
             if 'articulo_id' not in item or 'cantidad' not in item:
                 raise serializers.ValidationError("Cada producto debe tener 'articulo_id' y 'cantidad'")
         return value
+
+
+# ================= NUEVO SERIALIZADOR: Stock General =================
+class StockItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockItem
+        fields = '__all__'
+        read_only_fields = ['id', 'fecha_actualizacion']

@@ -93,3 +93,47 @@ class ProductoLog(models.Model):
 
     def __str__(self):
         return f"{self.get_accion_display()} - {self.producto.nombre if self.producto else 'Eliminado'} - {self.fecha}"
+
+
+# ================= NUEVO MODELO: Stock General =================
+class StockItem(models.Model):
+    CATEGORIA_CHOICES = (
+        ('Anclas', 'Anclas'),
+        ('Cadenas', 'Cadenas'),
+        ('Químicos', 'Químicos'),
+        ('Herramientas', 'Herramientas'),
+        ('Patio', 'Patio'),
+    )
+    UNIDAD_CHOICES = (
+        ('kg', 'Kilogramos'),
+        ('L', 'Litros'),
+        ('u', 'Unidades'),
+        ('m', 'Metros'),
+        ('par', 'Pares'),
+    )
+    UBICACION_CHOICES = (
+        ('Patio A', 'Patio A'),
+        ('Patio B', 'Patio B'),
+        ('Oficina sup.', 'Oficina sup.'),
+        ('Planta baja', 'Planta baja'),
+        ('Químicos', 'Químicos'),
+    )
+    ESTADO_CHOICES = (
+        ('Nuevo', 'Nuevo'),
+        ('Usado', 'Usado'),
+        ('Oxidado', 'Oxidado'),
+        ('Caducado', 'Caducado'),
+    )
+
+    nombre = models.CharField(max_length=200)
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES)
+    cantidad = models.FloatField()
+    unidad = models.CharField(max_length=5, choices=UNIDAD_CHOICES)
+    ubicacion = models.CharField(max_length=30, choices=UBICACION_CHOICES)
+    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES)
+    serie_lote = models.CharField(max_length=100, blank=True, null=True)
+    observaciones = models.TextField(blank=True, null=True)
+    fecha_actualizacion = models.DateField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.nombre} - {self.cantidad} {self.unidad}"

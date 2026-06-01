@@ -221,12 +221,6 @@ export default function StockMovements() {
             >
               <i className="bi bi-filetype-csv"></i> CSV
             </button>
-            <button
-              onClick={handlePrint}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1"
-            >
-              <i className="bi bi-printer"></i> Imprimir
-            </button>
           </div>
         </div>
       </div>
