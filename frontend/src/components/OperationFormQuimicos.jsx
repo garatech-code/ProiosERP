@@ -4,9 +4,6 @@ import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
 
-/* =========================
-   PRODUCT ROW (con verificación de stock)
-========================= */
 function ProductRow({ product, index, onUpdate, onRemove }) {
   const [selectedProduct, setSelectedProduct] = useState(
     product.product ? { id: product.product, stock_actual: product.stock_actual || 0 } : null
@@ -14,7 +11,6 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 
   const handleProductSelect = (item) => {
     setSelectedProduct(item);
-    // Asegurar que enviamos el ID numérico, no el nombre
     let productValue = item?.id ? Number(item.id) : '';
     onUpdate(index, 'product', productValue);
     onUpdate(index, 'weight_kg', item?.peso_kg || item?.weight_kg || null);
@@ -27,8 +23,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   const isStockInsufficient = cantidad > stockActual;
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
-      }`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'}`}>
       <div className="sm:col-span-4">
         <AutocompleteCreate
           label="Producto *"
@@ -62,8 +57,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           min="1"
           value={cantidad}
           onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
-            }`}
+          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
         />
         {isStockInsufficient && (
           <p className="text-xs text-red-600 mt-1">
@@ -103,12 +97,11 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   );
 }
 
-/* =========================
-   MAIN COMPONENT
-========================= */
-export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
+export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }) {
   const navigate = useNavigate();
+  const { id: routeId } = useParams();
   const { user: currentUser } = useAuth();
+  const id = propId || routeId;
 
   const normalize = (str) => {
     let s = str?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() || "";
@@ -129,14 +122,12 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [error, setError] = useState(null);
-
   const [uploading, setUploading] = useState(false);
   const [existingFiles, setExistingFiles] = useState({
     packing_list_file: null,
     remito_file: null,
     rancho_file: null,
   });
-
   const [imoNumber, setImoNumber] = useState('');
   const [searchingImo, setSearchingImo] = useState(false);
   const [imoSuccess, setImoSuccess] = useState(false);
@@ -201,7 +192,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
             } catch { return ''; }
           };
 
-          // Cargar productos con stock_actual
           const productsWithStock = (op.products || []).map(p => ({
             ...p,
             stock_actual: p.stock_actual || 0
@@ -257,7 +247,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
     loadData();
   }, [id, currentUser]);
 
-  // Autosave silencioso (sólo en modo creación)
   useEffect(() => {
     if (!id) {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
@@ -288,7 +277,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
     }));
   };
 
-  // Verificar si algún producto tiene stock insuficiente o falta ID
   const hasStockIssues = () => {
     return formData.products.some(p =>
       !p.product || (p.quantity || 0) > (p.stock_actual || 0)
@@ -336,7 +324,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
     }
   };
 
-  // CORREGIDO: usar PATCH al detalle de la operación para subir archivos
   const handleFileUpload = async (event, fieldName) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -367,7 +354,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
 
-    // Validación de productos: todos deben tener ID y cantidad positiva
     for (let i = 0; i < formData.products.length; i++) {
       const p = formData.products[i];
       if (!p.product) {
@@ -407,7 +393,7 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
         ...formData,
         nombre: formData.nombre,
         products: validProducts.map(p => ({
-          product: Number(p.product), // Asegurar número
+          product: Number(p.product),
           quantity: p.quantity,
           unit_price: p.unit_price,
         })),
@@ -417,7 +403,11 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
         order_received_date: safeFormatDate(formData.order_received_date),
         client_confirmed_date: safeFormatDate(formData.client_confirmed_date),
         texto_pedido: formData.texto_pedido,
+        operarios_usuarios_id: formData.operarios_usuarios_id || [],
       };
+
+      console.log('📤 PAYLOAD enviado a /operaciones/operations/:', JSON.parse(JSON.stringify(payload)));
+      console.log('👥 operarios_usuarios_id:', payload.operarios_usuarios_id);
 
       let res;
       if (id) {
@@ -426,12 +416,15 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
         res = await axios.post('/operaciones/operations/', payload);
       }
 
+      console.log('✅ Respuesta del servidor:', res.data);
+
       if (onSuccess) onSuccess(res.data.id);
-      localStorage.removeItem(DRAFT_KEY); // Borrar borrador al guardar
+      localStorage.removeItem(DRAFT_KEY);
       if (onClose) onClose();
+      else navigate(-1);
 
     } catch (err) {
-      console.error("Error en submit:", err);
+      console.error("❌ Error en submit:", err);
       let errorMessage = 'Error al guardar. ';
       if (err.response?.data) {
         if (typeof err.response.data === 'object') {
@@ -462,7 +455,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
-
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-teal-50 dark:bg-slate-700/50 shrink-0">
           <h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">
             {id ? `Editar Operación Químicos #${id}` : 'Nueva Operación: Químicos'}
@@ -473,7 +465,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-
           {error && (
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
               <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
@@ -517,7 +508,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
           )}
 
           <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
-
             <div>
               <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Datos Generales</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -851,7 +841,6 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
                 </div>
               </div>
             )}
-
           </form>
         </div>
 
@@ -867,15 +856,13 @@ export default function OperationFormQuimicos({ id, onClose, onSuccess }) {
             type="submit"
             form="operation-form"
             disabled={loading || hasStockIssues()}
-            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
-              }`}
+            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
             title={hasStockIssues() ? "Hay productos sin stock suficiente o sin seleccionar" : ""}
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
             {id ? 'Guardar Cambios' : 'Confirmar Operación'}
           </button>
         </div>
-
       </div>
 
       <style dangerouslySetInnerHTML={{

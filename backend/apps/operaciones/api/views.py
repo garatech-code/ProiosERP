@@ -15,6 +15,7 @@ import logging
 from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto
 from apps.usuarios.models import User
 from apps.operaciones.services import get_or_create_ship_from_imo, get_or_create_port_from_name
+from apps.produccion.models import OrdenFabricacion
 
 from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
@@ -50,28 +51,38 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        print(f"🔍 [BACKEND] Usuario: {user.username} (role: {user.role})")
         qs = Operacion.objects.all().select_related('cliente', 'ship', 'port', 'agency').prefetch_related('detalles', 'documentos_adjuntos')
 
         if user.role in [User.Role.OWNER, User.Role.CONTABLE]:
+            print("✅ Owner/Contable -> todas las operaciones")
             return qs
 
-        return qs.filter(
-            Q(operadores_asignados=user) |
-            Q(contables_asignados=user)
-        ).distinct()
+        if user.role == User.Role.OPERADOR:
+            filtered = qs.filter(operadores_asignados=user).distinct()
+            print(f"👤 OPERADOR -> {filtered.count()} operaciones asignadas")
+            print(f"IDs: {list(filtered.values_list('id', flat=True))}")
+            return filtered
+
+        if user.role == User.Role.OPERARIO:
+            filtered = qs.filter(operarios_usuarios_asignados=user).distinct()
+            print(f"👷 OPERARIO -> {filtered.count()} operaciones asignadas")
+            print(f"IDs: {list(filtered.values_list('id', flat=True))}")
+            return filtered
+
+        print("⚠️ Rol no reconocido -> 0 operaciones")
+        return qs.none()
 
     def perform_create(self, serializer):
         user = self.request.user
         operation = serializer.save(creado_por=user)
         
-        # Si el usuario no es Owner ni Contable, se auto-asigna y se envía a revisión
         if user.role not in [User.Role.OWNER, User.Role.CONTABLE]:
             if user.role == User.Role.OPERADOR:
                 operation.operadores_asignados.add(user)
             elif user.role == User.Role.OPERARIO:
                 operation.operarios_usuarios_asignados.add(user)
                 
-            # Marcar para revisión del Owner automáticamente
             operation.estado_revision = Operacion.ESTADO_REVISION_PENDING
             operation.mensaje_revision = f"Operación iniciada por {user.username} ({user.role}) el {timezone.now().strftime('%d/%m/%Y a las %H:%M')}"
             operation.save()
@@ -529,7 +540,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
         op.save()
         return Response({'status': 'review_resolved', 'action': action})
 
-    # ========== ACCIONES PARA DOCUMENTOS ADICIONALES ==========
     @action(detail=True, methods=['post'], url_path='documentos')
     def upload_documento(self, request, pk=None):
         """Subir un documento adicional a la operación"""
@@ -561,7 +571,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         operacion = self.get_object()
         try:
             documento = operacion.documentos_adjuntos.get(id=doc_id)
-            documento.archivo.delete()  # eliminar archivo físico
+            documento.archivo.delete()
             documento.delete()
             return Response({'status': 'deleted'})
         except DocumentoAdjunto.DoesNotExist:
@@ -580,7 +590,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Documentos adicionales
             if documento_ids:
                 docs = operacion.documentos_adjuntos.filter(id__in=documento_ids)
                 for doc in docs:
@@ -593,7 +602,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
                         except Exception as e:
                             logger.error(f"Error agregando documento {doc.id} al zip: {e}")
 
-            # Adjuntos de la cadena de correos
             if adjunto_ids:
                 adjuntos = EmailAttachment.objects.filter(id__in=adjunto_ids, email__operacion=operacion)
                 for adj in adjuntos:
@@ -628,15 +636,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 except Articulo.DoesNotExist:
                     continue
                 
-                # Check active FormulaBOM for this article
                 formula = FormulaBOM.objects.filter(articulo_final_id=articulo.id, activa=True).first()
                 if not formula:
                     continue
                 
-                # Stock insufficient
                 shortage = detalle.cantidad - articulo.stock_actual
                 if shortage > 0:
-                    # Check if there is already an uncompleted production order for this formula and operation
                     if not OrdenFabricacion.objects.filter(operacion_id=op.id, formula=formula, completada=False).exists():
                         orden = OrdenFabricacion.objects.create(
                             operacion_id=op.id,
@@ -665,6 +670,98 @@ class OperacionViewSet(viewsets.ModelViewSet):
         ordenes = OrdenFabricacion.objects.filter(operacion_id=op.id)
         return Response(OrdenFabricacionSerializer(ordenes, many=True).data)
 
+    # ========== NUEVO ENDPOINT PARA OPERARIOS ==========
+    @action(detail=False, methods=['get'], url_path='tareas-produccion')
+    def tareas_produccion(self, request):
+        """
+        Devuelve las órdenes de fabricación pendientes
+        SOLO de las operaciones donde el operario está asignado.
+        """
+        user = request.user
+        print(f"🔍 [BACKEND tareas-produccion] Usuario: {user.username} (role: {user.role})")
+        
+        if user.role != User.Role.OPERARIO:
+            return Response({'error': 'Solo para operarios'}, status=403)
+        
+        # Obtener IDs de operaciones donde el usuario está asignado como operario
+        operaciones_ids = Operacion.objects.filter(
+            operarios_usuarios_asignados=user
+        ).values_list('id', flat=True)
+        
+        print(f"📋 [tareas-produccion] Operaciones asignadas IDs: {list(operaciones_ids)}")
+        
+        if not operaciones_ids:
+            return Response([])
+        
+        ordenes = OrdenFabricacion.objects.filter(
+            completada=False,
+            operacion_id__in=operaciones_ids
+        ).order_by('-fecha_solicitud')
+        
+        print(f"📦 [tareas-produccion] Órdenes pendientes encontradas: {ordenes.count()}")
+        
+        resultados = []
+        for orden in ordenes:
+            try:
+                operacion = Operacion.objects.get(id=orden.operacion_id)
+                op_data = {
+                    'id': operacion.id,
+                    'nombre': operacion.nombre or f"OP-{operacion.id:05d}",
+                    'ship_name': operacion.ship.name if operacion.ship else '',
+                    'port_name': operacion.port.name if operacion.port else '',
+                    'estado': operacion.get_estado_display(),
+                    'remito_file': operacion.remito_file.url if operacion.remito_file else None,
+                    'packing_list_file': operacion.packing_list_file.url if operacion.packing_list_file else None,
+                    'eta': operacion.eta,
+                }
+            except Operacion.DoesNotExist:
+                op_data = {
+                    'id': orden.operacion_id,
+                    'nombre': f"Operación #{orden.operacion_id} (no encontrada)",
+                    'ship_name': '',
+                    'port_name': '',
+                    'estado': '',
+                    'remito_file': None,
+                    'packing_list_file': None,
+                    'eta': None,
+                }
+            
+            resultados.append({
+                'orden_id': orden.id,
+                'operacion': op_data,
+                'producto_nombre': orden.formula.articulo_final_nombre,
+                'cantidad_a_producir': float(orden.cantidad_a_producir),
+                'fecha_solicitud': orden.fecha_solicitud,
+                'completada': orden.completada,
+            })
+        
+        return Response(resultados)
+
+    # ========== ENDPOINT AUXILIAR PARA ASIGNAR OPERARIOS ==========
+    @action(detail=True, methods=['post'], url_path='asignar-operarios')
+    def asignar_operarios(self, request, pk=None):
+        """
+        Endpoint específico para asignar operarios (usuarios con rol OPERARIO) a una operación.
+        Body: {"operarios_usuarios_id": [1,2,3]}
+        """
+        operacion = self.get_object()
+        operarios_ids = request.data.get('operarios_usuarios_id', [])
+        
+        if not isinstance(operarios_ids, list):
+            return Response({'error': 'operarios_usuarios_id debe ser una lista de IDs'}, status=400)
+        
+        usuarios = User.objects.filter(id__in=operarios_ids)
+        for u in usuarios:
+            if u.role != User.Role.OPERARIO:
+                return Response({'error': f'El usuario {u.username} no tiene rol OPERARIO'}, status=400)
+        
+        operacion.operarios_usuarios_asignados.set(operarios_ids)
+        operacion.save()
+        
+        return Response({
+            'status': 'ok',
+            'operarios_usuarios_asignados': list(operacion.operarios_usuarios_asignados.values_list('id', flat=True))
+        })
 
 
 class AgendaEventViewSet(viewsets.ModelViewSet):

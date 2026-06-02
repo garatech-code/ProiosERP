@@ -361,17 +361,43 @@ export default function OperationDetail() {
     }
   };
 
-  const openPreview = (url) => {
+  const previewTextFile = async (url, filename) => {
+    try {
+      const response = await axios.get(url, { responseType: 'text' });
+      setPreviewFile({
+        url: null,
+        type: 'text',
+        content: response.data,
+        filename: filename,
+      });
+    } catch (error) {
+      console.error("Error al cargar el archivo de texto:", error);
+      showToast('No se pudo cargar el contenido del archivo de texto', 'error');
+    }
+  };
+
+  const openPreview = (url, filename = 'documento') => {
     if (!url) return;
-    if (url.match(/\.xlsx?$/i)) {
+    const friendlyName = filename || url.split('/').pop();
+    const ext = url.split('.').pop().toLowerCase();
+
+    if (ext === 'xlsx' || ext === 'xls') {
       previewExcelFile(url);
       return;
     }
-    let type = 'pdf';
-    if (url.match(/\.(jpe?g|png|gif|bmp|webp)$/i)) type = 'image';
-    else if (url.match(/\.pdf$/i)) type = 'pdf';
-    else type = 'unknown';
-    setPreviewFile({ url, type });
+    if (ext === 'pdf') {
+      setPreviewFile({ url, type: 'pdf', filename: friendlyName });
+      return;
+    }
+    if (ext === 'txt') {
+      previewTextFile(url, friendlyName);
+      return;
+    }
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
+      setPreviewFile({ url, type: 'image', filename: friendlyName });
+      return;
+    }
+    setPreviewFile({ url, type: 'unknown', filename: friendlyName });
   };
 
   const toggleSelectDoc = (docId) => {
@@ -867,19 +893,29 @@ export default function OperationDetail() {
                   </dl>
 
                   {isOwner && (
-                    <div className="bg-slate-800 px-4 py-4 sm:px-6 text-white">
-                      <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
-                        <i className="bi bi-people-fill"></i> Personal de Misión Asignado
-                      </p>
-                      <div className="flex gap-4 text-xs">
-                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                          Operadores (Oficina): {operation.operadores_id?.length || 0}
-                        </span>
-                        <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                          Operarios (Planta): {operation.operarios_id?.length || 0}
-                        </span>
+                    <>
+                      <div className="bg-slate-800 px-4 py-4 sm:px-6 text-white">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
+                          <i className="bi bi-people-fill"></i> Personal de Misión Asignado
+                        </p>
+                        <div className="flex flex-wrap gap-4 text-xs">
+                          <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                            Operadores (Oficina): {operation.operadores_id?.length || 0}
+                          </span>
+                          <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                            Operarios (Planta - PersonalPlantel): {operation.operarios_id?.length || 0}
+                          </span>
+                          <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                            Operarios Usuarios App: {operation.operarios_usuarios_id?.length || 0}
+                          </span>
+                        </div>
+                        {operation.operarios_usuarios_nombres?.length > 0 && (
+                          <div className="mt-2 text-xs text-slate-300">
+                            <span className="font-bold">Nombres:</span> {operation.operarios_usuarios_nombres.join(', ')}
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -1110,7 +1146,7 @@ export default function OperationDetail() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                       {operation.packing_list_file && (
                         <button
-                          onClick={() => openPreview(operation.packing_list_file)}
+                          onClick={() => openPreview(operation.packing_list_file, 'Packing List')}
                           className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
                         >
                           <i className="bi bi-eye-fill"></i> Ver Documento
@@ -1149,7 +1185,7 @@ export default function OperationDetail() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
                       {operation.remito_file && (
                         <button
-                          onClick={() => openPreview(operation.remito_file)}
+                          onClick={() => openPreview(operation.remito_file, 'Remito Firmado')}
                           className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
                         >
                           <i className="bi bi-eye-fill"></i> Ver Documento
@@ -1168,7 +1204,7 @@ export default function OperationDetail() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
                       {operation.rancho_file && (
                         <button
-                          onClick={() => openPreview(operation.rancho_file)}
+                          onClick={() => openPreview(operation.rancho_file, 'Rancho / Permiso Aduanero')}
                           className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
                         >
                           <i className="bi bi-eye-fill"></i> Ver Documento
@@ -1245,7 +1281,7 @@ export default function OperationDetail() {
                           
                           <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
                             <button
-                              onClick={() => openPreview(adj.file)}
+                              onClick={() => openPreview(adj.file, adj.filename)}
                               className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
                             >
                               <i className="bi bi-eye-fill"></i> Ver
@@ -1394,17 +1430,7 @@ export default function OperationDetail() {
           defaultOperacionId={id}
           defaultRecipient={operation.agency_email || operation.client_email || ''}
           initialSubject={`Packing List - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
-          initialBody={`Estimados,
-
-Adjuntamos el Packing List correspondiente a la operación en curso:
-
-• Cliente: ${operation.client_name}
-• Buque: ${operation.ship_name}
-• Puerto: ${operation.port_name}
-
-Quedamos a la espera de su confirmación para proceder.
-
-Saludos cordiales.`}
+          initialBody={`Estimados,\n\nAdjuntamos el Packing List correspondiente a la operación en curso:\n\n• Cliente: ${operation.client_name}\n• Buque: ${operation.ship_name}\n• Puerto: ${operation.port_name}\n\nQuedamos a la espera de su confirmación para proceder.\n\nSaludos cordiales.`}
           initialAttachments={[aduanasEmailAttachment]}
         />
       )}
@@ -1593,14 +1619,14 @@ Saludos cordiales.`}
         </div>
       )}
 
-      {/* Modal para vista previa de PDF / Imagen / Otros */}
+      {/* Modal para vista previa de PDF / Imagen / Texto / Otros */}
       {previewFile && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
             <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <i className="bi bi-file-earmark-text-fill text-indigo-500"></i>
-                Vista previa del documento
+                Vista previa: {previewFile.filename || 'Documento'}
               </h3>
               <button onClick={() => setPreviewFile(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
                 <i className="bi bi-x-lg"></i>
@@ -1613,14 +1639,10 @@ Saludos cordiales.`}
               {previewFile.type === 'image' && (
                 <img src={previewFile.url} alt="Vista previa" className="max-w-full max-h-[85vh] object-contain shadow-lg rounded-lg" />
               )}
-              {previewFile.type === 'excel' && (
-                <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
-                  <i className="bi bi-file-earmark-spreadsheet text-5xl text-emerald-500 mb-3 block"></i>
-                  <p className="text-slate-600 dark:text-slate-300">Para ver el contenido del Excel, usa el botón "Vista Previa" específico.</p>
-                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">
-                    <i className="bi bi-download me-1"></i> Descargar archivo
-                  </a>
-                </div>
+              {previewFile.type === 'text' && (
+                <pre className="w-full p-4 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg overflow-auto text-sm font-mono whitespace-pre-wrap">
+                  {previewFile.content}
+                </pre>
               )}
               {previewFile.type === 'unknown' && (
                 <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
@@ -1633,9 +1655,11 @@ Saludos cordiales.`}
               )}
             </div>
             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
-              <a href={previewFile.url} download className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
-                <i className="bi bi-download me-1"></i> Descargar
-              </a>
+              {previewFile.url && previewFile.type !== 'text' && (
+                <a href={previewFile.url} download className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
+                  <i className="bi bi-download me-1"></i> Descargar
+                </a>
+              )}
               <button onClick={() => setPreviewFile(null)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>
           </div>
