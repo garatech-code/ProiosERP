@@ -10,6 +10,7 @@ import OperationEmails from './OperationEmails';
 import LogoSpinner from './LogoSpinner';
 import OperationDocuments from './OperationDocuments';
 import AutocompleteCreate from './AutocompleteCreate';
+import ToolsModal from './ToolsModal';
 import * as XLSX from 'xlsx';
 
 export default function OperationDetail() {
@@ -22,6 +23,7 @@ export default function OperationDetail() {
   const [uploading, setUploading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showPackingModal, setShowPackingModal] = useState(false);
+  const [isToolsModalOpen, setIsToolsModalOpen] = useState(false);
   const [stockVerification, setStockVerification] = useState(null);
   const [checkingStock, setCheckingStock] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -64,10 +66,19 @@ export default function OperationDetail() {
   const [selectedEmailAtts, setSelectedEmailAtts] = useState([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
 
-  // Estados para el flujo de Enviar a Aduanas
+  // Estados para el flujo de Enviar a Aduanas / Permisos
   const [showAduanasEmailModal, setShowAduanasEmailModal] = useState(false);
   const [aduanasEmailAttachment, setAduanasEmailAttachment] = useState(null);
   const [fetchingAduanasFile, setFetchingAduanasFile] = useState(false);
+
+  // Flujo específico para Servicios
+  const [showPnaModal, setShowPnaModal] = useState(false);
+  const [pnaType, setPnaType] = useState('frio');
+  const [leaveMaterials, setLeaveMaterials] = useState(false);
+
+  const [showCotizacionEmailModal, setShowCotizacionEmailModal] = useState(false);
+  const [cotizacionEmailAttachment, setCotizacionEmailAttachment] = useState(null);
+  const [fetchingCotizacionFile, setFetchingCotizacionFile] = useState(false);
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -288,6 +299,32 @@ export default function OperationDetail() {
     }
   };
 
+  const handleGeneratePdf = async (pdfEndpoint, params = {}) => {
+    setActionLoading(true);
+    try {
+      let url = `/operaciones/operations/${id}/${pdfEndpoint}/`;
+      const queryParams = new URLSearchParams(params);
+      if (queryParams.toString()) {
+        url += `?${queryParams.toString()}`;
+      }
+      const response = await axios.get(url, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `${pdfEndpoint}_OP${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      showToast('Documento generado con éxito.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al generar el documento PDF.', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRequestReview = async () => {
     setRevisionActionLoading(true);
     try {
@@ -341,6 +378,29 @@ export default function OperationDetail() {
       showToast('Error al subir archivo', 'error');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleUploadCotizacionCustom = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!window.confirm('¿Subir una cotización personalizada?')) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('archivo', file);
+    formData.append('tipo', 'cotizacion_servicio');
+    try {
+      await axios.post(`/operaciones/operations/${id}/documentos/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      showToast('Cotización personalizada subida exitosamente.', 'success');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al subir la cotización', 'error');
+    } finally {
+      setUploading(false);
+      event.target.value = null;
     }
   };
 
@@ -401,13 +461,13 @@ export default function OperationDetail() {
   };
 
   const toggleSelectDoc = (docId) => {
-    setSelectedDocs(prev => 
+    setSelectedDocs(prev =>
       prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
     );
   };
 
   const toggleSelectEmailAtt = (attId) => {
-    setSelectedEmailAtts(prev => 
+    setSelectedEmailAtts(prev =>
       prev.includes(attId) ? prev.filter(id => id !== attId) : [...prev, attId]
     );
   };
@@ -422,7 +482,7 @@ export default function OperationDetail() {
       }, {
         responseType: 'blob'
       });
-      
+
       const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -432,7 +492,7 @@ export default function OperationDetail() {
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
       showToast('Descarga ZIP completada exitosamente', 'success');
-      
+
       setSelectedDocs([]);
       setSelectedEmailAtts([]);
     } catch (err) {
@@ -494,6 +554,29 @@ export default function OperationDetail() {
     }
   };
 
+  const handlePreviewToolsPDF = async (isDownload = false) => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/generate_solicitud_particular_pdf/`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      
+      if (isDownload) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `solicitud_particular_${id}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('Descargando Solicitud Particular...', 'success');
+      } else {
+        openPreview(url, 'Generador de Solicitud Particular');
+      }
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      showToast('No se pudo generar la solicitud particular', 'error');
+    }
+  };
+
   const handleEnviarAduanasClick = async () => {
     setFetchingAduanasFile(true);
     try {
@@ -522,7 +605,7 @@ export default function OperationDetail() {
   const handleAduanasEmailSuccess = async () => {
     setShowAduanasEmailModal(false);
     showToast('Correo de Aduanas encolado. Transicionando operación...', 'success');
-    
+
     setActionLoading(true);
     try {
       await axios.post(`/operaciones/operations/${id}/start_coordination/`, {
@@ -540,9 +623,45 @@ export default function OperationDetail() {
     }
   };
 
+  const handleCotizarClick = async () => {
+    setFetchingCotizacionFile(true);
+    try {
+      const url = `/operaciones/operations/${id}/generate_cotizacion_servicio/`;
+      const response = await axios.get(url, { responseType: 'blob' });
+      const file = new File([response.data], `Cotizacion_OP${id}.pdf`, {
+        type: 'application/pdf'
+      });
+      setCotizacionEmailAttachment(file);
+      setShowCotizacionEmailModal(true);
+    } catch (error) {
+      console.error(error);
+      showToast('Error al generar la cotización para adjuntar', 'error');
+    } finally {
+      setFetchingCotizacionFile(false);
+    }
+  };
+
+  const handleCotizacionEmailSuccess = async () => {
+    setShowCotizacionEmailModal(false);
+    showToast('Correo de Cotización encolado. Transicionando operación...', 'success');
+
+    setActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/cotizar_servicio/`);
+      showToast('Operación marcada como Cotizada.', 'success');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || 'Error al transicionar la operación';
+      showToast(errMsg, 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleOpenPackingModal = () => {
     if (!operation) return;
-    
+
     const productsMapped = (operation.products || []).map(p => ({
       product: p.product,
       name: p.product_name,
@@ -581,7 +700,7 @@ export default function OperationDetail() {
     setEditPackingProducts(prev => {
       const copy = [...prev];
       const row = { ...copy[idx] };
-      
+
       if (field === 'quantity') {
         row.quantity = parseInt(val) || 0;
         row.total_weight = row.quantity * row.unit_weight;
@@ -590,7 +709,7 @@ export default function OperationDetail() {
         row.unit_price = parseFloat(val) || 0;
         row.subtotal = row.quantity * row.unit_price;
       }
-      
+
       copy[idx] = row;
       return copy;
     });
@@ -606,7 +725,7 @@ export default function OperationDetail() {
       showToast('El producto ya está en la lista', 'error');
       return;
     }
-    
+
     const unitWeight = parseFloat(item.peso_kg || item.weight_kg) || 0;
     const newProduct = {
       product: item.id,
@@ -618,7 +737,7 @@ export default function OperationDetail() {
       unit_price: 0,
       subtotal: 0
     };
-    
+
     setEditPackingProducts(prev => [...prev, newProduct]);
   };
 
@@ -633,7 +752,7 @@ export default function OperationDetail() {
         return;
       }
     }
-    
+
     setActionLoading(true);
     try {
       const payload = {
@@ -643,12 +762,12 @@ export default function OperationDetail() {
           unit_price: p.unit_price
         }))
       };
-      
+
       const res = await axios.patch(`/operaciones/operations/${id}/`, payload);
       showToast('Packing list guardado y actualizado con éxito', 'success');
-      
+
       setOperation(res.data);
-      
+
       const productsMapped = (res.data.products || []).map(p => ({
         product: p.product,
         name: p.product_name,
@@ -919,9 +1038,9 @@ export default function OperationDetail() {
                   )}
                 </div>
               </div>
-
-              <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                {!isOperario ? (
+              {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                  {!isOperario ? (
                   <>
                     <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
                       <div className="flex justify-between items-center">
@@ -1000,6 +1119,7 @@ export default function OperationDetail() {
                   <OperarioActionPanel products={operation.products} />
                 )}
               </div>
+              )}
 
               {(!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing' || productionOrders.length > 0)) && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
@@ -1094,130 +1214,191 @@ export default function OperationDetail() {
                 </div>
               )}
 
-              <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                  <div className="flex justify-between items-center">
+              {operation.tipo_operacion === 'servicios' && (
+                <div className="bg-indigo-50/50 dark:bg-indigo-900/10 shadow-sm sm:rounded-2xl border border-indigo-100 dark:border-indigo-800/30 overflow-hidden mb-6 p-4 sm:p-6 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300">Materiales a bordo (Consumibles / Repuestos)</h4>
+                    <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mt-1">
+                      Activa esta opción si se dejarán materiales en el buque. Esto habilitará la generación de Packing List y Rancho Aduanero.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setLeaveMaterials(!leaveMaterials)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${leaveMaterials ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+                    role="switch"
+                    aria-checked={leaveMaterials}
+                  >
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${leaveMaterials ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              )}
+
+              {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+                <>
+                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                          <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PROVEEDOR</label>
+                          <select
+                            value={proveedor}
+                            onChange={(e) => setProveedor(e.target.value)}
+                            className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                          >
+                            <option value="PROIOS SA">PROIOS SA (CUIT: 30-63661723-3)</option>
+                            <option value="PROIOS SALVAGE SA">PROIOS SALVAGE SA (CUIT: 33-71087653-9)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
+                          <select
+                            value={paisDestino}
+                            onChange={(e) => setPaisDestino(e.target.value)}
+                            className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                          >
+                            <option value="argentina">Argentina (empresa argentina)</option>
+                            <option value="bandera">Bandera del buque (cliente extranjero)</option>
+                          </select>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                            {paisDestino === 'argentina' ? 'Se usará Argentina' : (shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Bandera no especificada en el buque')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-folder-fill text-indigo-500"></i> Documentación {operation.tipo_operacion === 'servicios' && '(Por Materiales a Bordo)'}
+                      </h3>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
+                          {operation.packing_list_file && (
+                            <button
+                              onClick={() => openPreview(operation.packing_list_file, 'Packing List')}
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver Documento
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                          <button
+                            onClick={handleOpenPackingModal}
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            <i className="bi bi-pencil-square"></i> Editar
+                          </button>
+                          <button
+                            onClick={previewPackingListExcel}
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            <i className="bi bi-eye-fill"></i> Vista Previa
+                          </button>
+                          <button
+                            onClick={downloadPackingListExcel}
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
+                          </button>
+                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
+                          {operation.remito_file && (
+                            <button
+                              onClick={() => openPreview(operation.remito_file, 'Remito Firmado')}
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver Documento
+                            </button>
+                          )}
+                        </div>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
+                          {operation.rancho_file && (
+                            <button
+                              onClick={() => openPreview(operation.rancho_file)}
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver Documento
+                            </button>
+                          )}
+                        </div>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {operation.tipo_operacion === 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
                     <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
+                      <i className="bi bi-tools text-amber-500"></i> Solicitud Particular PNA (Herramientas a Bordo)
                     </h3>
                   </div>
-                </div>
-                <div className="p-4 sm:p-6 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PROVEEDOR</label>
-                      <select
-                        value={proveedor}
-                        onChange={(e) => setProveedor(e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                      >
-                        <option value="PROIOS SA">PROIOS SA (CUIT: 30-63661723-3)</option>
-                        <option value="PROIOS SALVAGE SA">PROIOS SALVAGE SA (CUIT: 33-71087653-9)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
-                      <select
-                        value={paisDestino}
-                        onChange={(e) => setPaisDestino(e.target.value)}
-                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                      >
-                        <option value="argentina">Argentina (empresa argentina)</option>
-                        <option value="bandera">Bandera del buque (cliente extranjero)</option>
-                      </select>
-                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                        {paisDestino === 'argentina' ? 'Se usará Argentina' : (shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Bandera no especificada en el buque')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
-                  </h3>
-                </div>
-                <div className="p-4 sm:p-6 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
-                      {operation.packing_list_file && (
+                  <div className="p-4 sm:p-6 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
+                        {operation.solicitud_particular_file && (
+                          <button
+                            onClick={() => openPreview(operation.solicitud_particular_file, 'Solicitud Particular Externa')}
+                            className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                          >
+                            <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
                         <button
-                          onClick={() => openPreview(operation.packing_list_file, 'Packing List')}
-                          className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                          onClick={() => setIsToolsModalOpen(true)}
+                          className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                         >
-                          <i className="bi bi-eye-fill"></i> Ver Documento
+                          <i className="bi bi-card-list"></i> Gestionar Herramientas
                         </button>
-                      )}
+                        <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                        </label>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                      <button
-                        onClick={handleOpenPackingModal}
-                        className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                      >
-                        <i className="bi bi-pencil-square"></i> Editar
-                      </button>
-                      <button
-                        onClick={previewPackingListExcel}
-                        className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                      >
-                        <i className="bi bi-eye-fill"></i> Vista Previa
-                      </button>
-                      <button
-                        onClick={downloadPackingListExcel}
-                        className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                      >
-                        <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
-                      </button>
-                      <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
-                      {operation.remito_file && (
-                        <button
-                          onClick={() => openPreview(operation.remito_file, 'Remito Firmado')}
-                          className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
-                        >
-                          <i className="bi bi-eye-fill"></i> Ver Documento
-                        </button>
-                      )}
-                    </div>
-                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
-                    </label>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
-                      {operation.rancho_file && (
-                        <button
-                          onClick={() => openPreview(operation.rancho_file, 'Rancho / Permiso Aduanero')}
-                          className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
-                        >
-                          <i className="bi bi-eye-fill"></i> Ver Documento
-                        </button>
-                      )}
-                    </div>
-                    <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
-                    </label>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
               <OperationDocuments
@@ -1247,12 +1428,12 @@ export default function OperationDetail() {
                       const isImage = adj.content_type?.startsWith('image/') || adj.filename?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
                       const isPdf = adj.content_type === 'application/pdf' || adj.filename?.match(/\.pdf$/i);
                       const isExcel = adj.content_type?.includes('spreadsheet') || adj.content_type?.includes('excel') || adj.filename?.match(/\.xlsx?$/i);
-                      
+
                       let iconClass = "bi-file-earmark-fill text-slate-400";
                       if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
                       else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
                       else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
-                      
+
                       return (
                         <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
                           <div className="flex items-start gap-3">
@@ -1278,7 +1459,7 @@ export default function OperationDetail() {
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
                             <button
                               onClick={() => openPreview(adj.file, adj.filename)}
@@ -1359,63 +1540,146 @@ export default function OperationDetail() {
                     </button>
                   )}
 
-                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
-                    <button
-                      onClick={() => handleAction('confirm_operation', '¿Confirmar etapa de Preparación y pasar al estado de Suministros (Armado de Packing List)?')}
-                      disabled={actionLoading}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                    >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
-                    </button>
-                  )}
-                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_send_to_customs && !isOperario && (
-                    <button
-                      onClick={handleEnviarAduanasClick}
-                      disabled={actionLoading || fetchingAduanasFile || (stockVerification && !stockVerification.todo_suficiente)}
-                      className={`w-full sm:w-auto px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${(stockVerification && !stockVerification.todo_suficiente)
-                        ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                        : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
-                        }`}
-                    >
-                      {actionLoading || fetchingAduanasFile ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Procesando...
-                        </>
-                      ) : (
-                        <><i className="bi bi-building-check"></i> Enviar a Aduanas</>
+                  {operation.tipo_operacion !== 'servicios' ? (
+                    <>
+                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
+                        <button
+                          onClick={() => handleAction('confirm_operation', '¿Confirmar etapa de Preparación y pasar al estado de Suministros (Armado de Packing List)?')}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                          {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
+                        </button>
                       )}
-                    </button>
-                  )}
-                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_coordinate && !isOperario && (
-                    <button
-                      onClick={() => handleAction('finalize_production', '¿Aduanas aprobó el despacho (Rancho)? Pasar a lista para envío.')}
-                      disabled={actionLoading}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-white hover:bg-amber-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                    >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-truck"></i> Despacho de Aduana Listo</>}
-                    </button>
-                  )}
-                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_deliver && !isOperario && (
-                    <button
-                      onClick={() => handleAction('mark_delivered', '¿Marcar como remitada? Se asume que la logística ya fue gestionada.')}
-                      disabled={actionLoading}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                    >
-                      {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
-                    </button>
-                  )}
-                  {(!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
-                    <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
-                      {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
-                    </button>
+                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_send_to_customs && !isOperario && (
+                        <button
+                          onClick={handleEnviarAduanasClick}
+                          disabled={actionLoading || fetchingAduanasFile || (stockVerification && !stockVerification.todo_suficiente)}
+                          className={`w-full sm:w-auto px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${(stockVerification && !stockVerification.todo_suficiente)
+                            ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                            : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
+                            }`}
+                        >
+                          {actionLoading || fetchingAduanasFile ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Procesando...
+                            </>
+                          ) : (
+                            <><i className="bi bi-building-check"></i> Enviar a Aduanas</>
+                          )}
+                        </button>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_coordinate && !isOperario && (
+                        <button
+                          onClick={() => handleAction('finalize_production', '¿Aduanas aprobó el despacho (Rancho)? Pasar a lista para envío.')}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-white hover:bg-amber-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                          {actionLoading ? 'Procesando...' : <><i className="bi bi-truck"></i> Despacho de Aduana Listo</>}
+                        </button>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_deliver && !isOperario && (
+                        <button
+                          onClick={() => handleAction('mark_delivered', '¿Marcar como remitada? Se asume que la logística ya fue gestionada.')}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                          {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
+                        </button>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
+                        <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                          {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                          <button
+                            onClick={() => openPreview(`/api/operaciones/operations/${id}/generate_cotizacion_servicio/`)}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                            title="Vista previa del documento generado automáticamente"
+                          >
+                            <i className="bi bi-eye-fill"></i> Vista Previa
+                          </button>
+                          <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
+                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
+                            <input type="file" className="hidden" onChange={handleUploadCotizacionCustom} disabled={uploading} />
+                          </label>
+                          <button
+                            onClick={handleCotizarClick}
+                            disabled={actionLoading || fetchingCotizacionFile}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading || fetchingCotizacionFile ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
+                          </button>
+                        </div>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                          <button
+                            onClick={() => setShowPnaModal(true)}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                          >
+                            <i className="bi bi-file-earmark-pdf"></i> Generar Permiso PNA
+                          </button>
+                          <button
+                            onClick={() => handleAction('tramitar_permisos_pna', '¿Marcar permisos PNA como gestionados?')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading ? 'Procesando...' : <><i className="bi bi-shield-check"></i> Permisos Tramitados</>}
+                          </button>
+                        </div>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'permisos_pna' && (
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+
+                          <button
+                            onClick={() => handleAction('iniciar_ejecucion_servicio', '¿Iniciar la ejecución del servicio a bordo?')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 text-white hover:bg-indigo-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading ? 'Procesando...' : <><i className="bi bi-tools"></i> Iniciar Ejecución</>}
+                          </button>
+                        </div>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'en_ejecucion' && (
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                          <button
+                            onClick={() => handleGeneratePdf('generate_reporte_servicio')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-4 py-2 border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                          >
+                            <i className="bi bi-file-earmark-pdf"></i> Reporte de Servicio (Base)
+                          </button>
+                          <button
+                            onClick={() => handleAction('finalizar_servicio_reporte', '¿Finalizar el servicio? Asegúrate de subir luego el reporte firmado por el cliente en Documentación.')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading ? 'Procesando...' : <><i className="bi bi-check-all"></i> Servicio Finalizado</>}
+                          </button>
+                        </div>
+                      )}
+                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && (
+                        <button onClick={() => handleAction('close_servicio', '¿Cerrar Operación por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                          {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             </div>
 
             <div className="lg:col-span-1 sticky top-24 self-start">
-              <OperationTracker currentState={operation.status || operation.estado} />
+              <OperationTracker currentState={operation.status || operation.estado} operationType={operation.tipo_operacion} />
             </div>
           </div>
         </div>
@@ -1432,6 +1696,30 @@ export default function OperationDetail() {
           initialSubject={`Packing List - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
           initialBody={`Estimados,\n\nAdjuntamos el Packing List correspondiente a la operación en curso:\n\n• Cliente: ${operation.client_name}\n• Buque: ${operation.ship_name}\n• Puerto: ${operation.port_name}\n\nQuedamos a la espera de su confirmación para proceder.\n\nSaludos cordiales.`}
           initialAttachments={[aduanasEmailAttachment]}
+        />
+      )}
+
+      {/* Modal de Enviar Cotización */}
+      {showCotizacionEmailModal && (
+        <ComposeEmailModal
+          onClose={() => setShowCotizacionEmailModal(false)}
+          onSuccess={handleCotizacionEmailSuccess}
+          user={user}
+          defaultOperacionId={id}
+          defaultRecipient={operation.agency_email || operation.client_email || ''}
+          initialSubject={`Cotización de Servicio - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
+          initialBody={`Estimados,
+
+Adjuntamos la cotización correspondiente al servicio solicitado para el buque ${operation.ship_name}.
+
+• Cliente: ${operation.client_name}
+• Buque: ${operation.ship_name}
+• Puerto: ${operation.port_name}
+
+Quedamos a su disposición por cualquier consulta y a la espera de su confirmación.
+
+Saludos cordiales.`}
+          initialAttachments={cotizacionEmailAttachment ? [cotizacionEmailAttachment] : []}
         />
       )}
 
@@ -1591,6 +1879,60 @@ export default function OperationDetail() {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para generar Permiso PNA */}
+      {showPnaModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <h3 className="text-lg leading-6 font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-shield-check text-blue-500"></i> Generar Permiso PNA
+              </h3>
+              <button onClick={() => setShowPnaModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+              <p className="text-sm mb-4 text-slate-600 dark:text-slate-300">
+                Seleccione el tipo de permiso que desea generar para la Prefectura Naval Argentina.
+              </p>
+
+              <div className="space-y-4">
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${pnaType === 'frio' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <input type="radio" name="pnaType" value="frio" checked={pnaType === 'frio'} onChange={() => setPnaType('frio')} className="mt-1" />
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-white">Trabajo en Frío</h4>
+                    <p className="text-xs text-slate-500 mt-1">Tareas generales que no implican chispas, soldaduras o fuentes de calor.</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${pnaType === 'caliente' ? 'border-red-500 bg-red-50/50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <input type="radio" name="pnaType" value="caliente" checked={pnaType === 'caliente'} onChange={() => setPnaType('caliente')} className="mt-1" />
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-white">Trabajo en Caliente</h4>
+                    <p className="text-xs text-slate-500 mt-1">Tareas que implican fuego, soldaduras, corte de metales u otras fuentes de ignición.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div className="px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <button
+                type="button"
+                className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                onClick={() => {
+                  handleGeneratePdf('generate_permiso_pna', { tipo: pnaType });
+                  setShowPnaModal(false);
+                }}
+              >
+                Generar Documento
+              </button>
+              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPnaModal(false)}>
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
@@ -1762,6 +2104,13 @@ export default function OperationDetail() {
         }
         `,
       }} />
+      <ToolsModal
+        isOpen={isToolsModalOpen}
+        onClose={() => setIsToolsModalOpen(false)}
+        operation={operation}
+        onSave={fetchOperation}
+        onPreview={handlePreviewToolsPDF}
+      />
     </div>
   );
 }

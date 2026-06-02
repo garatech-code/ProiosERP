@@ -49,12 +49,21 @@ class Agency(models.Model):
 
 
 class Operacion(models.Model):
-    # Estados FSM
+    # Estados FSM (Productos / Químicos)
     ESTADO_SOLICITADA = 'solicitada'
     ESTADO_ARMADO_PACKING = 'armado_packing'
     ESTADO_EN_ADUANA = 'en_aduana'
     ESTADO_LISTA_PARA_ENVIO = 'lista_para_envio'
     ESTADO_REMITADA = 'remitada'
+    
+    # Estados FSM específicos (Servicios)
+    ESTADO_SOLICITUD_SERVICIO = 'solicitud_servicio'
+    ESTADO_COTIZADO = 'cotizado'
+    ESTADO_PERMISOS_PNA = 'permisos_pna'
+    ESTADO_EN_EJECUCION = 'en_ejecucion'
+    ESTADO_REPORTE_FIRMADO = 'reporte_firmado'
+
+    # Estados Comunes
     ESTADO_ENTREGADA = 'entregada'
     ESTADO_CANCELADA = 'cancelada'
 
@@ -64,6 +73,13 @@ class Operacion(models.Model):
         (ESTADO_EN_ADUANA, 'En Aduana (Esperando Rancho)'),
         (ESTADO_LISTA_PARA_ENVIO, 'Logística (Despacho y Remito)'),
         (ESTADO_REMITADA, 'Entregada en sitio'),
+        
+        (ESTADO_SOLICITUD_SERVICIO, 'Solicitud de Servicio'),
+        (ESTADO_COTIZADO, 'Servicio Cotizado'),
+        (ESTADO_PERMISOS_PNA, 'Permisos PNA Gestionados'),
+        (ESTADO_EN_EJECUCION, 'En Ejecución'),
+        (ESTADO_REPORTE_FIRMADO, 'Reporte Firmado / Finalizado'),
+
         (ESTADO_ENTREGADA, 'Completada / Cerrada'),
         (ESTADO_CANCELADA, 'Cancelada'),
     )
@@ -109,10 +125,12 @@ class Operacion(models.Model):
     detalle_servicio = models.TextField(blank=True, null=True, help_text="Descripción detallada para operaciones de tipo Servicio.")
     subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
+    herramientas_solicitud_particular = models.TextField(blank=True, null=True, help_text="Listado de herramientas a subir/bajar para la Solicitud Particular.")
 
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)
     rancho_file = models.FileField(upload_to='ranchos/', null=True, blank=True)
+    solicitud_particular_file = models.FileField(upload_to='solicitud_particular/', null=True, blank=True)
     stock_consumido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -173,6 +191,27 @@ class Operacion(models.Model):
     def close(self):
         self.closed_date = timezone.now()
         pass
+
+    # Transiciones para Servicios
+    @transition(field=estado, source=[ESTADO_SOLICITUD_SERVICIO, ESTADO_SOLICITADA], target=ESTADO_COTIZADO)
+    def cotizar_servicio(self):
+        self.client_confirmed_date = timezone.now()
+
+    @transition(field=estado, source=ESTADO_COTIZADO, target=ESTADO_PERMISOS_PNA)
+    def tramitar_permisos_pna(self):
+        pass
+
+    @transition(field=estado, source=ESTADO_PERMISOS_PNA, target=ESTADO_EN_EJECUCION)
+    def iniciar_ejecucion_servicio(self):
+        pass
+
+    @transition(field=estado, source=ESTADO_EN_EJECUCION, target=ESTADO_REPORTE_FIRMADO)
+    def finalizar_servicio_reporte(self):
+        self.delivery_date = timezone.now()
+
+    @transition(field=estado, source=ESTADO_REPORTE_FIRMADO, target=ESTADO_ENTREGADA)
+    def close_servicio(self):
+        self.closed_date = timezone.now()
 
     @transition(field=estado, source='*', target=ESTADO_CANCELADA)
     def cancel(self):
@@ -281,12 +320,25 @@ class DocumentoAdjunto(models.Model):
     TIPO_DELIVERY_NOTE = 'delivery_note'
     TIPO_FACTURA_PROVEEDOR = 'factura_proveedor'
     TIPO_HABILITACION_ADUANERA = 'habilitacion_aduanera'
+    
+    # Documentos específicos de Servicios
+    TIPO_COTIZACION_SERVICIO = 'cotizacion_servicio'
+    TIPO_PERMISO_PNA = 'permiso_pna'
+    TIPO_SOLICITUD_PARTICULAR = 'solicitud_particular'
+    TIPO_REPORTE_SERVICIO = 'reporte_servicio'
+    
     TIPO_OTROS = 'otros'
 
     TIPO_CHOICES = (
         (TIPO_DELIVERY_NOTE, 'Preparación'),
         (TIPO_FACTURA_PROVEEDOR, 'Factura a proveedor'),
         (TIPO_HABILITACION_ADUANERA, 'Habilitación aduanera'),
+        
+        (TIPO_COTIZACION_SERVICIO, 'Cotización de Servicio'),
+        (TIPO_PERMISO_PNA, 'Permiso PNA'),
+        (TIPO_SOLICITUD_PARTICULAR, 'Solicitud Particular'),
+        (TIPO_REPORTE_SERVICIO, 'Reporte de Servicio'),
+        
         (TIPO_OTROS, 'Otros'),
     )
 

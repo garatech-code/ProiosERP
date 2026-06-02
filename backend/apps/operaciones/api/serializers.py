@@ -136,13 +136,14 @@ class OperacionSerializer(serializers.ModelSerializer):
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date',
             'delivery_date', 'closed_date',
-            'packing_list_file', 'remito_file', 'rancho_file',
+            'packing_list_file', 'remito_file', 'rancho_file', 'solicitud_particular_file',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
             'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
-            'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre'
+            'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
+            'herramientas_solicitud_particular'
         ]
         extra_kwargs = {
             'cliente': {'required': False},

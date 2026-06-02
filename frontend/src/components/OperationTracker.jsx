@@ -1,38 +1,71 @@
 // src/components/OperationTracker.jsx
 import React from 'react';
 
-export default function OperationTracker({ currentState }) {
+export default function OperationTracker({ currentState, operationType }) {
+    const isService = operationType === 'servicios';
+
     // Mapeo robusto de estados (soporta los tuyos en español e inglés)
     const getActiveStep = (state) => {
         if (state === 'cancelada' || state === 'cancelled') return -1;
-        switch (state) {
-            case 'solicitada':
-                return 1;
-            case 'armado_packing':
-                return 2;
-            case 'en_aduana':
-                return 3;
-            case 'lista_para_envio':
-            case 'remitada':
-                return 4;
-            case 'entregada':
-            case 'closed':
-                return 5;
-            default:
-                return 1;
+        
+        if (isService) {
+            switch (state) {
+                case 'solicitud_servicio':
+                case 'solicitada': // Fallback si quedó con el estado viejo
+                    return 1;
+                case 'cotizado':
+                    return 2;
+                case 'permisos_pna':
+                    return 3;
+                case 'en_ejecucion':
+                    return 4;
+                case 'reporte_firmado':
+                case 'entregada':
+                case 'closed':
+                    return 5;
+                default:
+                    return 1;
+            }
+        } else {
+            switch (state) {
+                case 'solicitada':
+                    return 1;
+                case 'armado_packing':
+                    return 2;
+                case 'en_aduana':
+                    return 3;
+                case 'lista_para_envio':
+                case 'remitada':
+                    return 4;
+                case 'entregada':
+                case 'closed':
+                    return 5;
+                default:
+                    return 1;
+            }
         }
     };
 
     const activeStep = getActiveStep(currentState);
     const isCancelled = activeStep === -1;
 
-    const steps = [
+    const stepsProduct = [
         { num: 1, label: 'Preparación', icon: 'bi-file-earmark-text', desc: 'Orden ingresada' },
         { num: 2, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
         { num: 3, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
         { num: 4, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
         { num: 5, label: 'Finalizada', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
     ];
+
+    const stepsService = [
+        { num: 1, label: 'Solicitud Recibida', icon: 'bi-file-earmark-text', desc: 'Análisis de servicio' },
+        { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
+        { num: 3, label: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA' },
+        { num: 4, label: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
+        { num: 5, label: 'Reporte Final', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
+    ];
+
+    const steps = isService ? stepsService : stepsProduct;
 
     if (isCancelled) {
         return (
@@ -50,7 +83,7 @@ export default function OperationTracker({ currentState }) {
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 h-full flex flex-col sticky top-24 min-h-[500px]">
             <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-4 shrink-0">
                 <i className="bi bi-signpost-split text-indigo-500 text-lg"></i>
-                Estado del Flujo
+                Estado del Flujo {isService && <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded ml-auto">SERVICIOS</span>}
             </h3>
 
             <div className="flex-1 relative py-2">

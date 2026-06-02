@@ -172,6 +172,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
       operarios_id: [],
       operarios_usuarios_id: [],
       subtipo_servicio: '',
+      herramientas_solicitud_particular: '',
     };
   });
 
@@ -231,6 +232,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
             operarios_id: op.operarios_id || [],
             operarios_usuarios_id: op.operarios_usuarios_id || [],
             subtipo_servicio: op.subtipo_servicio || '',
+            herramientas_solicitud_particular: op.herramientas_solicitud_particular || '',
           });
 
           setExistingFiles({
@@ -788,39 +790,6 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
               />
             </div>
 
-            <div>
-              <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">
-                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Repuestos Adicionales / Carga</h3>
-                <button
-                  type="button"
-                  onClick={addProduct}
-                  className="text-sm font-bold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <span>+</span> Añadir Ítem
-                </button>
-              </div>
-
-              {formData.products.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                  <p className="text-gray-500 text-sm">No hay productos en esta operación.</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {formData.products.map((p, i) => (
-                    <ProductRow key={i} product={p} index={i} onUpdate={handleProductUpdate} onRemove={removeProduct} />
-                  ))}
-                </div>
-              )}
-
-              {formData.products.length > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <div className="bg-slate-800 text-white px-6 py-3 rounded-xl shadow-md flex items-center gap-4">
-                    <span className="text-sm font-medium text-slate-300 uppercase tracking-wider">Total Estimado</span>
-                    <span className="text-xl font-bold">${calculateTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div>
               <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Notas Adicionales</label>

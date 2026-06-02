@@ -58,9 +58,10 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
   // Plantilla Institucional HTML + Firma
   const buildHtmlBody = () => {
     // Firma dinámica según usuario
-    const senderName = (user?.first_name || user?.last_name)
-      ? `${user?.first_name || ''} ${user?.last_name || ''}`.trim()
-      : user?.username || 'Usuario de Proios';
+    const firstName = user?.first_name || '';
+    const lastName = user?.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    const senderName = fullName || user?.username || 'Usuario de Proios';
 
     const signature = `
       <div style="margin-top: 25px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #4b5563; border-left: 3px solid #13a6b8; padding-left: 12px; margin-left: 2px;">
@@ -119,7 +120,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     // We will send the beautiful HTML version. The plaintext will unfortunately show HTML tags unless we clean it on backend, 
     // but for this demo, most clients render HTML.
     
-    const plainText = formData.body + `\n\n--\n${user?.first_name} ${user?.last_name || user?.username}\n${user?.role || ''}\nProIOS`;
+    const plainText = formData.body + `\n\n--\n${user?.first_name || ''} ${user?.last_name || user?.username}\n${user?.role || ''}\nProIOS`;
 
     try {
       const formDataToSend = new FormData();

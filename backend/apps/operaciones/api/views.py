@@ -243,6 +243,29 @@ class OperacionViewSet(viewsets.ModelViewSet):
         op.save()
         return Response({'status': 'ok'})
 
+    @action(detail=True, methods=['post'], url_path='upload_solicitud_particular')
+    def upload_solicitud_particular(self, request, pk=None):
+        op = self.get_object()
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=400)
+        op.solicitud_particular_file = request.FILES['file']
+        op.save()
+        return Response({'status': 'ok'})
+
+    @action(detail=True, methods=['get'])
+    def generate_solicitud_particular_pdf(self, request, pk=None):
+        op = self.get_object()
+        from apps.operaciones.services_pdf import generar_solicitud_particular_pdf
+        try:
+            pdf_bytes = generar_solicitud_particular_pdf(op)
+            from django.http import HttpResponse
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="Solicitud_Particular_OP{op.id}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando PDF de solicitud particular")
+            return Response({'error': str(e)}, status=400)
+
     @action(detail=True, methods=['get'], url_path='packing_list_json')
     def packing_list_json(self, request, pk=None):
         op = self.get_object()
@@ -762,6 +785,117 @@ class OperacionViewSet(viewsets.ModelViewSet):
             'status': 'ok',
             'operarios_usuarios_asignados': list(operacion.operarios_usuarios_asignados.values_list('id', flat=True))
         })
+
+
+    # ========== SERVICIOS (FSM y Generación de PDF) ==========
+    
+    @action(detail=True, methods=['post'])
+    def cotizar_servicio(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.cotizar_servicio()
+                op.save()
+            return Response({'status': 'cotizado'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def tramitar_permisos_pna(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.tramitar_permisos_pna()
+                op.save()
+            return Response({'status': 'permisos_gestionados'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def iniciar_ejecucion_servicio(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.iniciar_ejecucion_servicio()
+                op.save()
+            return Response({'status': 'en_ejecucion'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def finalizar_servicio_reporte(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.finalizar_servicio_reporte()
+                op.save()
+            return Response({'status': 'reporte_firmado'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def close_servicio(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.close_servicio()
+                op.save()
+            return Response({'status': 'closed_servicio'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['get'])
+    def generate_cotizacion_servicio(self, request, pk=None):
+        op = self.get_object()
+        from apps.operaciones.services_pdf import generar_cotizacion_servicio_pdf
+        try:
+            pdf_content = generar_cotizacion_servicio_pdf(op)
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="cotizacion_OP{op.id}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando cotizacion de servicio")
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['get'])
+    def generate_permiso_pna(self, request, pk=None):
+        op = self.get_object()
+        tipo_trabajo = request.query_params.get('tipo', 'frio')
+        from apps.operaciones.services_pdf import generar_permiso_pna_pdf
+        try:
+            pdf_content = generar_permiso_pna_pdf(op, tipo_trabajo)
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="permiso_pna_OP{op.id}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando permiso PNA")
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['get'])
+    def generate_solicitud_particular(self, request, pk=None):
+        op = self.get_object()
+        from apps.operaciones.services_pdf import generar_solicitud_particular_pdf
+        try:
+            pdf_content = generar_solicitud_particular_pdf(op)
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="solicitud_particular_OP{op.id}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando solicitud particular")
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['get'])
+    def generate_reporte_servicio(self, request, pk=None):
+        op = self.get_object()
+        from apps.operaciones.services_pdf import generar_reporte_servicio_pdf
+        try:
+            pdf_content = generar_reporte_servicio_pdf(op)
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="reporte_servicio_OP{op.id}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando reporte servicio")
+            return Response({'error': str(e)}, status=500)
 
 
 class AgendaEventViewSet(viewsets.ModelViewSet):
