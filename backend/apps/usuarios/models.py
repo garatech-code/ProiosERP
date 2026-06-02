@@ -17,6 +17,7 @@ class User(AbstractUser):
     # Todos los operadores y contables, por defecto, están sujetos a revisión
     # El Owner podrá desactivar esta bandera en el perfil del usuario.
     requires_owner_review = models.BooleanField(default=True)
+    must_change_password = models.BooleanField(default=False)
     
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"

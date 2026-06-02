@@ -15,6 +15,7 @@ import AgendaEventModal from '../components/AgendaEventModal';
 import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
 import StockMovements from '../components/StockMovements'; // NUEVO
+import UserManagement from '../components/UserManagement';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -596,6 +597,11 @@ export default function OwnerDashboard() {
                         <i className="bi bi-boxes text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Movimientos Stock</span>}
                     </button>
+                    {/* NUEVO: Botón Gestión Usuarios */}
+                    <button title={!isSidebarOpen ? "Gestión Usuarios" : ""} onClick={() => setActiveTab('users')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-person-gear text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Gestión Usuarios</span>}
+                    </button>
                 </div>
 
                 <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
@@ -690,6 +696,11 @@ export default function OwnerDashboard() {
                     <i className="bi bi-boxes text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Stock</span>
                 </button>
+                {/* NUEVO: Botón móvil para Gestión Usuarios */}
+                <button onClick={() => setActiveTab('users')} className={`flex flex-col items-center p-2 ${activeTab === 'users' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-person-gear text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Usuarios</span>
+                </button>
             </div>
 
             {/* Main Content Area */}
@@ -705,16 +716,18 @@ export default function OwnerDashboard() {
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
                             {activeTab === 'staff' && 'Personal de Plantel'}
                             {activeTab === 'stockMovements' && 'Movimientos de Stock'} {/* NUEVO */}
+                            {activeTab === 'users' && 'Gestión de Usuarios'}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
                             {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : 
                              activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : 
                              activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' :
-                             activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' : // NUEVO
+                             activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' : 
+                             activeTab === 'users' ? 'Crea y administra las cuentas de acceso web para tus empleados.' :
                              'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
-                    {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && ( // NUEVO: ocultar botón en stockMovements
+                    {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && ( // NUEVO: ocultar botón en stockMovements y users
                         <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                             <i className="bi bi-plus-lg text-lg"></i>
                             Nueva Operación
@@ -743,6 +756,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'inventory' && <InventoryManagement />}
                             {activeTab === 'staff' && <StaffManagement />}
                             {activeTab === 'stockMovements' && <StockMovements />} {/* NUEVO */}
+                            {activeTab === 'users' && <UserManagement />}
                         </>
                     )}
                 </div>

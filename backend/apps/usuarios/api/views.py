@@ -2,6 +2,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from django.contrib.auth import get_user_model
 from .serializers import CustomTokenObtainPairSerializer, UserSerializer, FeedbackItemSerializer
 from apps.usuarios.permissions import IsAdminUser
@@ -38,6 +39,54 @@ class UserViewSet(viewsets.ModelViewSet):
             qs = qs.filter(role=role_param)
             
         return qs
+
+    def perform_create(self, serializer):
+        # El username ingresado actúa como DNI
+        username = serializer.validated_data.get('username')
+        user = serializer.save()
+        user.set_password(username)  # Contraseña inicial = DNI
+        user.must_change_password = True
+        user.save()
+
+        # Enviar correo de bienvenida con instrucciones
+        from django.conf import settings
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost')
+        login_url = f"{frontend_url}/login"
+
+        from apps.usuarios.services import send_welcome_email
+        send_welcome_email(user, login_url)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def change_password(self, request):
+        user = request.user
+        new_password = request.data.get('new_password')
+        if not new_password:
+            return Response({"detail": "La nueva contraseña es requerida."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.usuarios.services import validate_password_rules
+        # Validar reglas de contraseña
+        error_msg = validate_password_rules(new_password, username=user.username)
+        if error_msg:
+            return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Cambiar contraseña
+        user.set_password(new_password)
+        user.must_change_password = False
+        user.save()
+
+        # Devolver nuevos tokens para evitar deslogueo
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        # Agregar claims personalizados
+        refresh['role'] = user.role
+        refresh['username'] = user.username
+        refresh['must_change_password'] = user.must_change_password
+
+        return Response({
+            "detail": "Contraseña actualizada exitosamente.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        }, status=status.HTTP_200_OK)
 
 class FeedbackItemViewSet(viewsets.ModelViewSet):
     queryset = FeedbackItem.objects.all()

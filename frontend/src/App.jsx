@@ -6,6 +6,7 @@ import Login from './components/Login';
 import DashboardRouter from './components/DashboardRouter';
 import OperationFormProductos from './components/OperationFormProductos';
 import OperationDetail from './components/OperationDetail';
+import ChangePassword from './components/ChangePassword';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -15,6 +16,9 @@ const ProtectedRoute = ({ children }) => {
   if (!user) {
     // Guardamos la URL exacta en la que estaba (incluyendo query params)
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  }
+  if (user.must_change_password && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
   }
   return children;
 };
@@ -73,6 +77,7 @@ const AppRoutes = () => {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+      <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
       <Route path="/operations/new" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id/edit" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id" element={<ProtectedRoute><OperationDetail /></ProtectedRoute>} />

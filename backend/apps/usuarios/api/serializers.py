@@ -8,8 +8,8 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'first_name', 'last_name')
-        read_only_fields = ('id',)
+        fields = ('id', 'username', 'email', 'role', 'first_name', 'last_name', 'must_change_password')
+        read_only_fields = ('id', 'must_change_password')
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -19,7 +19,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Agregar claims personalizados
         token['role'] = user.role
         token['username'] = user.username
+        token['must_change_password'] = user.must_change_password
+        token['first_name'] = user.first_name
+        token['last_name'] = user.last_name
         return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['must_change_password'] = self.user.must_change_password
+        return data
 
 class FeedbackItemSerializer(serializers.ModelSerializer):
     creado_por_username = serializers.ReadOnlyField(source='creado_por.username')

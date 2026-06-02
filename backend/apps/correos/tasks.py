@@ -208,23 +208,56 @@ def send_outlook_email(email_message_id):
         email_msg.subject = subject
         email_msg.save(update_fields=['subject'])
 
+    from email.utils import formataddr
     msg["Subject"] = subject
-    msg["From"] = EMAIL_IMAP_USER
+    # Format From header with sender's name if available
+    if email_msg.sender_name:
+        msg["From"] = formataddr((email_msg.sender_name, EMAIL_IMAP_USER))
+    else:
+        msg["From"] = EMAIL_IMAP_USER
     msg["To"] = email_msg.recipient_address
     
     if email_msg.cc_address:
         msg["Cc"] = email_msg.cc_address
 
-    # Body
-    body_multipart = MIMEMultipart("alternative")
-    text_body = email_msg.body_text or "Este es un correo institucional de ProIOS Logistics."
+    # Body y recursos relacionados (imágenes inline)
+    text_body = email_msg.body_text or "Este es un correo institucional de Proios Manager."
     html_body = email_msg.body_html or text_body
-    
-    part1 = MIMEText(text_body, "plain")
-    part2 = MIMEText(html_body, "html")
-    body_multipart.attach(part1)
-    body_multipart.attach(part2)
-    msg.attach(body_multipart)
+
+    if "cid:header_institucional" in html_body:
+        # Estructura relacionada para recursos inline
+        related_multipart = MIMEMultipart("related")
+        
+        alternative_multipart = MIMEMultipart("alternative")
+        alternative_multipart.attach(MIMEText(text_body, "plain"))
+        alternative_multipart.attach(MIMEText(html_body, "html"))
+        related_multipart.attach(alternative_multipart)
+        
+        # Adjuntar la imagen inline
+        import os
+        from django.conf import settings
+        from email.mime.image import MIMEImage
+        
+        logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'header_institucional.png')
+        if os.path.exists(logo_path):
+            try:
+                with open(logo_path, 'rb') as f:
+                    img_data = f.read()
+                img_part = MIMEImage(img_data)
+                img_part.add_header('Content-ID', '<header_institucional>')
+                img_part.add_header('Content-Disposition', 'inline', filename='header_institucional.png')
+                related_multipart.attach(img_part)
+            except Exception as e:
+                logger.error(f"Error attaching inline logo: {e}")
+        else:
+            logger.error(f"Inline logo not found at {logo_path}")
+            
+        msg.attach(related_multipart)
+    else:
+        body_multipart = MIMEMultipart("alternative")
+        body_multipart.attach(MIMEText(text_body, "plain"))
+        body_multipart.attach(MIMEText(html_body, "html"))
+        msg.attach(body_multipart)
 
     # Attachments
     for attachment in email_msg.adjuntos.all():

@@ -9,7 +9,14 @@ export const AuthProvider = ({ children }) => {
         if (token) {
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
-                return { id: payload.user_id, username: payload.username, role: payload.role };
+                return { 
+                    id: payload.user_id, 
+                    username: payload.username, 
+                    role: payload.role, 
+                    must_change_password: payload.must_change_password,
+                    first_name: payload.first_name,
+                    last_name: payload.last_name
+                };
             } catch (e) {
                 return null;
             }
@@ -48,15 +55,36 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('refresh_token', refresh);
             // Decodificar token
             const payload = JSON.parse(atob(access.split('.')[1]));
-            setUser({ id: payload.user_id, username: payload.username, role: payload.role });
+            setUser({ 
+                id: payload.user_id, 
+                username: payload.username, 
+                role: payload.role, 
+                must_change_password: payload.must_change_password,
+                first_name: payload.first_name,
+                last_name: payload.last_name
+            });
         } catch (error) {
             console.error('Login error', error);
             throw error;
         }
     };
 
+    const updateAuthUser = (access, refresh) => {
+        localStorage.setItem('access_token', access);
+        localStorage.setItem('refresh_token', refresh);
+        const payload = JSON.parse(atob(access.split('.')[1]));
+        setUser({
+            id: payload.user_id,
+            username: payload.username,
+            role: payload.role,
+            must_change_password: payload.must_change_password,
+            first_name: payload.first_name,
+            last_name: payload.last_name
+        });
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, updateAuthUser }}>
             {!loading && children}
         </AuthContext.Provider>
     );

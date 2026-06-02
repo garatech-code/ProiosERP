@@ -90,9 +90,13 @@ DATABASES = {
 
 # Configuración de archivos estáticos para WhiteNoise
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = BASE_DIR / "static"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_MANIFEST_STRICT = False
+
+STATICFILES_DIRS = [
+    BASE_DIR / "static_local",
+]
 
 # Configuración de archivos media (subidas de usuario)
 MEDIA_URL = "/media/"
@@ -105,6 +109,8 @@ USE_I18N = True
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost')
+
 # Custom user model
 AUTH_USER_MODEL = "usuarios.User"
 
@@ -115,6 +121,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
+        "apps.usuarios.permissions.RestrictedPasswordPermission",
     ),
 }
 

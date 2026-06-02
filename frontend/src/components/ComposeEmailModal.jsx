@@ -58,11 +58,15 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
   // Plantilla Institucional HTML + Firma
   const buildHtmlBody = () => {
     // Firma dinámica según usuario
+    const senderName = (user?.first_name || user?.last_name)
+      ? `${user?.first_name || ''} ${user?.last_name || ''}`.trim()
+      : user?.username || 'Usuario de Proios';
+
     const signature = `
-      <div style="margin-top: 20px; font-family: Arial, sans-serif; color: #4a5568; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-        <p style="margin: 0; font-weight: bold; color: #1a202c; font-size: 14px;">${user?.first_name} ${user?.last_name || user?.username}</p>
-        <p style="margin: 2px 0; font-size: 12px;">Departamento: <strong style="color:#4f46e5;">${user?.role || 'ProIOS Member'}</strong></p>
-        <p style="margin: 2px 0; font-size: 11px; color: #718096;">Este mensaje fue enviado a través del ERP Central de ProIOS.</p>
+      <div style="margin-top: 25px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #4b5563; border-left: 3px solid #13a6b8; padding-left: 12px; margin-left: 2px;">
+        <p style="margin: 0; font-weight: bold; color: #093641; font-size: 14px;">${senderName}</p>
+        <p style="margin: 2px 0; font-size: 12px; color: #6b7280;">Cargo / Rol: <strong style="color:#13a6b8;">${user?.role || 'Miembro de Proios'}</strong></p>
+        <p style="margin: 2px 0; font-size: 11px; color: #9ca3af;">Este mensaje fue enviado a través del portal Proios Manager.</p>
       </div>
     `;
 
@@ -71,30 +75,31 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
       return formData.body.replace(/\n/g, '<br>') + signature;
     }
 
-    // Plantilla Institucional ProIOS
+    // Plantilla Institucional Proios Manager
+    const logoUrl = "cid:header_institucional";
     return `
       <!DOCTYPE html>
       <html>
       <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 20px; overflow: hidden;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; margin-top: 20px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
           <tr>
-            <td style="background-color: #4f46e5; padding: 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">ProIOS <span style="font-weight:300;">Logistics</span></h1>
+            <td style="background-color: #093641; border-bottom: 4px solid #13a6b8; text-align: center; padding: 0;">
+              <img src="${logoUrl}" alt="Proios Manager" style="width: 100%; max-width: 600px; display: block; border: 0; height: auto;" />
             </td>
           </tr>
           <tr>
-            <td style="padding: 30px; color: #334155; font-size: 14px; line-height: 1.6;">
+            <td style="padding: 30px 25px; color: #334155; font-size: 14px; line-height: 1.6;">
               ${formData.body.replace(/\n/g, '<br>')}
             </td>
           </tr>
           <tr>
-            <td style="padding: 0 30px 30px 30px;">
+            <td style="padding: 0 25px 30px 25px;">
               ${signature}
             </td>
           </tr>
           <tr>
-            <td style="background-color: #f1f5f9; padding: 15px; text-align: center; color: #94a3b8; font-size: 11px;">
-              © ${new Date().getFullYear()} ProIOS. Todos los derechos reservados.<br>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 15px; text-align: center; color: #94a3b8; font-size: 11px;">
+              © ${new Date().getFullYear()} Proios Manager. Todos los derechos reservados.<br>
               Generado automáticamente por el Sistema de Gestión Integrado.
             </td>
           </tr>
