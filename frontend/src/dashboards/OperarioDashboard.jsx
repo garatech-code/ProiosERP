@@ -248,36 +248,81 @@ export default function OperarioDashboard() {
                         </div>
                       </div>
 
-                      {/* Sección: Productos de la operación (ventas) */}
-                      <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                          <i className="bi bi-box-seam text-indigo-500"></i> Productos a entregar
-                        </h3>
-                        {productos.length === 0 ? (
-                          <p className="text-sm text-gray-500 dark:text-slate-400 italic">No hay productos registrados en esta operación.</p>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                              <thead className="bg-gray-50 dark:bg-slate-700/50">
-                                <tr>
-                                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400">Producto</th>
-                                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-slate-400">Cantidad</th>
-                                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400">Presentación</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                                {productos.map((prod, idx) => (
-                                  <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
-                                    <td className="px-3 py-2 font-medium text-gray-800 dark:text-white">{prod.product_name}</td>
-                                    <td className="px-3 py-2 text-center text-gray-700 dark:text-slate-300">{prod.quantity}</td>
-                                    <td className="px-3 py-2 text-gray-600 dark:text-slate-400">{prod.presentation || '-'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                      {/* Sección: Detalles de la Operación */}
+                      {op.tipo_operacion === 'servicios' ? (
+                        <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                          <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                            <i className="bi bi-tools text-indigo-500"></i> Detalles del Servicio
+                          </h3>
+                          <div className="bg-gray-50 dark:bg-slate-700/30 p-3 rounded-xl border border-gray-100 dark:border-slate-600 space-y-3">
+                            {op.subtipo_servicio && (
+                              <p className="text-sm text-gray-700 dark:text-slate-300">
+                                <span className="font-bold text-gray-900 dark:text-white">Subtipo:</span> {op.subtipo_servicio}
+                              </p>
+                            )}
+                            <p className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap">
+                              <span className="font-bold text-gray-900 dark:text-white">Detalle:</span><br/> 
+                              {op.detalle_servicio || <span className="italic text-gray-500">Sin detalle especificado</span>}
+                            </p>
+                            {op.herramientas_solicitud_particular && (
+                              <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
+                                <span className="font-bold text-sm text-gray-900 dark:text-white mb-1 block">Herramientas Asignadas:</span>
+                                <div className="text-sm text-gray-700 dark:text-slate-300 max-h-32 overflow-y-auto custom-scrollbar">
+                                  {(() => {
+                                    try {
+                                      const tools = JSON.parse(op.herramientas_solicitud_particular);
+                                      if (Array.isArray(tools) && tools.length > 0) {
+                                        return (
+                                          <ul className="list-disc pl-4 space-y-1">
+                                            {tools.map((t, idx) => (
+                                              <li key={idx}>
+                                                <span className="font-medium">{t.descripcion}</span> (Cant: {t.cantidad}) {t.serie && <span className="text-xs text-gray-500">SN: {t.serie}</span>}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        );
+                                      }
+                                      return <span className="italic text-gray-500">No hay herramientas registradas</span>;
+                                    } catch(e) {
+                                      return <span className="whitespace-pre-wrap">{op.herramientas_solicitud_particular}</span>;
+                                    }
+                                  })()}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                          <h3 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                            <i className="bi bi-box-seam text-indigo-500"></i> Productos a entregar
+                          </h3>
+                          {productos.length === 0 ? (
+                            <p className="text-sm text-gray-500 dark:text-slate-400 italic">No hay productos registrados en esta operación.</p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50 dark:bg-slate-700/50">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400">Producto</th>
+                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-slate-400">Cantidad</th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400">Presentación</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                                  {productos.map((prod, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                                      <td className="px-3 py-2 font-medium text-gray-800 dark:text-white">{prod.product_name}</td>
+                                      <td className="px-3 py-2 text-center text-gray-700 dark:text-slate-300">{prod.quantity}</td>
+                                      <td className="px-3 py-2 text-gray-600 dark:text-slate-400">{prod.presentation || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Sección: Órdenes de fabricación (si las hay) */}
                       {ordenes.length > 0 && (

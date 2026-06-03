@@ -16,6 +16,12 @@ DEBUG = os.getenv('DEBUG', '0') == '1'
 # Render asigna una URL .onrender.com, asegúrate de añadirla en tu .env o aquí
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Solución para Mixed Content en producción: 
+# Si la app está detrás de un proxy HTTPS (Render, Nginx, ALB), esto fuerza a Django 
+# y DRF a construir URLs (como los links a PDFs y fotos) usando https:// en lugar de http://
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 # Apps instaladas
 INSTALLED_APPS = [
     "django.contrib.admin",
