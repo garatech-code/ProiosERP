@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import AutocompleteCreate from './AutocompleteCreate';
 import LogoSpinner from './LogoSpinner';
-import * as XLSX from 'xlsx';  // npm install xlsx
+import * as XLSX from 'xlsx';
 
 export default function InventoryManagement() {
   const [products, setProducts] = useState([]);
@@ -75,12 +75,6 @@ export default function InventoryManagement() {
   const [movimientoModal, setMovimientoModal] = useState({ open: false, producto: null, tipo: 'INGRESO', cantidad: 1, razon: '' });
   const [registrandoMovimiento, setRegistrandoMovimiento] = useState(false);
 
-  // Stock Físico (funciones pero no se muestran)
-  const [stockItems, setStockItems] = useState([]);
-  const [filteredStock, setFilteredStock] = useState([]);
-  const [uploadingStockExcel, setUploadingStockExcel] = useState(false);
-  const [stockExcelFeedback, setStockExcelFeedback] = useState(null);
-
   const showToast = (message, type = 'info') => {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 4000);
@@ -121,16 +115,6 @@ export default function InventoryManagement() {
       const res = await axios.get('/produccion/formulas/');
       setFormulas(res.data);
     } catch (err) {}
-  };
-  
-  const fetchStockItems = async () => {
-    try {
-      const res = await axios.get('/inventario/stock/');
-      setStockItems(res.data);
-      setFilteredStock(res.data);
-    } catch (err) {
-      showToast('Error al cargar stock físico', 'error');
-    }
   };
   
   const calcularProductosCriticos = () => {
@@ -407,50 +391,38 @@ export default function InventoryManagement() {
     fetchProducts();
     setDeletingMultiple(false);
   };
-  const handleExcelUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    setUploadingExcel(true);
-    const fd = new FormData(); fd.append('file', file);
-    try {
-      const res = await axios.post('/inventario/products/upload_excel/', fd);
-      setExcelFeedback({ type: 'success', message: `${res.data.creados} creados, ${res.data.actualizados} actualizados.`, errors: res.data.errores });
-      fetchProducts();
-    } catch { setExcelFeedback({ type: 'error', message: 'Error en archivo excel.', errors: [] }); }
-    finally { setUploadingExcel(false); event.target.value = ''; }
-  };
   
-  // ---------- Stock Físico ----------
-  const downloadStockTemplate = () => {
+  // ---------- Importación de Excel estándar (ahora usa /products/upload_excel) ----------
+  const downloadStandardTemplate = () => {
     const columnas = [
       'nombre', 'categoria', 'cantidad', 'unidad',
       'ubicacion', 'estado', 'serie_lote', 'observaciones'
     ];
     const ejemplo = [
-      'Ancla 15kg', 'Anclas', 15, 'kg',
-      'Patio A', 'Nuevo', 'A-123', 'Ancla de acero'
+      'Cloro 100%', 'quimicos', 1000, 'L',
+      'Depósito Químicos', 'Bueno', 'LOTE-001', 'Producto líquido'
     ];
     const data = [columnas, ejemplo];
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
     XLSX.utils.book_append_sheet(wb, ws, 'StockTemplate');
-    XLSX.writeFile(wb, 'plantilla_stock_fisico.xlsx');
+    XLSX.writeFile(wb, 'plantilla_stock_estandar.xlsx');
   };
   
-  const handleStockExcelUpload = async (event) => {
+  const handleExcelUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    setUploadingStockExcel(true);
+    setUploadingExcel(true);
     const fd = new FormData();
     fd.append('file', file);
     try {
-      const res = await axios.post('/inventario/stock/upload_excel/', fd);
-      setStockExcelFeedback({ type: 'success', message: `${res.data.creados} creados, ${res.data.actualizados} actualizados`, errors: res.data.errores });
-      fetchStockItems();
+      const res = await axios.post('/inventario/products/upload_excel/', fd);
+      setExcelFeedback({ type: 'success', message: `${res.data.creados} creados, ${res.data.actualizados} actualizados.`, errors: res.data.errores });
+      fetchProducts();
     } catch (err) {
-      setStockExcelFeedback({ type: 'error', message: err.response?.data?.error || 'Error', errors: [] });
+      setExcelFeedback({ type: 'error', message: err.response?.data?.error || 'Error en archivo excel.', errors: [] });
     } finally {
-      setUploadingStockExcel(false);
+      setUploadingExcel(false);
       event.target.value = '';
     }
   };
@@ -554,7 +526,6 @@ export default function InventoryManagement() {
     } catch { showToast('Error al cargar movimientos', 'error'); setMovimientosGlobal(prev => ({ ...prev, loading: false })); }
   };
   
-  // ---------- REGISTRAR MOVIMIENTO RÁPIDO ----------
   const registrarMovimiento = async () => {
     if (!movimientoModal.producto) return;
     if (movimientoModal.cantidad <= 0) {
@@ -685,8 +656,8 @@ export default function InventoryManagement() {
               <button onClick={openMultiDeleteModal} className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-xl shadow-sm text-red-700 bg-white hover:bg-red-50">
                 <i className="bi bi-trash mr-1"></i> Multi-Borrado
               </button>
-              <button onClick={downloadStockTemplate} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50">
-                  <i className="bi bi-download mr-1 text-emerald-600"></i> Plantilla
+              <button onClick={downloadStandardTemplate} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                <i className="bi bi-download mr-1 text-emerald-600"></i> Plantilla Excel
               </button>
               <button onClick={openCreateModal} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
                 <i className="bi bi-plus-lg mr-1"></i> Nuevo artículo
@@ -741,8 +712,8 @@ export default function InventoryManagement() {
           className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl bg-white focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
       </div>
       
-      {/* Listados de artículos (todo, quimicos) */}
-      {(activeTab === 'todo' || activeTab === 'quimicos') && (
+      {/* Listados de artículos (todo, quimicos, productos) */}
+      {(activeTab === 'todo' || activeTab === 'quimicos' || activeTab === 'productos') && (
         <>
           {loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-12 h-12" /></div> :
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -881,63 +852,7 @@ export default function InventoryManagement() {
         </>
       )}
       
-      {/* ================= SECCIÓN DE INSUMOS Y PRODUCTOS (solo artículos, sin stock físico) ================= */}
-      {activeTab === 'productos' && (
-        <>
-          <div className="mb-8">
-            <h3 className="text-md font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              <i className="bi bi-box-seam text-indigo-500"></i> Productos e insumos registrados
-            </h3>
-            {loading ? <div className="flex justify-center py-10"><LogoSpinner size="w-10 h-10" /></div> :
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredProducts.map(product => {
-                  const cardBg = getCardColorClass(product);
-                  const barColor = getStockBarColor(product);
-                  const borderColor = getCardBorderColor(product);
-                  const stockNum = Number(product.stock_actual);
-                  const minStockNum = Number(product.stock_minimo) || 0;
-                  const maxStockNum = Number(product.stock_maximo) || 0;
-                  return (
-                    <div key={product.id} className={`rounded-xl shadow-sm border overflow-hidden hover:shadow-lg transition-shadow flex flex-col group ${cardBg} dark:bg-slate-800 ${borderColor} dark:border-slate-700`}>
-                      <div className="p-5 flex-1 relative">
-                        <div className={`absolute top-0 left-0 w-1.5 h-full ${barColor}`}></div>
-                        <div className="pl-2">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 transition-colors">{product.nombre}</h3>
-                            <div className="flex gap-1 shrink-0">
-                              <button onClick={() => openEditModal(product)} className="text-indigo-300 hover:text-indigo-600" title="Editar"><i className="bi bi-pencil-square"></i></button>
-                              <button onClick={() => confirmDelete(product)} className="text-red-300 hover:text-red-600" title="Eliminar"><i className="bi bi-trash"></i></button>
-                              <button onClick={() => openMovimientosModal(product)} className="text-blue-300 hover:text-blue-600 ml-1" title="Ver movimientos"><i className="bi bi-clock-history"></i></button>
-                              <button onClick={() => fetchLogs(product.id)} className="text-gray-400 hover:text-gray-600 ml-1" title="Ver historial de cambios"><i className="bi bi-file-text"></i></button>
-                              <button onClick={() => setMovimientoModal({ open: true, producto: product, tipo: 'INGRESO', cantidad: 1, razon: '' })} className="text-emerald-500 hover:text-emerald-700 ml-1" title="Registrar movimiento"><i className="bi bi-plus-circle"></i></button>
-                            </div>
-                          </div>
-                          <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 space-y-1 mb-3">
-                            <p><span className="font-semibold text-gray-400">Presentación:</span> {product.presentacion}</p>
-                            <p><span className="font-semibold text-gray-400">Peso Base:</span> {parseFloat(product.peso_kg).toFixed(2)} kg</p>
-                            {product.categoria && <p><span className="font-semibold text-gray-400">Categoría:</span> {product.categoria}</p>}
-                            {product.proveedor_nombre && <p><span className="font-semibold text-gray-400">Proveedor:</span> {product.proveedor_nombre}</p>}
-                            <p><span className="font-semibold text-gray-400">Stock Actual:</span> 
-                              <span className={`ml-1 font-bold ${stockNum === 0 ? 'text-red-600' : (minStockNum > 0 && stockNum <= minStockNum ? 'text-yellow-700' : (maxStockNum > 0 && stockNum >= maxStockNum ? 'text-orange-600' : 'text-green-600'))}`}>
-                                {stockNum.toFixed(2)}
-                              </span>
-                            </p>
-                            {minStockNum > 0 && <p className="text-xs text-gray-500"><span className="font-semibold text-gray-400">Stock Mínimo:</span> {minStockNum.toFixed(2)}</p>}
-                            {maxStockNum > 0 && <p className="text-xs text-gray-500"><span className="font-semibold text-gray-400">Stock Máximo:</span> {maxStockNum.toFixed(2)}</p>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            }
-            {filteredProducts.length === 0 && !loading && <div className="text-center py-8 text-gray-500">No hay productos en esta categoría.</div>}
-          </div>
-        </>
-      )}
-      
-      {/* ===== MODALES (CORREGIDOS) ===== */}
+      {/* ===== MODALES (sin cambios, se mantienen) ===== */}
       
       {/* Modal Proveedor */}
       {showProveedorModal && createPortal(
@@ -1046,7 +961,7 @@ export default function InventoryManagement() {
         document.body
       )}
       
-      {/* Modal Movimientos por producto - CORREGIDO */}
+      {/* Modal Movimientos por producto */}
       {movimientosModal.open && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4" onClick={() => setMovimientosModal({ open: false, producto: null, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '' }, page: 1, totalPages: 1, exportando: false })}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
@@ -1064,25 +979,12 @@ export default function InventoryManagement() {
               {movimientosModal.loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-10 h-10" /></div> : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Razón</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Operación</th>
-                      </tr>
-                    </thead>
+                    <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-xs font-medium">Fecha</th><th className="px-4 py-3 text-left text-xs font-medium">Tipo</th><th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th><th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th><th className="px-4 py-3 text-left text-xs font-medium">Razón</th><th className="px-4 py-3 text-left text-xs font-medium">Operación</th></tr></thead>
                     <tbody className="divide-y divide-gray-200">
                       {movimientosModal.movimientos.map(m => (
                         <tr key={m.id}>
                           <td className="px-4 py-2 text-sm">{new Date(m.fecha).toLocaleString()}</td>
-                          <td className="px-4 py-2 text-sm">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {m.tipo}
-                            </span>
-                          </td>
+                          <td className="px-4 py-2 text-sm"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{m.tipo}</span></td>
                           <td className="px-4 py-2 text-sm">{m.cantidad}</td>
                           <td className="px-4 py-2 text-sm">{m.stock_resultante}</td>
                           <td className="px-4 py-2 text-sm">{m.razon}</td>
@@ -1150,27 +1052,13 @@ export default function InventoryManagement() {
               {movimientosGlobal.loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-10 h-10" /></div> : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Producto</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Razón</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium">Operación</th>
-                      </tr>
-                    </thead>
+                    <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-xs font-medium">Fecha</th><th className="px-4 py-3 text-left text-xs font-medium">Producto</th><th className="px-4 py-3 text-left text-xs font-medium">Tipo</th><th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th><th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th><th className="px-4 py-3 text-left text-xs font-medium">Razón</th><th className="px-4 py-3 text-left text-xs font-medium">Operación</th></tr></thead>
                     <tbody className="divide-y divide-gray-200">
                       {movimientosGlobal.movimientos.map(m => (
                         <tr key={m.id}>
                           <td className="px-4 py-2 text-sm">{new Date(m.fecha).toLocaleString()}</td>
                           <td className="px-4 py-2 text-sm">{m.articulo_nombre}</td>
-                          <td className="px-4 py-2 text-sm">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {m.tipo}
-                            </span>
-                          </td>
+                          <td className="px-4 py-2 text-sm"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{m.tipo}</span></td>
                           <td className="px-4 py-2 text-sm">{m.cantidad}</td>
                           <td className="px-4 py-2 text-sm">{m.stock_resultante}</td>
                           <td className="px-4 py-2 text-sm">{m.razon}</td>
@@ -1202,36 +1090,33 @@ export default function InventoryManagement() {
               <button onClick={() => setMovimientoModal(prev => ({ ...prev, open: false }))} className="text-gray-500 hover:text-gray-700"><i className="bi bi-x-lg text-xl"></i></button>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold mb-1">Tipo</label>
+              <div><label className="block text-sm font-bold mb-1">Tipo</label>
                 <select value={movimientoModal.tipo} onChange={e => setMovimientoModal(prev => ({ ...prev, tipo: e.target.value }))} className="w-full border rounded-lg px-3 py-2">
                   <option value="INGRESO">Ingreso</option>
                   <option value="SALIDA">Salida</option>
                   <option value="AJUSTE">Ajuste (setea stock)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {movimientoModal.tipo === 'INGRESO' ? 'Aumenta el stock' : movimientoModal.tipo === 'SALIDA' ? 'Reduce el stock' : 'Establece el stock exacto'}
-                </p>
+                <p className="text-xs text-gray-500 mt-1">{movimientoModal.tipo === 'INGRESO' ? 'Aumenta el stock' : movimientoModal.tipo === 'SALIDA' ? 'Reduce el stock' : 'Establece el stock exacto'}</p>
               </div>
-              <div>
-                <label className="block text-sm font-bold mb-1">Cantidad</label>
-                <input type="number" step="0.01" value={movimientoModal.cantidad} onChange={e => setMovimientoModal(prev => ({ ...prev, cantidad: parseFloat(e.target.value) || 0 }))} className="w-full border rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold mb-1">Razón</label>
-                <textarea value={movimientoModal.razon} onChange={e => setMovimientoModal(prev => ({ ...prev, razon: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2" placeholder="Ej: Compra, Devolución, Ajuste..." />
-              </div>
+              <div><label className="block text-sm font-bold mb-1">Cantidad</label><input type="number" step="0.01" value={movimientoModal.cantidad} onChange={e => setMovimientoModal(prev => ({ ...prev, cantidad: parseFloat(e.target.value) || 0 }))} className="w-full border rounded-lg px-3 py-2" /></div>
+              <div><label className="block text-sm font-bold mb-1">Razón</label><textarea value={movimientoModal.razon} onChange={e => setMovimientoModal(prev => ({ ...prev, razon: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2" placeholder="Ej: Compra, Devolución, Ajuste..." /></div>
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => setMovimientoModal(prev => ({ ...prev, open: false }))} className="px-4 py-2 border rounded-lg">Cancelar</button>
-                <button onClick={registrarMovimiento} disabled={registrandoMovimiento} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">
-                  {registrandoMovimiento ? 'Registrando...' : 'Registrar'}
-                </button>
+                <button onClick={registrarMovimiento} disabled={registrandoMovimiento} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">{registrandoMovimiento ? 'Registrando...' : 'Registrar'}</button>
               </div>
             </div>
           </div>
         </div>,
         document.body
       )}
+      
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; border: 2px solid #f8fafc; }
+      ` }} />
     </div>
   );
 }
