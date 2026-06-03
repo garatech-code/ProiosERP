@@ -460,6 +460,29 @@ export default function OperationDetail() {
     setPreviewFile({ url, type: 'unknown', filename: friendlyName });
   };
 
+  const handleDownloadFile = async (url, filename) => {
+    if (!url) return;
+    try {
+      showToast('Iniciando descarga...', 'info');
+      // Fetch the file as a blob
+      const response = await axios.get(url, { responseType: 'blob' });
+      // Create object url
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename || 'archivo');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error al descargar:', error);
+      showToast('Error al descargar, abriendo en nueva pestaña...', 'error');
+      // Fallback
+      window.open(url, '_blank');
+    }
+  };
+
   const toggleSelectDoc = (docId) => {
     setSelectedDocs(prev =>
       prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
@@ -1467,15 +1490,12 @@ export default function OperationDetail() {
                             >
                               <i className="bi bi-eye-fill"></i> Ver
                             </button>
-                            <a
-                              href={adj.file}
-                              download
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={() => handleDownloadFile(adj.file, adj.filename)}
                               className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
                             >
                               <i className="bi bi-download"></i> Descargar
-                            </a>
+                            </button>
                           </div>
                         </div>
                       );
@@ -1990,17 +2010,17 @@ Saludos cordiales.`}
                 <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-excel text-5xl text-amber-500 mb-3 block"></i>
                   <p className="text-slate-600 dark:text-slate-300">No se puede previsualizar este tipo de archivo.</p>
-                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">
+                  <button onClick={() => handleDownloadFile(previewFile.url, previewFile.filename)} className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">
                     <i className="bi bi-download me-1"></i> Descargar archivo
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
               {previewFile.url && previewFile.type !== 'text' && (
-                <a href={previewFile.url} download className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
+                <button onClick={() => handleDownloadFile(previewFile.url, previewFile.filename)} className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
                   <i className="bi bi-download me-1"></i> Descargar
-                </a>
+                </button>
               )}
               <button onClick={() => setPreviewFile(null)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>

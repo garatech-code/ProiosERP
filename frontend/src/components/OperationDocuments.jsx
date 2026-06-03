@@ -66,6 +66,24 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
         return tipos.find(t => t.value === tipo)?.label || tipo;
     };
 
+    const handleDownloadFile = async (url, filename) => {
+        if (!url) return;
+        try {
+            const response = await axios.get(url, { responseType: 'blob' });
+            const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.setAttribute('download', filename || 'documento');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+            console.error('Error al descargar:', error);
+            window.open(url, '_blank');
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Documentos adicionales</h3>
@@ -173,15 +191,12 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
                                             <i className="bi bi-eye-fill"></i> Ver
                                         </button>
                                     )}
-                                    <a
-                                        href={doc.archivo}
-                                        download
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        onClick={() => handleDownloadFile(doc.archivo, doc.nombre_personalizado || 'documento')}
                                         className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
                                     >
                                         <i className="bi bi-download"></i> Descargar
-                                    </a>
+                                    </button>
                                     <button 
                                         onClick={() => handleDelete(doc.id)} 
                                         className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
