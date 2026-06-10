@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
-import { useParams, useNavigate } from 'react-router-dom';
+import ProductMultiSelectModal from './ProductMultiSelectModal';
+import LogoSpinner from './LogoSpinner';
 
 /* =========================
    PRODUCT ROW (con verificación de stock)
@@ -30,7 +32,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       <div className="sm:col-span-4">
         <AutocompleteCreate
           label="Producto *"
-          endpoint="/inventario/products/?categoria=otros,insumos"
+          endpoint="/inventario/products/"   // ← SIN filtro de categoría (muestra todos)
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
@@ -138,6 +140,9 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
   const [searchingImo, setSearchingImo] = useState(false);
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
+
+  // Estado para el modal de selección múltiple
+  const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
 
   const DRAFT_KEY = 'draft_op_productos';
 
@@ -285,6 +290,14 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
     }));
   };
 
+  const handleAddMultipleProducts = (newProducts) => {
+    console.log('Productos recibidos en handleAddMultipleProducts:', newProducts);
+    setFormData(prev => ({
+      ...prev,
+      products: [...prev.products, ...newProducts],
+    }));
+  };
+
   const removeProduct = (i) => {
     setFormData(prev => ({
       ...prev,
@@ -369,7 +382,6 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
     setLoading(true);
     setError(null);
 
-    // Validación de productos
     for (let i = 0; i < formData.products.length; i++) {
       const p = formData.products[i];
       if (!p.product) {
@@ -419,11 +431,9 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
         order_received_date: safeFormatDate(formData.order_received_date),
         client_confirmed_date: safeFormatDate(formData.client_confirmed_date),
         texto_pedido: formData.texto_pedido,
-        // Forzar inclusión del campo operarios_usuarios_id
         operarios_usuarios_id: formData.operarios_usuarios_id || [],
       };
 
-      // 🔍 LOG: Mostrar en consola lo que se envía
       console.log('📤 PAYLOAD enviado a /operaciones/operations/:', JSON.parse(JSON.stringify(payload)));
       console.log('👥 operarios_usuarios_id:', payload.operarios_usuarios_id);
 
@@ -434,7 +444,6 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
         res = await axios.post('/operaciones/operations/', payload);
       }
 
-      // 🔍 LOG: Respuesta del servidor
       console.log('✅ Respuesta del servidor:', res.data);
 
       if (onSuccess) onSuccess(res.data.id);
@@ -473,11 +482,11 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
   return (
     <div
       className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4"
-      onMouseDown={handleCloseModal}
+      onClick={handleCloseModal}
     >
       <div
         className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto"
-        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-700/50 shrink-0">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
@@ -786,13 +795,22 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
             <div>
               <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">
                 <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Carga (Productos)</h3>
-                <button
-                  type="button"
-                  onClick={addProduct}
-                  className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <span>+</span> Añadir Ítem
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={addProduct}
+                    className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    <span>+</span> Añadir Ítem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMultiSelectModal(true)}
+                    className="text-sm font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    <span>📋</span> Seleccionar múltiples
+                  </button>
+                </div>
               </div>
 
               {formData.products.length === 0 ? (
@@ -897,6 +915,16 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
           </button>
         </div>
       </div>
+
+      {/* Modal de selección múltiple */}
+      {showMultiSelectModal && (
+        <ProductMultiSelectModal
+          isOpen={showMultiSelectModal}
+          onClose={() => setShowMultiSelectModal(false)}
+          onAddProducts={handleAddMultipleProducts}
+          existingProductIds={formData.products.map(p => p.product).filter(id => id)}
+        />
+      )}
 
       <style dangerouslySetInnerHTML={{
         __html: `

@@ -14,9 +14,19 @@ class ArticuloSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Articulo
-        fields = ['id', 'nombre', 'descripcion', 'presentacion', 'peso_kg', 'stock_actual',
-                  'stock_minimo', 'stock_maximo', 'categoria', 'proveedor', 'proveedor_nombre']
+        fields = [
+            'id', 'nombre', 'descripcion', 'presentacion', 'peso_kg', 'stock_actual',
+            'stock_minimo', 'stock_maximo', 'categoria', 'proveedor', 'proveedor_nombre',
+            'unidad', 'ubicacion', 'estado', 'serie_lote'
+        ]
         read_only_fields = ['id']
+
+    def validate(self, data):
+        stock_min = data.get('stock_minimo', 0)
+        stock_max = data.get('stock_maximo', None)
+        if stock_max is not None and stock_min > stock_max:
+            raise serializers.ValidationError({'stock_minimo': 'El stock mínimo no puede ser mayor que el stock máximo.'})
+        return data
 
 
 class MovimientoStockSerializer(serializers.ModelSerializer):
@@ -53,7 +63,6 @@ class DisponibilidadSerializer(serializers.Serializer):
         return value
 
 
-# ================= NUEVO SERIALIZADOR: Stock General =================
 class StockItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockItem

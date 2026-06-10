@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
@@ -30,11 +31,12 @@ class Proveedor(models.Model):
 class Articulo(models.Model):
     CATEGORIA_CHOICES = (
         ('quimicos', 'Químicos'),
+        ('anclas', 'Anclas'),
         ('otros', 'Otros'),
         ('insumos', 'Insumos'),
     )
     nombre = models.CharField(max_length=200)
-    descripcion = models.TextField(blank=True)
+    descripcion = models.TextField(blank=True, help_text="Observaciones o descripción del producto")
     presentacion = models.CharField(max_length=100)
     peso_kg = models.DecimalField(max_digits=10, decimal_places=2)
     stock_actual = models.DecimalField(max_digits=15, decimal_places=4, default=0.0)
@@ -48,6 +50,25 @@ class Articulo(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='articulos')
     ultima_modificacion = models.DateTimeField(auto_now=True)
     modificado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Nuevos campos para stock físico
+    unidad = models.CharField(max_length=10, blank=True, null=True, help_text="Unidad de medida (kg, L, u, m, par)")
+    ubicacion = models.CharField(max_length=100, blank=True, null=True, help_text="Ubicación física del producto")
+    estado = models.CharField(max_length=50, blank=True, null=True, help_text="Estado del producto (Nuevo, Usado, Oxidado, etc.)")
+    serie_lote = models.CharField(max_length=100, blank=True, null=True, help_text="Número de serie o lote")
+
+    def clean(self):
+        super().clean()
+        if self.stock_maximo and self.stock_minimo and self.stock_minimo > self.stock_maximo:
+            raise ValidationError({'stock_minimo': 'El stock mínimo no puede ser mayor que el stock máximo.'})
+        if self.stock_minimo < 0:
+            raise ValidationError({'stock_minimo': 'El stock mínimo no puede ser negativo.'})
+        if self.stock_maximo and self.stock_maximo < 0:
+            raise ValidationError({'stock_maximo': 'El stock máximo no puede ser negativo.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.nombre} ({self.presentacion})"
@@ -95,7 +116,7 @@ class ProductoLog(models.Model):
         return f"{self.get_accion_display()} - {self.producto.nombre if self.producto else 'Eliminado'} - {self.fecha}"
 
 
-# ================= NUEVO MODELO: Stock General =================
+# ================= MODELO DE STOCK GENERAL (SEPARADO) =================
 class StockItem(models.Model):
     CATEGORIA_CHOICES = (
         ('Anclas', 'Anclas'),
