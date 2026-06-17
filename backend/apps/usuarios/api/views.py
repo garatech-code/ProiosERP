@@ -24,12 +24,16 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve', 'change_password']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
 
     def get_queryset(self):
-        # Admin y Owner pueden ver todos los usuarios para gestiones y asignaciones
         user = self.request.user
         if user.role == user.Role.OWNER:
+            qs = User.objects.all()
+        elif user.role in [user.Role.OPERADOR, user.Role.OPERADOR_JR]:
             qs = User.objects.all()
         else:
             qs = User.objects.filter(id=user.id)
@@ -111,11 +115,29 @@ class FeedbackItemViewSet(viewsets.ModelViewSet):
             )
         return super().partial_update(request, *args, **kwargs)
 
-    # Sobrescribimos DELETE para que nadie te borre los tickets
     def destroy(self, request, *args, **kwargs):
         if request.user.role != User.Role.OWNER:
             return Response(
-                {"detail": "Solo Gerencia puede eliminar tickets."}, 
+                {"detail": "Solo Gerencia puede eliminar los tickets."}, 
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
+
+class NotificacionViewSet(viewsets.ModelViewSet):
+    serializer_class = __import__('apps.usuarios.api.serializers', fromlist=['NotificacionSerializer']).NotificacionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return __import__('apps.usuarios.models', fromlist=['Notificacion']).Notificacion.objects.filter(usuario_destino=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        notificacion = self.get_object()
+        notificacion.leida = True
+        notificacion.save()
+        return Response({'status': 'ok'})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        self.get_queryset().update(leida=True)
+        return Response({'status': 'ok'})

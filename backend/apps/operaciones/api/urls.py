@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     OperacionViewSet, ClientViewSet, ShipViewSet, 
-    PortViewSet, AgencyViewSet, AgendaEventViewSet
+    PortViewSet, AgencyViewSet, AgendaEventViewSet, TvDashboardView
 )
 
 router = DefaultRouter()
@@ -14,5 +14,6 @@ router.register(r'agencies', AgencyViewSet, basename='agency')
 router.register(r'events', AgendaEventViewSet, basename='event')
 
 urlpatterns = [
+    path('tv-dashboard/', TvDashboardView.as_view(), name='tv-dashboard'),
     path('', include(router.urls)),
 ]

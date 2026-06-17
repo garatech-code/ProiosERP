@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { formatUserName } from '../utils/formatters';
 import ComposeEmailModal from './ComposeEmailModal';
 import OperarioActionPanel from './OperarioActionPanel';
 import OperationTracker from './OperationTracker';
@@ -79,6 +80,11 @@ export default function OperationDetail() {
   const [showCotizacionEmailModal, setShowCotizacionEmailModal] = useState(false);
   const [cotizacionEmailAttachment, setCotizacionEmailAttachment] = useState(null);
   const [fetchingCotizacionFile, setFetchingCotizacionFile] = useState(false);
+
+  const [showCotizacionPdfModal, setShowCotizacionPdfModal] = useState(false);
+  const [cotizacionAdicional, setCotizacionAdicional] = useState('');
+  const [detalleServicio, setDetalleServicio] = useState('');
+  const [pnaText, setPnaText] = useState('');
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -325,6 +331,49 @@ export default function OperationDetail() {
     }
   };
 
+  const openPnaModal = () => {
+    setPnaType('frio');
+    setPnaText(operation?.texto_permiso_pna || '');
+    setShowPnaModal(true);
+  };
+
+  const handleGeneratePnaPdf = async () => {
+    try {
+      if (pnaText !== operation?.texto_permiso_pna) {
+        await axios.patch(`/operaciones/operations/${id}/`, { texto_permiso_pna: pnaText });
+        fetchOperation();
+      }
+      handleGeneratePdf('generate_permiso_pna', { tipo: pnaType });
+      setShowPnaModal(false);
+    } catch (err) {
+      console.error(err);
+      showToast('Error al guardar el texto del Permiso PNA', 'error');
+    }
+  };
+
+  const openCotizacionPdfModal = () => {
+    setDetalleServicio(operation?.detalle_servicio || '');
+    setCotizacionAdicional(operation?.texto_cotizacion_adicional || '');
+    setShowCotizacionPdfModal(true);
+  };
+
+  const handlePreviewCotizacionPdf = async () => {
+    try {
+      if (detalleServicio !== operation?.detalle_servicio || cotizacionAdicional !== operation?.texto_cotizacion_adicional) {
+        await axios.patch(`/operaciones/operations/${id}/`, { 
+          detalle_servicio: detalleServicio,
+          texto_cotizacion_adicional: cotizacionAdicional
+        });
+        fetchOperation();
+      }
+      openPreview(`/api/operaciones/operations/${id}/generate_cotizacion_servicio/`);
+      setShowCotizacionPdfModal(false);
+    } catch (err) {
+      console.error(err);
+      showToast('Error al guardar los datos de cotización', 'error');
+    }
+  };
+
   const handleRequestReview = async () => {
     setRevisionActionLoading(true);
     try {
@@ -460,28 +509,7 @@ export default function OperationDetail() {
     setPreviewFile({ url, type: 'unknown', filename: friendlyName });
   };
 
-  const handleDownloadFile = async (url, filename) => {
-    if (!url) return;
-    try {
-      showToast('Iniciando descarga...', 'info');
-      // Fetch the file as a blob
-      const response = await axios.get(url, { responseType: 'blob' });
-      // Create object url
-      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.setAttribute('download', filename || 'archivo');
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error('Error al descargar:', error);
-      showToast('Error al descargar, abriendo en nueva pestaña...', 'error');
-      // Fallback
-      window.open(url, '_blank');
-    }
-  };
+
 
   const toggleSelectDoc = (docId) => {
     setSelectedDocs(prev =>
@@ -918,7 +946,7 @@ export default function OperationDetail() {
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 hidden sm:block">Hola, {user?.username}</span>
+              <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 hidden sm:block">Hola, {formatUserName(user)}</span>
               <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors" title="Cerrar sesión">
                 <i className="bi bi-box-arrow-right text-lg"></i>
               </button>
@@ -1490,12 +1518,15 @@ export default function OperationDetail() {
                             >
                               <i className="bi bi-eye-fill"></i> Ver
                             </button>
-                            <button
-                              onClick={() => handleDownloadFile(adj.file, adj.filename)}
+                            <a
+                              href={adj.file}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
                             >
                               <i className="bi bi-download"></i> Descargar
-                            </button>
+                            </a>
                           </div>
                         </div>
                       );
@@ -1619,7 +1650,7 @@ export default function OperationDetail() {
                       {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                           <button
-                            onClick={() => openPreview(`/api/operaciones/operations/${id}/generate_cotizacion_servicio/`)}
+                            onClick={openCotizacionPdfModal}
                             disabled={actionLoading}
                             className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                             title="Vista previa del documento generado automáticamente"
@@ -1642,7 +1673,7 @@ export default function OperationDetail() {
                       {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                           <button
-                            onClick={() => setShowPnaModal(true)}
+                            onClick={openPnaModal}
                             disabled={actionLoading}
                             className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                           >
@@ -1938,19 +1969,81 @@ Saludos cordiales.`}
                   </div>
                 </label>
               </div>
+
+              <div className="mt-6">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Texto del Permiso PNA (Opcional)</label>
+                <textarea
+                  value={pnaText}
+                  onChange={(e) => setPnaText(e.target.value)}
+                  placeholder="Escriba aquí si desea sobreescribir el texto predeterminado del permiso..."
+                  rows="4"
+                  className="w-full text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">Si deja esto en blanco, se usará el texto predeterminado.</p>
+              </div>
             </div>
             <div className="px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 shrink-0">
               <button
                 type="button"
                 className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                onClick={() => {
-                  handleGeneratePdf('generate_permiso_pna', { tipo: pnaType });
-                  setShowPnaModal(false);
-                }}
+                onClick={handleGeneratePnaPdf}
               >
                 Generar Documento
               </button>
               <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPnaModal(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Editar Cotización PDF */}
+      {showCotizacionPdfModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <h3 className="text-lg leading-6 font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-file-earmark-pdf text-indigo-500"></i> Previsualizar / Editar Cotización
+              </h3>
+              <button onClick={() => setShowCotizacionPdfModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Detalle del Servicio</label>
+                  <textarea
+                    value={detalleServicio}
+                    onChange={(e) => setDetalleServicio(e.target.value)}
+                    placeholder="Descripción principal del servicio..."
+                    rows="4"
+                    className="w-full text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Notas / Condiciones Adicionales</label>
+                  <textarea
+                    value={cotizacionAdicional}
+                    onChange={(e) => setCotizacionAdicional(e.target.value)}
+                    placeholder="Escriba condiciones de pago, validez, o cualquier nota extra..."
+                    rows="4"
+                    className="w-full text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Este texto aparecerá en la parte inferior del PDF de cotización.</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 shrink-0">
+              <button
+                type="button"
+                className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                onClick={handlePreviewCotizacionPdf}
+              >
+                Previsualizar PDF
+              </button>
+              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowCotizacionPdfModal(false)}>
                 Cancelar
               </button>
             </div>
@@ -2010,17 +2103,17 @@ Saludos cordiales.`}
                 <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-excel text-5xl text-amber-500 mb-3 block"></i>
                   <p className="text-slate-600 dark:text-slate-300">No se puede previsualizar este tipo de archivo.</p>
-                  <button onClick={() => handleDownloadFile(previewFile.url, previewFile.filename)} className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">
+                  <a href={previewFile.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">
                     <i className="bi bi-download me-1"></i> Descargar archivo
-                  </button>
+                  </a>
                 </div>
               )}
             </div>
             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
               {previewFile.url && previewFile.type !== 'text' && (
-                <button onClick={() => handleDownloadFile(previewFile.url, previewFile.filename)} className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
+                <a href={previewFile.url} download target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
                   <i className="bi bi-download me-1"></i> Descargar
-                </button>
+                </a>
               )}
               <button onClick={() => setPreviewFile(null)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium text-sm">Cerrar</button>
             </div>

@@ -1,4 +1,25 @@
+import ipaddress
 from rest_framework import permissions
+
+class IsLocalIP(permissions.BasePermission):
+    """
+    Permite acceso solo si la IP proviene de una red local o privada (ej. 192.168.x.x, 10.x.x.x, 127.0.0.1)
+    """
+    def has_permission(self, request, view):
+        ip_str = request.META.get('HTTP_X_FORWARDED_FOR')
+        if ip_str:
+            ip_str = ip_str.split(',')[0].strip()
+        else:
+            ip_str = request.META.get('REMOTE_ADDR')
+            
+        if not ip_str:
+            return False
+            
+        try:
+            ip = ipaddress.ip_address(ip_str)
+            return ip.is_private or ip.is_loopback
+        except ValueError:
+            return False
 
 class IsAdminUser(permissions.BasePermission):
     """

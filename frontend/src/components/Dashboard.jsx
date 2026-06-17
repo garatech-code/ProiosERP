@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { formatUserName } from '../utils/formatters';
 import OperationFormProductos from './OperationFormProductos';
 import OperationFormWithIMO from './OperationFormWithIMO';
 
@@ -134,7 +135,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex flex-col text-right">
-                <span className="text-sm font-semibold text-gray-900 leading-tight">{user?.username || 'Usuario'}</span>
+                <span className="text-sm font-semibold text-gray-900 leading-tight">{formatUserName(user)}</span>
                 <span className="text-xs text-indigo-600 font-medium">{roleDisplay[user?.role] || user?.role}</span>
               </div>
               <button

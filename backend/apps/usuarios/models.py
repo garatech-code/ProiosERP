@@ -4,7 +4,8 @@ from django.db import models
 class User(AbstractUser):
     class Role(models.TextChoices):
         OWNER = 'OWNER', 'Dueño / Admin'
-        OPERADOR = 'OPERADOR', 'Operador Administrativo'
+        OPERADOR = 'OPERADOR', 'Operador Senior'
+        OPERADOR_JR = 'OPERADOR_JR', 'Operador Junior'
         CONTABLE = 'CONTABLE', 'Contable'
         OPERARIO = 'OPERARIO', 'Operario de Planta'
 
@@ -62,3 +63,17 @@ class PersonalPlantel(models.Model):
 
     def __str__(self):
         return f"{self.apellidos}, {self.nombres} ({self.dni}) - {self.rol}"
+
+class Notificacion(models.Model):
+    usuario_destino = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notificaciones')
+    mensaje = models.TextField()
+    operacion_id = models.IntegerField(null=True, blank=True)
+    leida = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return f"Notificación para {self.usuario_destino.username}: {self.mensaje[:50]}"
+

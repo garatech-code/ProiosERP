@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from '../api/axios';
+import { format } from 'date-fns';
+import { formatUserName } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
 import ProductMultiSelectModal from './ProductMultiSelectModal';
@@ -187,7 +189,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
   useEffect(() => {
     const loadData = async () => {
       try {
-        if (currentUser?.role === 'OWNER') {
+        if (currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR') {
           const [usersRes, staffRes] = await Promise.all([
             axios.get('/usuarios/users/'),
             axios.get('/usuarios/plantel/?activo=true')
@@ -644,7 +646,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
               />
             </div>
 
-            {currentUser?.role === 'OWNER' && (
+            {(currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR') && (
               <div>
                 <div className="flex justify-between items-center border-b dark:border-slate-600 pb-2 mb-4">
                   <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Equipo Asignado</h3>
@@ -674,7 +676,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                       />
                     </div>
                     <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
-                      {availableUsers.filter(u => u.role === 'OPERADOR' && (!filterOp || u.username.toLowerCase().includes(filterOp.toLowerCase()))).map(u => (
+                      {availableUsers.filter(u => (u.role === 'OPERADOR' || u.role === 'OPERADOR_JR') && (!filterOp || formatUserName(u).toLowerCase().includes(filterOp.toLowerCase()))).map(u => (
                         <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
                           <input
                             type="checkbox"
@@ -685,7 +687,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                             }}
                             className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{u.username}</span>
+                          <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{formatUserName(u)}</span>
                         </label>
                       ))}
                     </div>
@@ -705,7 +707,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                       />
                     </div>
                     <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
-                      {availableUsers.filter(u => u.role === 'OPERARIO' && (!filterUserOp || u.username.toLowerCase().includes(filterUserOp.toLowerCase()))).map(u => (
+                      {availableUsers.filter(u => u.role === 'OPERARIO' && (!filterUserOp || formatUserName(u).toLowerCase().includes(filterUserOp.toLowerCase()))).map(u => (
                         <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
                           <input
                             type="checkbox"
@@ -716,7 +718,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                             }}
                             className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{u.username}</span>
+                          <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{formatUserName(u)}</span>
                         </label>
                       ))}
                     </div>

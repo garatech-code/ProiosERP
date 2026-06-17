@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../api/axios';
+import { formatUserName } from '../utils/formatters';
 
 const ROLE_LABELS = {
     OWNER: 'Dueño / Admin',
-    OPERADOR: 'Operador Administrativo',
+    OPERADOR: 'Operador Senior',
+    OPERADOR_JR: 'Operador Junior',
     CONTABLE: 'Contable',
     OPERARIO: 'Operario de Planta',
 };
@@ -11,6 +13,7 @@ const ROLE_LABELS = {
 const ROLE_BADGES = {
     OWNER: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-800',
     OPERADOR: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    OPERADOR_JR: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 border-sky-200 dark:border-sky-800',
     CONTABLE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
     OPERARIO: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-800',
 };
@@ -27,7 +30,6 @@ export default function UserManagement() {
         username: '', // DNI
         first_name: '',
         last_name: '',
-        email: '',
         role: 'OPERARIO',
     });
     const [formError, setFormError] = useState('');
@@ -61,7 +63,6 @@ export default function UserManagement() {
             username: '',
             first_name: '',
             last_name: '',
-            email: '',
             role: 'OPERARIO',
         });
         setFormError('');
@@ -82,7 +83,7 @@ export default function UserManagement() {
 
         try {
             await axios.post('/usuarios/users/', formData);
-            setSuccessMessage('Usuario creado con éxito. Se ha enviado un correo con instrucciones.');
+            setSuccessMessage('Usuario creado con éxito.');
             setIsModalOpen(false);
             fetchUsers();
             setTimeout(() => setSuccessMessage(''), 5000);
@@ -164,7 +165,6 @@ export default function UserManagement() {
                                     <tr>
                                         <th className="px-6 py-4 font-bold">DNI (Usuario)</th>
                                         <th className="px-6 py-4 font-bold">Nombre Completo</th>
-                                        <th className="px-6 py-4 font-bold">E-mail</th>
                                         <th className="px-6 py-4 font-bold">Rol</th>
                                         <th className="px-6 py-4 font-bold text-center">Estado de Contraseña</th>
                                         <th className="px-6 py-4 font-bold text-right">Acciones</th>
@@ -177,11 +177,7 @@ export default function UserManagement() {
                                                 {u.username}
                                             </td>
                                             <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                                                {u.first_name} {u.last_name}
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                                                <i className="bi bi-envelope-fill text-slate-400 dark:text-slate-500 mr-2"></i>
-                                                {u.email}
+                                                {formatUserName(u)}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`px-2.5 py-1 text-xs font-bold rounded-full border ${ROLE_BADGES[u.role] || ''}`}>
@@ -229,7 +225,7 @@ export default function UserManagement() {
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                                                {u.first_name} {u.last_name}
+                                                {formatUserName(u)}
                                             </h3>
                                             <span className="font-mono text-xs font-bold text-slate-500 dark:text-slate-400">
                                                 DNI: {u.username}
@@ -244,10 +240,6 @@ export default function UserManagement() {
                                     </div>
 
                                     <div className="text-xs space-y-1 text-slate-600 dark:text-slate-400">
-                                        <p className="flex items-center gap-1.5">
-                                            <i className="bi bi-envelope text-slate-400"></i>
-                                            {u.email}
-                                        </p>
                                         <div className="flex flex-wrap gap-2 pt-2">
                                             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${ROLE_BADGES[u.role] || ''}`}>
                                                 {ROLE_LABELS[u.role] || u.role}
@@ -347,21 +339,6 @@ export default function UserManagement() {
                                         placeholder="Ej. Pérez"
                                     />
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                    E-mail *
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    required
-                                    className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
-                                    placeholder="juan.perez@empresa.com"
-                                />
                             </div>
 
                             <div>

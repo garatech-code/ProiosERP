@@ -143,7 +143,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
-            'herramientas_solicitud_particular'
+            'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -163,7 +163,10 @@ class OperacionSerializer(serializers.ModelSerializer):
         return [f"{s.apellidos}, {s.nombres}" for s in obj.operarios_asignados.all()]
 
     def get_operarios_usuarios_nombres(self, obj):
-        return [u.username for u in obj.operarios_usuarios_asignados.all()]
+        return [
+            f"{u.first_name} {u.last_name}".strip() if u.first_name or u.last_name else u.username
+            for u in obj.operarios_usuarios_asignados.all()
+        ]
 
     def get_can_confirm(self, obj):
         return obj.estado == Operacion.ESTADO_SOLICITADA
@@ -354,8 +357,8 @@ class OperacionSerializer(serializers.ModelSerializer):
 
 
 class AgendaEventSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    assigned_to_name = serializers.CharField(source='assigned_to.username', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    assigned_to_name = serializers.SerializerMethodField()
 
     class Meta:
         model = AgendaEvent
@@ -365,3 +368,13 @@ class AgendaEventSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return ""
+        return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+
+    def get_assigned_to_name(self, obj):
+        if not obj.assigned_to:
+            return ""
+        return f"{obj.assigned_to.first_name} {obj.assigned_to.last_name}".strip() or obj.assigned_to.username

@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
 import { format } from 'date-fns';
 import es from 'date-fns/locale/es';
+import { formatUserName, getUserInitials } from '../utils/formatters';
 
 export default function OperarioDashboard() {
   const { user, logout } = useAuth();
@@ -140,12 +141,12 @@ export default function OperarioDashboard() {
         <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
           <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
             <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
-              {user?.username?.[0]?.toUpperCase()}
+              {getUserInitials(user)}
             </div>
             {isSidebarOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{user?.username}</p>
-                <p className="text-xs text-slate-400 capitalize truncate">Operario</p>
+                <p className="text-sm font-semibold text-white truncate">{formatUserName(user)}</p>
+                <p className="text-xs text-slate-400 capitalize truncate">{user?.role?.toLowerCase() || 'Operario'}</p>
               </div>
             )}
           </div>

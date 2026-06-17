@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { formatUserName, getUserInitials } from '../utils/formatters';
 import OperationTypeSelector from '../components/OperationTypeSelector';
 import OperationFormProductos from '../components/OperationFormProductos';
 import OperationFormQuimicos from '../components/OperationFormQuimicos';
@@ -362,7 +363,7 @@ export default function OwnerDashboard() {
                         <option value={user?.id || ''}>Mi Agenda</option>
                         <option value="">Todos los Operadores</option>
                         {operators.map(op => (
-                            <option key={op.id} value={op.id}>{op.username}</option>
+                            <option key={op.id} value={op.id}>{formatUserName(op)}</option>
                         ))}
                     </select>
                     <button 
@@ -623,11 +624,11 @@ export default function OwnerDashboard() {
                     </button>
                     <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
                         <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
-                            {user?.username?.[0]?.toUpperCase()}
+                            {getUserInitials(user)}
                         </div>
                         {isSidebarOpen && (
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-white truncate">{user?.username}</p>
+                                <p className="text-sm font-semibold text-white truncate">{formatUserName(user)}</p>
                                 <p className="text-xs text-slate-400 capitalize truncate">{user?.role?.toLowerCase()}</p>
                             </div>
                         )}

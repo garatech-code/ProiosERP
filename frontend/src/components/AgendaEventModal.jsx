@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import Select from 'react-select';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { formatUserName } from '../utils/formatters';
 
 export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave }) {
     const { user } = useAuth();
@@ -209,10 +211,10 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                                     onChange={e => setAssignedTo(e.target.value)}
                                     required
                                 >
-                                    <option value={String(user.id)}>Mí mismo ({user.username})</option>
+                                    <option value={String(user.id)}>Mí mismo ({formatUserName(user)})</option>
                                     {operators.map(op => (
                                         <option key={op.id} value={String(op.id)}>
-                                            Operador: {op.username}
+                                            Operador: {formatUserName(op)}
                                         </option>
                                     ))}
                                 </select>

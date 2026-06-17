@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import { formatUserName } from '../utils/formatters';
 import EmailTemplateManager from './EmailTemplateManager';
 
 export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, defaultOperacionId, defaultRecipient, initialSubject, initialBody, initialAttachments }) {
@@ -61,7 +63,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     const firstName = user?.first_name || '';
     const lastName = user?.last_name || '';
     const fullName = `${firstName} ${lastName}`.trim();
-    const senderName = fullName || user?.username || 'Usuario de Proios';
+    const senderName = fullName || formatUserName(user);
 
     const signature = `
       <div style="margin-top: 25px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #4b5563; border-left: 3px solid #13a6b8; padding-left: 12px; margin-left: 2px;">
@@ -120,7 +122,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     // We will send the beautiful HTML version. The plaintext will unfortunately show HTML tags unless we clean it on backend, 
     // but for this demo, most clients render HTML.
     
-    const plainText = formData.body + `\n\n--\n${user?.first_name || ''} ${user?.last_name || user?.username}\n${user?.role || ''}\nProIOS`;
+    const plainText = formData.body + `\n\n--\n${formatUserName(user)}\n${user?.role || ''}\nProIOS`;
 
     try {
       const formDataToSend = new FormData();
@@ -229,7 +231,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
               placeholder="Escribe tu mensaje aquí..."
             ></textarea>
             <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-              * La firma se añadirá automáticamente al final del mensaje con tus datos: <b>{user?.first_name} {user?.last_name || user?.username} ({user?.role})</b>.
+              * La firma se añadirá automáticamente al final del mensaje con tus datos: <b>{formatUserName(user)} ({user?.role})</b>.
             </p>
             
             {/* Sección de Adjuntos */}

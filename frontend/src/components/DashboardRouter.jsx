@@ -31,6 +31,7 @@ export default function DashboardRouter() {
             case 'OWNER':
                 return <OwnerDashboard />;
             case 'OPERADOR':
+            case 'OPERADOR_JR':
                 return <OperadorDashboard />;
             case 'CONTABLE':
                 return <ContableDashboard />;

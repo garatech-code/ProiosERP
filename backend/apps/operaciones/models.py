@@ -126,6 +126,8 @@ class Operacion(models.Model):
     subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
     herramientas_solicitud_particular = models.TextField(blank=True, null=True, help_text="Listado de herramientas a subir/bajar para la Solicitud Particular.")
+    texto_permiso_pna = models.TextField(blank=True, null=True, help_text="Texto personalizado para el PDF de Permiso PNA.")
+    texto_cotizacion_adicional = models.TextField(blank=True, null=True, help_text="Texto adicional o condiciones para la Cotización.")
 
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)

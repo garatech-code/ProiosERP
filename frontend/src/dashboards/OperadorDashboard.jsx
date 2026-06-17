@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { formatUserName, getUserInitials } from '../utils/formatters';
 import InboxView from '../components/InboxView';
 import InventoryManagement from '../components/InventoryManagement';
 import OperationTypeSelector from '../components/OperationTypeSelector';
@@ -11,6 +12,7 @@ import OperationFormServicios from '../components/OperationFormServicios';
 import OperationFormOtros from '../components/OperationFormOtros';
 import DebugFeedback from '../components/DebugFeedback';
 import AgendaEventModal from '../components/AgendaEventModal';
+import NotificationMenu from '../components/NotificationMenu';
 import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
 
@@ -493,11 +495,11 @@ export default function OperadorDashboard() {
 
                     <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
                         <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
-                            {user?.username?.[0]?.toUpperCase()}
+                            {getUserInitials(user)}
                         </div>
                         {isSidebarOpen && (
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-white truncate">{user?.username}</p>
+                                <p className="text-sm font-semibold text-white truncate">{formatUserName(user)}</p>
                                 <p className="text-xs text-slate-400 capitalize truncate">{user?.role?.toLowerCase()}</p>
                             </div>
                         )}
@@ -515,7 +517,8 @@ export default function OperadorDashboard() {
                     <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
                     <h1 className="font-black text-lg">ProIOS</h1>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                    <NotificationMenu />
                     <button
                         onClick={() => setShowDebugForm(true)}
                         className="bg-indigo-900/80 text-indigo-300 hover:bg-indigo-600 hover:text-white p-2 rounded-lg font-bold text-sm transition-colors border border-indigo-500/50"
@@ -563,12 +566,15 @@ export default function OperadorDashboard() {
                             {activeTab === 'operations' ? 'Gestiona la logística y cumplimiento de las operaciones.' : 'Bandeja de gestión de oficina.'}
                         </p>
                     </div>
-                    {activeTab !== 'inventory' && (
-                        <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
-                            <i className="bi bi-plus-lg text-lg"></i>
-                            Nueva Operación
-                        </button>
-                    )}
+                    <div className="flex items-center gap-4">
+                        <NotificationMenu />
+                        {activeTab !== 'inventory' && (
+                            <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                                <i className="bi bi-plus-lg text-lg"></i>
+                                Nueva Operación
+                            </button>
+                        )}
+                    </div>
                 </header>
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">

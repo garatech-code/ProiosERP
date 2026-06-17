@@ -1,14 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from apps.usuarios.models import FeedbackItem
+from apps.usuarios.models import FeedbackItem, Notificacion
 
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'first_name', 'last_name', 'must_change_password')
+        fields = ('id', 'username', 'role', 'first_name', 'last_name', 'must_change_password')
         read_only_fields = ('id', 'must_change_password')
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -41,3 +41,9 @@ class FeedbackItemSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['creado_por'] = self.context['request'].user
         return super().create(validated_data)
+
+class NotificacionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notificacion
+        fields = '__all__'
+        read_only_fields = ['usuario_destino', 'fecha_creacion']

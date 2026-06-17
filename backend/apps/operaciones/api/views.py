@@ -59,9 +59,13 @@ class OperacionViewSet(viewsets.ModelViewSet):
             return qs
 
         if user.role == User.Role.OPERADOR:
+            filtered = qs.filter(Q(operadores_asignados=user) | Q(creado_por=user)).distinct()
+            print(f"👤 OPERADOR -> {filtered.count()} operaciones asignadas o creadas")
+            return filtered
+
+        if getattr(User.Role, 'OPERADOR_JR', None) and user.role == User.Role.OPERADOR_JR:
             filtered = qs.filter(operadores_asignados=user).distinct()
-            print(f"👤 OPERADOR -> {filtered.count()} operaciones asignadas")
-            print(f"IDs: {list(filtered.values_list('id', flat=True))}")
+            print(f"👦 OPERADOR JR -> {filtered.count()} operaciones asignadas")
             return filtered
 
         if user.role == User.Role.OPERARIO:
@@ -79,6 +83,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
         
         if user.role not in [User.Role.OWNER, User.Role.CONTABLE]:
             if user.role == User.Role.OPERADOR:
+                operadores_ids = self.request.data.get('operadores_asignados', [])
+                if operadores_ids:
+                    operation.operadores_asignados.set(operadores_ids)
+                else:
+                    operation.operadores_asignados.add(user)
+            elif getattr(User.Role, 'OPERADOR_JR', None) and user.role == User.Role.OPERADOR_JR:
                 operation.operadores_asignados.add(user)
             elif user.role == User.Role.OPERARIO:
                 operation.operarios_usuarios_asignados.add(user)
@@ -121,8 +131,25 @@ class OperacionViewSet(viewsets.ModelViewSet):
         except ImportError:
             return Response({'error': 'Librería holidays no instalada'}, status=500)
 
+    def destroy(self, request, *args, **kwargs):
+        if getattr(User.Role, 'OPERADOR_JR', None) and request.user.role == User.Role.OPERADOR_JR:
+            return Response({'error': 'No tiene permisos para eliminar operaciones'}, status=403)
+        return super().destroy(request, *args, **kwargs)
+
+    def notificar_senior(self, operacion, accion):
+        if operacion.creado_por and operacion.creado_por.role == User.Role.OPERADOR:
+            if getattr(User.Role, 'OPERADOR_JR', None) and self.request.user.role == User.Role.OPERADOR_JR:
+                from apps.usuarios.models import Notificacion
+                Notificacion.objects.create(
+                    usuario_destino=operacion.creado_por,
+                    mensaje=f"El Junior {self.request.user.username} ha {accion} la operación OP-{operacion.id}.",
+                    operacion_id=operacion.id
+                )
+
     @action(detail=True, methods=['post'])
     def cancel_operation(self, request, pk=None):
+        if getattr(User.Role, 'OPERADOR_JR', None) and request.user.role == User.Role.OPERADOR_JR:
+            return Response({'error': 'No tiene permisos para anular operaciones'}, status=403)
         op = self.get_object()
         try:
             with transaction.atomic():
@@ -147,6 +174,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
             try:
                 operacion.start_packing()
                 operacion.save()
+                self.notificar_senior(operacion, "iniciado el armado (confirmado)")
             except ValidationError as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
@@ -176,6 +204,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
             try:
                 op.send_to_customs()
                 op.save()
+                self.notificar_senior(op, "avanzado a aduanas")
                 return Response({'status': 'in_customs'})
             except ValidationError as e:
                 return Response({'error': str(e)}, status=400)
@@ -192,6 +221,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
             try:
                 op.finalize_customs()
                 op.save()
+                self.notificar_senior(op, "marcado como lista para envío")
                 return Response({'status': 'ready_for_delivery'})
             except ValidationError as e:
                 return Response({'error': str(e)}, status=400)
@@ -202,6 +232,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         try:
             op.mark_delivered()
             op.save()
+            self.notificar_senior(op, "marcado como remitada")
             return Response({'status': 'delivered'})
         except ValidationError as e:
             return Response({'error': str(e)}, status=400)
@@ -212,6 +243,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         try:
             op.close()
             op.save()
+            self.notificar_senior(op, "cerrado")
             return Response({'status': 'closed'})
         except ValidationError as e:
             return Response({'error': str(e)}, status=400)
@@ -930,3 +962,36 @@ class AgendaEventViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         logger.info(f"Evento de Agenda eliminado por {self.request.user.username}: {instance.title}")
         instance.delete()
+
+from rest_framework.views import APIView
+from apps.usuarios.permissions import IsLocalIP
+
+class TvDashboardView(APIView):
+    permission_classes = [IsLocalIP]
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        # Operaciones que no esten entregadas ni canceladas
+        qs = Operacion.objects.exclude(estado__in=[
+            Operacion.ESTADO_ENTREGADA,
+            Operacion.ESTADO_CANCELADA
+        ]).select_related('cliente', 'ship')
+        
+        data = []
+        for op in qs:
+            operadores = op.operadores_asignados.all()
+            operadores_nombres = [u.first_name or u.username for u in operadores]
+            
+            data.append({
+                'id': op.id,
+                'nombre': op.nombre or f"OP-{op.id:05d}",
+                'cliente': op.cliente.name if op.cliente else 'N/A',
+                'buque': op.ship.name if op.ship else 'N/A',
+                'eta': op.eta,
+                'estado': op.get_estado_display(),
+                'estado_raw': op.estado,
+                'tipo_operacion': op.get_tipo_operacion_display(),
+                'operadores': operadores_nombres
+            })
+            
+        return Response({'operaciones': data})

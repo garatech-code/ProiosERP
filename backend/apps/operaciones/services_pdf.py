@@ -63,6 +63,11 @@ def generar_cotizacion_servicio_pdf(operacion):
     story.append(Paragraph(f"<b>Forma de Cotización:</b> {forma_cotizacion}", styles['Normal']))
     story.append(Spacer(1, 1*cm))
     
+    if operacion.texto_cotizacion_adicional:
+        story.append(Paragraph("<b>Condiciones / Notas Adicionales:</b>", styles['Heading3']))
+        story.append(Paragraph(operacion.texto_cotizacion_adicional.replace('\n', '<br/>'), styles['Normal']))
+        story.append(Spacer(1, 1*cm))
+    
     # Precios
     data = [['Descripción', 'Monto']]
     total = 0
@@ -105,12 +110,15 @@ def generar_permiso_pna_pdf(operacion, tipo_trabajo):
     story.append(Paragraph("A la Prefectura Naval Argentina,", styles['Normal']))
     story.append(Spacer(1, 0.5*cm))
     
-    texto_permiso = f"""
-    Por medio de la presente solicitamos el permiso correspondiente para realizar tareas de 
-    <b>{titulo.split('- ')[1]}</b> a bordo del buque <b>{operacion.ship.name if operacion.ship else 'N/A'}</b>.
-    <br/><br/>
-    La operación estará a cargo de nuestro personal especializado y se cumplirán todas las normativas de seguridad correspondientes.
-    """
+    if operacion.texto_permiso_pna:
+        texto_permiso = operacion.texto_permiso_pna.replace('\n', '<br/>')
+    else:
+        texto_permiso = f"""
+        Por medio de la presente solicitamos el permiso correspondiente para realizar tareas de 
+        <b>{titulo.split('- ')[1]}</b> a bordo del buque <b>{operacion.ship.name if operacion.ship else 'N/A'}</b>.
+        <br/><br/>
+        La operación estará a cargo de nuestro personal especializado y se cumplirán todas las normativas de seguridad correspondientes.
+        """
     story.append(Paragraph(texto_permiso, styles['Normal']))
     
     story.append(Spacer(1, 4*cm))

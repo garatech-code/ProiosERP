@@ -114,6 +114,25 @@ services:
       - backend
       - frontend
 
+  tv-dashboard:
+    build:
+      context: ./tv-dashboard
+      dockerfile: Dockerfile
+      target: build-stage
+    container_name: proios_tv_dashboard
+    restart: always
+    command: npm run dev -- --host 0.0.0.0 --port 4000
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./tv-dashboard:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:
