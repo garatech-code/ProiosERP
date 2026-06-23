@@ -253,7 +253,7 @@ export default function InventoryManagement() {
     const [currentProveedor, setCurrentProveedor] = useState(null);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: 'otros' });
+    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', costo: 0, precio_venta: 0, stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: 'otros' });
     const [submitting, setSubmitting] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -411,7 +411,7 @@ export default function InventoryManagement() {
     const fetchProveedores = async () => {
         try {
             const res = await axios.get('/inventario/proveedores/');
-            setProveedores(res.data);
+            setProveedores(res.data.results || res.data || []);
         } catch (err) {
             showToast('Error al cargar proveedores', 'error');
         }
@@ -420,7 +420,7 @@ export default function InventoryManagement() {
     const fetchFormulas = async () => {
         try {
             const res = await axios.get('/produccion/formulas/');
-            setFormulas(res.data);
+            setFormulas(res.data.results || res.data || []);
         } catch (err) {}
     };
     
@@ -601,9 +601,9 @@ export default function InventoryManagement() {
         setEditingProduct(null);
         let defaultCategoria = activeTab === 'quimicos' ? 'quimicos' : 'otros';
         const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
-        if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0 }); }
-        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria }); }
-        else setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
+        if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0, costo: draft.costo || 0, precio_venta: draft.precio_venta || 0 }); }
+        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', costo: 0, precio_venta: 0, stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria }); }
+        else setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', costo: 0, precio_venta: 0, stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
         setValidationError('');
         setShowProductModal(true);
     };
@@ -614,6 +614,8 @@ export default function InventoryManagement() {
             descripcion: product.descripcion || '',
             presentacion: product.presentacion,
             peso_kg: product.peso_kg,
+            costo: product.costo || 0,
+            precio_venta: product.precio_venta || 0,
             stock_actual: product.stock_actual,
             stock_minimo: product.stock_minimo || 0,
             stock_maximo: product.stock_maximo || 0,
@@ -642,6 +644,8 @@ export default function InventoryManagement() {
                 presentacion: formData.presentacion.trim(),
                 categoria: formData.categoria,
                 peso_kg: peso,
+                costo: parseFloat(formData.costo) || 0,
+                precio_venta: parseFloat(formData.precio_venta) || 0,
                 stock_actual: Number(formData.stock_actual) || 0,
                 stock_minimo: stockMinimo,
                 stock_maximo: stockMaximo,
@@ -1106,6 +1110,8 @@ export default function InventoryManagement() {
                                                 <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 space-y-1 mb-3">
                                                     <p><span className="font-semibold text-gray-400">Presentación:</span> {product.presentacion}</p>
                                                     <p><span className="font-semibold text-gray-400">Peso Base:</span> {parseFloat(product.peso_kg).toFixed(2)} kg</p>
+                                                    <p><span className="font-semibold text-gray-400">Costo:</span> ${parseFloat(product.costo || 0).toFixed(4)}</p>
+                                                    <p><span className="font-semibold text-gray-400">Precio Venta:</span> ${parseFloat(product.precio_venta || 0).toFixed(2)}</p>
                                                     {product.categoria && <p><span className="font-semibold text-gray-400">Categoría:</span> {product.categoria}</p>}
                                                     {product.proveedor_nombre && <p><span className="font-semibold text-gray-400">Proveedor:</span> {product.proveedor_nombre}</p>}
                                                     <p><span className="font-semibold text-gray-400">Stock Actual:</span> 
@@ -1117,10 +1123,17 @@ export default function InventoryManagement() {
                                                     {maxStockNum > 0 && <p className="text-xs text-gray-500"><span className="font-semibold text-gray-400">Stock Máximo:</span> {maxStockNum.toFixed(2)}</p>}
                                                 </div>
                                                 <div className="mt-4 pt-4 border-t border-gray-100">
-                                                    {formula ? (
+                                                    {formula ? (() => {
+                                                        const costoPrep = parseFloat(formula.costo_total) || 0;
+                                                        const ganancia = parseFloat(product.precio_venta || 0) - costoPrep;
+                                                        return (
                                                         <div><div className="flex items-center justify-between mb-2"><span className="text-[10px] bg-green-100 text-green-800 font-extrabold uppercase px-2 py-0.5 rounded-md">BOM Activo</span><button onClick={() => deleteFormula(formula.id)} className="text-[10px] text-red-500 hover:underline">Revocar</button></div>
-                                                        <ul className="text-xs text-gray-500 space-y-0.5 max-h-16 overflow-hidden">{formula.componentes.slice(0, 2).map((c, i) => <li key={i} className="truncate">• {c.insumo_nombre}</li>)}</ul></div>
-                                                    ) : <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold uppercase px-2 py-0.5 rounded-md inline-block mb-2">Sin Receta</span>}
+                                                        <div className="mb-2 text-xs bg-gray-50 p-2 rounded-lg">
+                                                            <div className="flex justify-between"><span className="text-gray-500">Costo Prep:</span> <span className="font-bold">${costoPrep.toFixed(4)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-gray-500">Ganancia:</span> <span className={`font-bold ${ganancia > 0 ? 'text-green-600' : 'text-red-600'}`}>${ganancia.toFixed(4)}</span></div>
+                                                        </div>
+                                                        <ul className="text-xs text-gray-500 space-y-0.5 max-h-16 overflow-hidden">{(formula.componentes || []).slice(0, 2).map((c, i) => <li key={i} className="truncate">• {c.insumo_nombre}</li>)}</ul></div>
+                                                    )})() : <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold uppercase px-2 py-0.5 rounded-md inline-block mb-2">Sin Receta</span>}
                                                     <button onClick={() => openFormulaConfig(product)} className="w-full mt-2 py-1.5 bg-slate-50 hover:bg-slate-100 text-indigo-600 text-xs font-bold rounded-lg transition-colors border border-slate-200">{formula ? 'Modificar Fórmula' : 'Crear Fórmula'}</button>
                                                 </div>
                                             </div>
@@ -1248,6 +1261,10 @@ export default function InventoryManagement() {
                                     <div><label className="block text-sm font-bold mb-1">Stock Físico</label><input type="number" step="0.01" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-bold mb-1">Costo (USD)</label><input type="number" step="0.01" min="0" value={formData.costo} onChange={e => setFormData({...formData, costo: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
+                                    <div><label className="block text-sm font-bold mb-1">Precio Venta (USD)</label><input type="number" step="0.01" min="0" value={formData.precio_venta} onChange={e => setFormData({...formData, precio_venta: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
                                     <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta amarilla" /></div>
                                     <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta naranja" /></div>
                                 </div>
@@ -1301,15 +1318,36 @@ export default function InventoryManagement() {
                         <div className="p-6 flex-1 overflow-y-auto">
                             <div className="mb-4"><label className="block text-xs font-bold uppercase">Nombre de la Receta</label><input type="text" value={formulaName} onChange={e => setFormulaName(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
                             <div className="mb-4 flex justify-between items-end"><label className="text-xs font-bold uppercase">Ingredientes</label><button onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '' }])} className="text-xs bg-indigo-50 px-3 py-1.5 rounded-lg">+ Agregar</button></div>
-                            <div className="space-y-3">{ingredients.map((ing, idx) => (
+                            <div className="space-y-3">{ingredients.map((ing, idx) => {
+                                const insumoDetails = products.find(p => p.id === parseInt(ing.insumo_id));
+                                const costoInsumo = insumoDetails ? parseFloat(insumoDetails.costo) || 0 : 0;
+                                const subtotal = (parseFloat(ing.cantidad) || 0) * costoInsumo;
+                                return (
                                 <div key={idx} className="flex gap-2 items-start bg-slate-50 p-2 rounded-xl">
                                     <div className="flex-1"><AutocompleteCreate label="Insumo" endpoint="/inventario/products/?categoria=otros" value={ing.insumo_id} nameField="nombre" onSelect={(item) => { const newIng = [...ingredients]; newIng[idx].insumo_id = item.id; setIngredients(newIng); }} createFields={[]} extraCreateData={{ categoria: 'otros' }} /></div>
                                     <div className="w-24"><label className="block text-[10px] font-bold">Cant.</label><input type="number" step="0.01" value={ing.cantidad} onChange={e => { const newIng = [...ingredients]; newIng[idx].cantidad = e.target.value; setIngredients(newIng); }} className="w-full border rounded px-2 py-1" /></div>
+                                    <div className="w-24 pt-1"><label className="block text-[10px] font-bold text-gray-500">Costo</label><div className="text-sm font-bold text-gray-700">${subtotal.toFixed(4)}</div></div>
                                     <div className="pt-5"><button onClick={() => { const newIng = [...ingredients]; newIng.splice(idx, 1); setIngredients(newIng); }} className="text-red-400"><i className="bi bi-trash"></i></button></div>
                                 </div>
-                            ))}</div>
+                                );
+                            })}</div>
                         </div>
-                        <div className="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50"><button onClick={() => setShowFormulaModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button onClick={saveFormula} disabled={submitting} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                        <div className="px-6 py-4 border-t flex justify-between items-center bg-gray-50">
+                            {(() => {
+                                const costoTotalReceta = ingredients.reduce((sum, ing) => {
+                                    const ins = products.find(p => p.id === parseInt(ing.insumo_id));
+                                    return sum + (parseFloat(ing.cantidad) || 0) * (ins ? parseFloat(ins.costo) || 0 : 0);
+                                }, 0);
+                                const ganancia = parseFloat(selectedQuimico?.precio_venta || 0) - costoTotalReceta;
+                                return (
+                                    <div className="text-sm">
+                                        <p><span className="font-bold text-gray-600">Costo Total:</span> <span className="font-black text-indigo-700">${costoTotalReceta.toFixed(4)}</span></p>
+                                        <p><span className="font-bold text-gray-600">Ganancia (s/ PV ${parseFloat(selectedQuimico?.precio_venta || 0).toFixed(2)}):</span> <span className={`font-black ${ganancia > 0 ? 'text-green-600' : 'text-red-600'}`}>${ganancia.toFixed(4)}</span></p>
+                                    </div>
+                                );
+                            })()}
+                            <div className="flex gap-3"><button onClick={() => setShowFormulaModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button onClick={saveFormula} disabled={submitting} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                        </div>
                     </div>
                 </div>,
                 document.body
