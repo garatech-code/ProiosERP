@@ -39,6 +39,8 @@ class Articulo(models.Model):
     descripcion = models.TextField(blank=True, help_text="Observaciones o descripción del producto")
     presentacion = models.CharField(max_length=100)
     peso_kg = models.DecimalField(max_digits=10, decimal_places=2)
+    costo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Costo unitario (manual o calculado)")
+    precio_venta = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Precio de venta unitario")
     stock_actual = models.DecimalField(max_digits=15, decimal_places=4, default=0.0)
     stock_minimo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Stock mínimo para alerta (amarillo)")
     stock_maximo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Stock máximo (opcional)")

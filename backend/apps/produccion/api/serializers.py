@@ -5,10 +5,11 @@ from apps.inventario.models import Articulo
 class ComponenteBOMSerializer(serializers.ModelSerializer):
     insumo_nombre = serializers.SerializerMethodField()
     insumo_presentacion = serializers.SerializerMethodField()
+    insumo_costo = serializers.SerializerMethodField()
 
     class Meta:
         model = ComponenteBOM
-        fields = ['id', 'insumo_id', 'insumo_nombre', 'insumo_presentacion', 'cantidad_requerida']
+        fields = ['id', 'insumo_id', 'insumo_nombre', 'insumo_presentacion', 'insumo_costo', 'cantidad_requerida']
 
     def get_insumo_nombre(self, obj):
         try:
@@ -22,19 +23,43 @@ class ComponenteBOMSerializer(serializers.ModelSerializer):
         except Articulo.DoesNotExist:
             return ""
 
+    def get_insumo_costo(self, obj):
+        try:
+            return Articulo.objects.get(id=obj.insumo_id).costo
+        except Articulo.DoesNotExist:
+            return 0.0
+
 class FormulaBOMSerializer(serializers.ModelSerializer):
     componentes = ComponenteBOMSerializer(many=True, required=False)
     articulo_final_nombre = serializers.SerializerMethodField()
+    costo_total = serializers.SerializerMethodField()
+    articulo_final_precio_venta = serializers.SerializerMethodField()
 
     class Meta:
         model = FormulaBOM
-        fields = ['id', 'nombre', 'articulo_final_id', 'articulo_final_nombre', 'activa', 'componentes']
+        fields = ['id', 'nombre', 'articulo_final_id', 'articulo_final_nombre', 'articulo_final_precio_venta', 'activa', 'componentes', 'costo_total']
 
     def get_articulo_final_nombre(self, obj):
         try:
             return Articulo.objects.get(id=obj.articulo_final_id).nombre
         except Articulo.DoesNotExist:
             return "Artículo Eliminado"
+
+    def get_costo_total(self, obj):
+        total = 0
+        for comp in obj.componentes.all():
+            try:
+                articulo = Articulo.objects.get(id=comp.insumo_id)
+                total += comp.cantidad_requerida * articulo.costo
+            except Articulo.DoesNotExist:
+                pass
+        return total
+
+    def get_articulo_final_precio_venta(self, obj):
+        try:
+            return Articulo.objects.get(id=obj.articulo_final_id).precio_venta
+        except Articulo.DoesNotExist:
+            return 0.0
 
     def create(self, validated_data):
         componentes_data = validated_data.pop('componentes', [])
