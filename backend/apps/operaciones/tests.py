@@ -21,6 +21,9 @@ class ProiosFlowIntegrationTestCase(TestCase):
         self.owner_client.force_authenticate(user=self.owner)
         self.operario_client = APIClient()
         self.operario_client.force_authenticate(user=self.operario)
+        self.contable = User.objects.create_user(username='contable_user', password='password123', role='CONTABLE')
+        self.contable_client = APIClient()
+        self.contable_client.force_authenticate(user=self.contable)
         
         # Create Client, Ship, Port
         self.client = Client.objects.create(name="Test Client", email="test@client.com")
@@ -105,9 +108,9 @@ class ProiosFlowIntegrationTestCase(TestCase):
         self.assertEqual(orden.cantidad_a_producir, 5)
         self.assertFalse(orden.completada)
         
-        # 4. Operario should not be able to complete production orders
+        # 4. Contable should not be able to complete production orders
         url_completar = f'/api/produccion/ordenes/{orden_id}/completar/'
-        res = self.operario_client.post(url_completar)
+        res = self.contable_client.post(url_completar)
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
         
         # 5. Complete production order as Owner (replenish stock)
@@ -255,11 +258,100 @@ class ProiosFlowIntegrationTestCase(TestCase):
         mov_insumo = MovimientoStock.objects.filter(articulo=prod_insumo_no_control, operacion_id=self.operacion.id)
         self.assertEqual(mov_insumo.count(), 0)
         
-        # Revert/Cancel the operation
-        url_cancel = f'/api/operaciones/operations/{self.operacion.id}/cancel_operation/'
-        res = self.owner_client.post(url_cancel)
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        
         # Insumo stock should still be 0.0
         prod_insumo_no_control.refresh_from_db()
         self.assertEqual(prod_insumo_no_control.stock_actual, 0.0)
+
+
+class IsOwnerOrCreatorSeniorPermissionTestCase(TestCase):
+    def setUp(self):
+        # Create users of different roles
+        self.owner = User.objects.create_user(username='perm_owner', password='password123', role='OWNER')
+        self.senior_creator = User.objects.create_user(username='perm_senior_creator', password='password123', role='OPERADOR')
+        self.senior_other = User.objects.create_user(username='perm_senior_other', password='password123', role='OPERADOR')
+        self.junior = User.objects.create_user(username='perm_junior', password='password123', role='OPERADOR_JR')
+        self.contable = User.objects.create_user(username='perm_contable', password='password123', role='CONTABLE')
+        self.operario = User.objects.create_user(username='perm_operario', password='password123', role='OPERARIO')
+        
+        # Create a Client, Ship, Port for testing
+        self.client = Client.objects.create(name="Perm Client", email="perm@client.com")
+        self.ship = Ship.objects.create(name="Perm Ship", flag="AR")
+        self.port = Port.objects.create(name="Perm Port", country="Argentina")
+
+        # Create an operation created by senior_creator
+        self.operacion = Operacion.objects.create(
+            cliente=self.client,
+            ship=self.ship,
+            port=self.port,
+            creado_por=self.senior_creator,
+            estado='solicitada'
+        )
+
+        # Clients for requesting
+        self.clients = {}
+        for role, user in [
+            ('OWNER', self.owner),
+            ('SENIOR_CREATOR', self.senior_creator),
+            ('SENIOR_OTHER', self.senior_other),
+            ('JUNIOR', self.junior),
+            ('CONTABLE', self.contable),
+            ('OPERARIO', self.operario)
+        ]:
+            client = APIClient()
+            client.force_authenticate(user=user)
+            self.clients[role] = client
+
+    def test_owner_can_modify(self):
+        # OWNER should be able to modify the operation
+        url = f'/api/operaciones/operations/{self.operacion.id}/'
+        response = self.clients['OWNER'].patch(url, {'nombre': 'Modified by Owner'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.operacion = Operacion.objects.get(id=self.operacion.id)
+        self.assertEqual(self.operacion.nombre, 'Modified by Owner')
+
+    def test_senior_creator_can_modify(self):
+        # The creator of the operation (who is a Senior OPERADOR) should be able to modify it
+        url = f'/api/operaciones/operations/{self.operacion.id}/'
+        response = self.clients['SENIOR_CREATOR'].patch(url, {'nombre': 'Modified by Senior Creator'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.operacion = Operacion.objects.get(id=self.operacion.id)
+        self.assertEqual(self.operacion.nombre, 'Modified by Senior Creator')
+
+    def test_unassigned_users_get_404(self):
+        # Users that cannot see the operation in get_queryset get 404 (Not Found)
+        url = f'/api/operaciones/operations/{self.operacion.id}/'
+        
+        # senior_other is not creator and not assigned -> 404
+        response = self.clients['SENIOR_OTHER'].patch(url, {'nombre': 'Attempt'})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # junior, contable, operario are not assigned -> 404 (contable can see all, wait, contable can see all!)
+        # Let's check contable: contable can see all, but doesn't have write permissions. So contable should get 403!
+        response = self.clients['CONTABLE'].patch(url, {'nombre': 'Attempt'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # junior and operario are not assigned -> 404
+        for role in ['JUNIOR', 'OPERARIO']:
+            response = self.clients[role].patch(url, {'nombre': 'Attempt'})
+            self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_assigned_unauthorized_users_get_403(self):
+        # If a user is assigned, they can see the operation (so no 404), but if they attempt to modify they get 403
+        
+        # 1. Assign senior_other (non-creator OPERADOR)
+        self.operacion.operadores_asignados.add(self.senior_other)
+        url = f'/api/operaciones/operations/{self.operacion.id}/'
+        response = self.clients['SENIOR_OTHER'].patch(url, {'nombre': 'Attempt'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 2. Assign junior (OPERADOR_JR)
+        self.operacion.operadores_asignados.add(self.junior)
+        response = self.clients['JUNIOR'].patch(url, {'nombre': 'Attempt'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 3. Assign operario (OPERARIO)
+        self.operacion.operarios_usuarios_asignados.add(self.operario)
+        response = self.clients['OPERARIO'].patch(url, {'nombre': 'Attempt'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+

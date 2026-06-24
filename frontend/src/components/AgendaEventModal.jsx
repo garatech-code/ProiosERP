@@ -205,19 +205,43 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                         {isOwner && (
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Asignar a *</label>
-                                <select
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                                    value={assignedTo}
-                                    onChange={e => setAssignedTo(e.target.value)}
-                                    required
-                                >
-                                    <option value={String(user.id)}>Mí mismo ({formatUserName(user)})</option>
-                                    {operators.map(op => (
-                                        <option key={op.id} value={String(op.id)}>
-                                            Operador: {formatUserName(op)}
-                                        </option>
-                                    ))}
-                                </select>
+                                <Select
+                                    options={[
+                                        { value: String(user.id), label: `Mí mismo (${formatUserName(user)})` },
+                                        ...operators.map(op => ({ value: String(op.id), label: `Operador: ${formatUserName(op)}` }))
+                                    ]}
+                                    value={
+                                        assignedTo === String(user.id) 
+                                        ? { value: String(user.id), label: `Mí mismo (${formatUserName(user)})` }
+                                        : operators.filter(op => String(op.id) === assignedTo).map(op => ({ value: String(op.id), label: `Operador: ${formatUserName(op)}` }))[0]
+                                    }
+                                    onChange={selected => setAssignedTo(selected ? selected.value : '')}
+                                    placeholder="Seleccionar asignado..."
+                                    unstyled
+                                    classNames={{
+                                        control: (state) =>
+                                            `flex items-center w-full px-3 py-1.5 border ${
+                                                state.isFocused
+                                                    ? 'border-indigo-500 ring-2 ring-indigo-500'
+                                                    : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                                            } bg-white dark:bg-slate-700 rounded-xl transition-colors cursor-pointer`,
+                                        menu: () => 'bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 mt-1 z-50 absolute w-full',
+                                        menuList: () => 'py-1 max-h-60 overflow-y-auto',
+                                        option: (state) =>
+                                            `px-4 py-2 cursor-pointer ${
+                                                state.isSelected
+                                                    ? 'bg-indigo-500 text-white'
+                                                    : state.isFocused
+                                                        ? 'bg-indigo-50 dark:bg-slate-700 text-gray-900 dark:text-white'
+                                                        : 'text-gray-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
+                                            }`,
+                                        singleValue: () => 'text-gray-900 dark:text-white',
+                                        input: () => 'text-gray-900 dark:text-white',
+                                        placeholder: () => 'text-gray-400 dark:text-slate-400',
+                                        indicatorSeparator: () => 'bg-gray-200 dark:bg-slate-600 mx-2',
+                                        dropdownIndicator: () => 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer',
+                                    }}
+                                />
                             </div>
                         )}
                     </form>

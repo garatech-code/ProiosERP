@@ -73,7 +73,12 @@ export default function AutocompleteCreate({
   const fetchOptions = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(endpoint);
+      let url = endpoint;
+      if (!url.includes('page_size=')) {
+        const separator = url.includes('?') ? '&' : '?';
+        url = `${url}${separator}page_size=10000`;
+      }
+      const res = await axios.get(url);
       const data = Array.isArray(res.data) ? res.data : res.data.results || [];
       setOptions(data);
       setFilteredOptions(data);

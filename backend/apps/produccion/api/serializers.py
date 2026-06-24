@@ -5,11 +5,10 @@ from apps.inventario.models import Articulo
 class ComponenteBOMSerializer(serializers.ModelSerializer):
     insumo_nombre = serializers.SerializerMethodField()
     insumo_presentacion = serializers.SerializerMethodField()
-    insumo_costo = serializers.SerializerMethodField()
 
     class Meta:
         model = ComponenteBOM
-        fields = ['id', 'insumo_id', 'insumo_nombre', 'insumo_presentacion', 'insumo_costo', 'cantidad_requerida']
+        fields = ['id', 'insumo_id', 'insumo_nombre', 'insumo_presentacion', 'cantidad_requerida']
 
     def get_insumo_nombre(self, obj):
         try:
@@ -23,21 +22,13 @@ class ComponenteBOMSerializer(serializers.ModelSerializer):
         except Articulo.DoesNotExist:
             return ""
 
-    def get_insumo_costo(self, obj):
-        try:
-            return Articulo.objects.get(id=obj.insumo_id).costo
-        except Articulo.DoesNotExist:
-            return 0.0
-
 class FormulaBOMSerializer(serializers.ModelSerializer):
     componentes = ComponenteBOMSerializer(many=True, required=False)
     articulo_final_nombre = serializers.SerializerMethodField()
-    costo_total = serializers.SerializerMethodField()
-    articulo_final_precio_venta = serializers.SerializerMethodField()
 
     class Meta:
         model = FormulaBOM
-        fields = ['id', 'nombre', 'articulo_final_id', 'articulo_final_nombre', 'articulo_final_precio_venta', 'activa', 'componentes', 'costo_total']
+        fields = ['id', 'nombre', 'articulo_final_id', 'articulo_final_nombre', 'activa', 'componentes']
 
     def get_articulo_final_nombre(self, obj):
         try:
@@ -45,21 +36,42 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
         except Articulo.DoesNotExist:
             return "Artículo Eliminado"
 
-    def get_costo_total(self, obj):
-        total = 0
-        for comp in obj.componentes.all():
+    def validate(self, data):
+        articulo_final_id = data.get('articulo_final_id')
+        if articulo_final_id:
             try:
-                articulo = Articulo.objects.get(id=comp.insumo_id)
-                total += comp.cantidad_requerida * articulo.costo
+                art_final = Articulo.objects.get(id=articulo_final_id)
+                if art_final.categoria != 'quimicos':
+                    raise serializers.ValidationError(
+                        {"articulo_final_id": "El artículo final debe tener la categoría 'quimicos'."}
+                    )
             except Articulo.DoesNotExist:
-                pass
-        return total
+                raise serializers.ValidationError(
+                    {"articulo_final_id": "El artículo final no existe en el inventario."}
+                )
 
-    def get_articulo_final_precio_venta(self, obj):
-        try:
-            return Articulo.objects.get(id=obj.articulo_final_id).precio_venta
-        except Articulo.DoesNotExist:
-            return 0.0
+        componentes = data.get('componentes', [])
+        if componentes:
+            from decimal import Decimal
+            total_qty = sum(Decimal(str(comp.get('cantidad_requerida', 0))) for comp in componentes)
+            if abs(total_qty - Decimal('1.0')) > Decimal('0.0001'):
+                raise serializers.ValidationError(
+                    {"componentes": "La suma de los porcentajes de los ingredientes debe ser exactamente 100%."}
+                )
+        for comp in componentes:
+            insumo_id = comp.get('insumo_id')
+            if insumo_id:
+                try:
+                    insumo = Articulo.objects.get(id=insumo_id)
+                    if insumo.categoria != 'quimicos':
+                        raise serializers.ValidationError(
+                            {"componentes": f"El ingrediente '{insumo.nombre}' debe tener la categoría 'quimicos'."}
+                        )
+                except Articulo.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"componentes": f"El ingrediente con ID {insumo_id} no existe en el inventario."}
+                    )
+        return data
 
     def create(self, validated_data):
         componentes_data = validated_data.pop('componentes', [])

@@ -728,12 +728,14 @@ export default function OwnerDashboard() {
                              'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
-                    {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && ( // NUEVO: ocultar botón en stockMovements y users
-                        <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
-                            <i className="bi bi-plus-lg text-lg"></i>
-                            Nueva Operación
-                        </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && (
+                            <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                                <i className="bi bi-plus-lg text-lg"></i>
+                                Nueva Operación
+                            </button>
+                        )}
+                    </div>
                 </header>
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 custom-scrollbar">

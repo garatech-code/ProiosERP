@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
-export default function OperationDocuments({ operacionId, documentos, onDocumentChange, openPreview, selectedDocs = [], toggleSelectDoc }) {
+export default function OperationDocuments({ operacionId, documentos, onDocumentChange, openPreview, selectedDocs = [], toggleSelectDoc, canEdit = true }) {
     const { user } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [tipoSeleccionado, setTipoSeleccionado] = useState('delivery_note');
@@ -71,58 +71,60 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Documentos adicionales</h3>
 
-            <form onSubmit={handleUpload} className="mb-6 p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Tipo de documento *</label>
-                        <select
-                            value={tipoSeleccionado}
-                            onChange={(e) => setTipoSeleccionado(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 rounded px-3 py-2"
-                        >
-                            {tipos.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
-                    </div>
-                    {tipoSeleccionado === 'otros' && (
+            {canEdit && (
+                <form onSubmit={handleUpload} className="mb-6 p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Nombre personalizado *</label>
-                            <input
-                                type="text"
-                                value={nombrePersonalizado}
-                                onChange={(e) => setNombrePersonalizado(e.target.value)}
-                                required
+                            <label className="block text-sm font-medium mb-1">Tipo de documento *</label>
+                            <select
+                                value={tipoSeleccionado}
+                                onChange={(e) => setTipoSeleccionado(e.target.value)}
                                 className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 rounded px-3 py-2"
-                                placeholder="Ej: Certificado de origen"
+                            >
+                                {tipos.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                        </div>
+                        {tipoSeleccionado === 'otros' && (
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Nombre personalizado *</label>
+                                <input
+                                    type="text"
+                                    value={nombrePersonalizado}
+                                    onChange={(e) => setNombrePersonalizado(e.target.value)}
+                                    required
+                                    className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 rounded px-3 py-2"
+                                    placeholder="Ej: Certificado de origen"
+                                />
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Archivo *</label>
+                            <input
+                                type="file"
+                                onChange={handleFileChange}
+                                required
+                                className="w-full text-sm"
                             />
                         </div>
-                    )}
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Archivo *</label>
-                        <input
-                            type="file"
-                            onChange={handleFileChange}
-                            required
-                            className="w-full text-sm"
-                        />
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium mb-1">Descripción (opcional)</label>
+                            <textarea
+                                value={descripcion}
+                                onChange={(e) => setDescripcion(e.target.value)}
+                                rows={2}
+                                className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 rounded px-3 py-2"
+                            />
+                        </div>
                     </div>
-                    <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium mb-1">Descripción (opcional)</label>
-                        <textarea
-                            value={descripcion}
-                            onChange={(e) => setDescripcion(e.target.value)}
-                            rows={2}
-                            className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 rounded px-3 py-2"
-                        />
-                    </div>
-                </div>
-                <button
-                    type="submit"
-                    disabled={uploading}
-                    className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                >
-                    {uploading ? 'Subiendo...' : 'Subir documento'}
-                </button>
-            </form>
+                    <button
+                        type="submit"
+                        disabled={uploading}
+                        className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                        {uploading ? 'Subiendo...' : 'Subir documento'}
+                    </button>
+                </form>
+            )}
 
             {documentos.length === 0 ? (
                 <p className="text-gray-500 dark:text-slate-400 text-sm">No hay documentos adicionales.</p>
@@ -183,12 +185,14 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
                                     >
                                         <i className="bi bi-download"></i> Descargar
                                     </a>
-                                    <button 
-                                        onClick={() => handleDelete(doc.id)} 
-                                        className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                    >
-                                        <i className="bi bi-trash text-base"></i>
-                                    </button>
+                                    {canEdit && (
+                                        <button 
+                                            onClick={() => handleDelete(doc.id)} 
+                                            className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                        >
+                                            <i className="bi bi-trash text-base"></i>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );

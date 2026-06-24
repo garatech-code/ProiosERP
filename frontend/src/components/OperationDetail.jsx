@@ -897,6 +897,7 @@ export default function OperationDetail() {
 
   const isOperario = user?.role === 'OPERARIO';
   const isOwner = user?.role === 'OWNER';
+  const canEdit = isOwner || (isOperador && operation?.creado_por === user?.id);
 
   if (loading) return <div className="flex justify-center mt-20"><LogoSpinner size="w-16 h-16" /></div>;
   if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
@@ -933,9 +934,11 @@ export default function OperationDetail() {
                     <h1 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
                       {operation.nombre || `OP-${String(operation.id).padStart(4, '0')}`}
                     </h1>
-                    <button onClick={() => setEditingName(true)} className="text-slate-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <i className="bi bi-pencil-square"></i>
-                    </button>
+                    {canEdit && (
+                      <button onClick={() => setEditingName(true)} className="text-slate-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i className="bi bi-pencil-square"></i>
+                      </button>
+                    )}
                   </div>
                   {operation.nombre && (
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold tracking-widest uppercase mt-[-2px]">
@@ -1157,9 +1160,27 @@ export default function OperationDetail() {
                         <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
                         <div>
                           <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
-                          <ul className="mt-2 text-xs font-medium text-red-700 space-y-1">
+                          <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
                             {stockVerification.errores?.map((err, idx) => (
-                              <li key={idx}>• {err.nombre}: Piden {err.necesario}, pero hay {err.disponible}.</li>
+                              <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
+                                <div>
+                                  • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
+                                </div>
+                                {err.formula_shortage && err.formula_shortage.length > 0 && (
+                                  <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
+                                    <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
+                                      <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
+                                    </span>
+                                    <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
+                                      {err.formula_shortage.map((fS, fIdx) => (
+                                        <li key={fIdx}>
+                                          <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </li>
                             ))}
                           </ul>
                         </div>
@@ -1350,7 +1371,7 @@ export default function OperationDetail() {
                             onClick={handleOpenPackingModal}
                             className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                           >
-                            <i className="bi bi-pencil-square"></i> Editar
+                            <i className={`bi ${canEdit ? 'bi-pencil-square' : 'bi-eye-fill'}`}></i> {canEdit ? 'Editar' : 'Ver'}
                           </button>
                           <button
                             onClick={previewPackingListExcel}
@@ -1364,9 +1385,9 @@ export default function OperationDetail() {
                           >
                             <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
                           </button>
-                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                             <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                           </label>
                         </div>
                       </div>
@@ -1384,9 +1405,9 @@ export default function OperationDetail() {
                             </button>
                           )}
                         </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
                       </div>
 
@@ -1403,9 +1424,9 @@ export default function OperationDetail() {
                             </button>
                           )}
                         </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
                       </div>
                     </div>
@@ -1435,15 +1456,17 @@ export default function OperationDetail() {
                         )}
                       </div>
                       <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                        <button
-                          onClick={() => setIsToolsModalOpen(true)}
-                          className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                        >
-                          <i className="bi bi-card-list"></i> Gestionar Herramientas
-                        </button>
-                        <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {canEdit && (
+                          <button
+                            onClick={() => setIsToolsModalOpen(true)}
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            <i className="bi bi-card-list"></i> Gestionar Herramientas
+                          </button>
+                        )}
+                        <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || (isOperador && operation.estado_revision === 'rejected')} />
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
                       </div>
                     </div>
@@ -1459,6 +1482,7 @@ export default function OperationDetail() {
                 openPreview={openPreview}
                 selectedDocs={selectedDocs}
                 toggleSelectDoc={toggleSelectDoc}
+                canEdit={canEdit}
               />
 
               {/* ADJUNTOS DE LA CADENA DE CORREOS */}
@@ -1539,194 +1563,210 @@ export default function OperationDetail() {
                 <OperationEmails operacionId={id} openPreview={openPreview} />
               </div>
 
-              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-white w-full sm:w-auto text-center sm:text-left">
-                  <h4 className="font-black text-lg">Controles Operativos</h4>
-                  <p className="text-xs text-slate-400 font-medium">Avanza la operación a la siguiente fase.</p>
+              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+                  <div className="text-white w-full sm:w-auto text-center sm:text-left">
+                    <h4 className="font-black text-lg">Controles Operativos</h4>
+                    <p className="text-xs text-slate-400 font-medium">Avanza la operación a la siguiente fase.</p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto sm:justify-end">
+                    {isOwner && operation.status !== 'closed' && operation.estado !== 'entregada' && operation.status !== 'cancelled' && operation.estado !== 'cancelada' && (
+                      <button
+                        onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock consumido se devolverá automáticamente al inventario.')}
+                        disabled={actionLoading}
+                        className="w-full sm:w-auto px-4 py-2 border-2 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      >
+                        <i className="bi bi-x-octagon-fill"></i> Anular
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <i className="bi bi-pencil-fill"></i> Editar Info
+                      </button>
+                    )}
+
+                    {isOwner && operation.estado_revision === 'pending' && (
+                      <button
+                        onClick={() => handleResolveReview('approve')}
+                        disabled={revisionActionLoading}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-black rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                      >
+                        {revisionActionLoading ? 'Procesando...' : <><i className="bi bi-check-all text-lg leading-none"></i> Marcar como Visto</>}
+                      </button>
+                    )}
+
+                    {operation.tipo_operacion !== 'servicios' ? (
+                      <>
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
+                          <button
+                            onClick={() => handleAction('confirm_operation', '¿Confirmar etapa de Preparación y pasar al estado de Suministros (Armado de Packing List)?')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
+                          </button>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.can_send_to_customs && !isOperario && (
+                          <button
+                            onClick={handleEnviarAduanasClick}
+                            disabled={actionLoading || fetchingAduanasFile || (stockVerification && !stockVerification.todo_suficiente)}
+                            className={`w-full sm:w-auto px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${(stockVerification && !stockVerification.todo_suficiente)
+                              ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                              : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
+                              }`}
+                          >
+                            {actionLoading || fetchingAduanasFile ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Procesando...
+                              </>
+                            ) : (
+                              <><i className="bi bi-building-check"></i> Enviar a Aduanas</>
+                            )}
+                          </button>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.can_coordinate && !isOperario && (
+                          <button
+                            onClick={() => handleAction('finalize_production', '¿Aduanas aprobó el despacho (Rancho)? Pasar a lista para envío.')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-white hover:bg-amber-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading ? 'Procesando...' : <><i className="bi bi-truck"></i> Despacho de Aduana Listo</>}
+                          </button>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.can_deliver && !isOperario && (
+                          <button
+                            onClick={() => handleAction('mark_delivered', '¿Marcar como remitada? Se asume que la logística ya fue gestionada.')}
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                          >
+                            {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
+                          </button>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
+                          <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                            {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={openCotizacionPdfModal}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                              title="Vista previa del documento generado automáticamente"
+                            >
+                              <i className="bi bi-eye-fill"></i> Vista Previa
+                            </button>
+                            <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
+                              <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
+                              <input type="file" className="hidden" onChange={handleUploadCotizacionCustom} disabled={uploading} />
+                            </label>
+                            <button
+                              onClick={handleCotizarClick}
+                              disabled={actionLoading || fetchingCotizacionFile}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading || fetchingCotizacionFile ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
+                            </button>
+                          </div>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={openPnaModal}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                            >
+                              <i className="bi bi-file-earmark-pdf"></i> Generar Permiso PNA
+                            </button>
+                            <button
+                              onClick={() => handleAction('tramitar_permisos_pna', '¿Marcar permisos PNA como gestionados?')}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-shield-check"></i> Permisos Tramitados</>}
+                            </button>
+                          </div>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'permisos_pna' && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={() => handleAction('iniciar_ejecucion_servicio', '¿Iniciar la ejecución del servicio a bordo?')}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 text-white hover:bg-indigo-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-tools"></i> Iniciar Ejecución</>}
+                            </button>
+                          </div>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'en_ejecucion' && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={() => handleGeneratePdf('generate_reporte_servicio')}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-4 py-2 border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                            >
+                              <i className="bi bi-file-earmark-pdf"></i> Reporte de Servicio (Base)
+                            </button>
+                            <button
+                              onClick={() => handleAction('finalizar_servicio_reporte', '¿Finalizar el servicio? Asegúrate de subir luego el reporte firmado por el cliente en Documentación.')}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-check-all"></i> Servicio Finalizado</>}
+                            </button>
+                          </div>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && (
+                          <button onClick={() => handleAction('close_servicio', '¿Cerrar Operación por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                            {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto sm:justify-end">
-                  {isOwner && operation.status !== 'closed' && operation.estado !== 'entregada' && operation.status !== 'cancelled' && operation.estado !== 'cancelada' && (
-                    <button
-                      onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock consumido se devolverá automáticamente al inventario.')}
-                      disabled={actionLoading}
-                      className="w-full sm:w-auto px-4 py-2 border-2 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                    >
-                      <i className="bi bi-x-octagon-fill"></i> Anular
-                    </button>
-                  )}
-                  {isOwner && (
-                    <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
-                      <i className="bi bi-pencil-fill"></i> Editar Info
-                    </button>
-                  )}
-
-                  {isOperador && operation.estado_revision !== 'approved' && operation.estado_revision !== 'pending' && operation.estado !== 'entregada' && operation.estado !== 'cancelada' && (
-                    <div className="w-full bg-slate-700/50 p-4 rounded-xl border border-slate-600 mt-2 sm:mt-0 sm:max-w-sm sm:ml-auto">
-                      <h5 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2"><i className="bi bi-shield-check"></i> Solicitar Revisión</h5>
+                {isOperador && operation.estado_revision !== 'approved' && operation.estado_revision !== 'pending' && operation.estado !== 'entregada' && operation.estado !== 'cancelada' && (
+                  <div className="border-t border-slate-700/60 pt-6">
+                    <div className="bg-slate-700/20 p-4 sm:p-5 rounded-xl border border-slate-700/60 max-w-xl">
+                      <h5 className="text-sm font-bold text-slate-200 mb-1 flex items-center gap-2">
+                        <i className="bi bi-shield-check text-indigo-400 text-base"></i> Solicitar Revisión de la Operación
+                      </h5>
+                      <p className="text-xs text-slate-400 mb-4">
+                        Si has completado tus tareas o necesitas que un administrador apruebe los cambios, envía una solicitud con un mensaje o reporte opcional.
+                      </p>
                       <textarea
                         value={mensajeRevision}
                         onChange={(e) => setMensajeRevision(e.target.value)}
-                        placeholder="Nota o reporte para el administrador..."
-                        className="w-full text-sm bg-slate-800 text-white border-slate-600 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500 mb-2"
-                        rows="2"
+                        placeholder="Escribe un mensaje o reporte para el administrador (ej: packing list cargado)..."
+                        className="w-full text-sm bg-slate-900 text-white border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg p-2.5 mb-3 placeholder-slate-500"
+                        rows="3"
                       />
                       <button
                         onClick={handleRequestReview}
                         disabled={revisionActionLoading}
-                        className="w-full px-5 py-2.5 text-sm font-black rounded-lg shadow-lg bg-indigo-500 text-white hover:bg-indigo-400 transition-all font-bold"
+                        className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
                       >
-                        {revisionActionLoading ? 'Enviando...' : 'Enviar a Revisión'}
+                        {revisionActionLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                            Enviando...
+                          </>
+                        ) : (
+                          <><i className="bi bi-send-fill"></i> Enviar a Revisión</>
+                        )}
                       </button>
                     </div>
-                  )}
-
-                  {isOwner && operation.estado_revision === 'pending' && (
-                    <button
-                      onClick={() => handleResolveReview('approve')}
-                      disabled={revisionActionLoading}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-black rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      {revisionActionLoading ? 'Procesando...' : <><i className="bi bi-check-all text-lg leading-none"></i> Marcar como Visto</>}
-                    </button>
-                  )}
-
-                  {operation.tipo_operacion !== 'servicios' ? (
-                    <>
-                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
-                        <button
-                          onClick={() => handleAction('confirm_operation', '¿Confirmar etapa de Preparación y pasar al estado de Suministros (Armado de Packing List)?')}
-                          disabled={actionLoading}
-                          className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                        >
-                          {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
-                        </button>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_send_to_customs && !isOperario && (
-                        <button
-                          onClick={handleEnviarAduanasClick}
-                          disabled={actionLoading || fetchingAduanasFile || (stockVerification && !stockVerification.todo_suficiente)}
-                          className={`w-full sm:w-auto px-5 py-2.5 text-sm font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${(stockVerification && !stockVerification.todo_suficiente)
-                            ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                            : 'bg-indigo-500 text-white hover:bg-indigo-400 hover:shadow-indigo-500/30'
-                            }`}
-                        >
-                          {actionLoading || fetchingAduanasFile ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Procesando...
-                            </>
-                          ) : (
-                            <><i className="bi bi-building-check"></i> Enviar a Aduanas</>
-                          )}
-                        </button>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_coordinate && !isOperario && (
-                        <button
-                          onClick={() => handleAction('finalize_production', '¿Aduanas aprobó el despacho (Rancho)? Pasar a lista para envío.')}
-                          disabled={actionLoading}
-                          className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 text-white hover:bg-amber-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                        >
-                          {actionLoading ? 'Procesando...' : <><i className="bi bi-truck"></i> Despacho de Aduana Listo</>}
-                        </button>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.can_deliver && !isOperario && (
-                        <button
-                          onClick={() => handleAction('mark_delivered', '¿Marcar como remitada? Se asume que la logística ya fue gestionada.')}
-                          disabled={actionLoading}
-                          className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                        >
-                          {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
-                        </button>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
-                        <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
-                          {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                          <button
-                            onClick={openCotizacionPdfModal}
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                            title="Vista previa del documento generado automáticamente"
-                          >
-                            <i className="bi bi-eye-fill"></i> Vista Previa
-                          </button>
-                          <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
-                            <input type="file" className="hidden" onChange={handleUploadCotizacionCustom} disabled={uploading} />
-                          </label>
-                          <button
-                            onClick={handleCotizarClick}
-                            disabled={actionLoading || fetchingCotizacionFile}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                          >
-                            {actionLoading || fetchingCotizacionFile ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
-                          </button>
-                        </div>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                          <button
-                            onClick={openPnaModal}
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                          >
-                            <i className="bi bi-file-earmark-pdf"></i> Generar Permiso PNA
-                          </button>
-                          <button
-                            onClick={() => handleAction('tramitar_permisos_pna', '¿Marcar permisos PNA como gestionados?')}
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                          >
-                            {actionLoading ? 'Procesando...' : <><i className="bi bi-shield-check"></i> Permisos Tramitados</>}
-                          </button>
-                        </div>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'permisos_pna' && (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-
-                          <button
-                            onClick={() => handleAction('iniciar_ejecucion_servicio', '¿Iniciar la ejecución del servicio a bordo?')}
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 text-white hover:bg-indigo-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                          >
-                            {actionLoading ? 'Procesando...' : <><i className="bi bi-tools"></i> Iniciar Ejecución</>}
-                          </button>
-                        </div>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'en_ejecucion' && (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                          <button
-                            onClick={() => handleGeneratePdf('generate_reporte_servicio')}
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-4 py-2 border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                          >
-                            <i className="bi bi-file-earmark-pdf"></i> Reporte de Servicio (Base)
-                          </button>
-                          <button
-                            onClick={() => handleAction('finalizar_servicio_reporte', '¿Finalizar el servicio? Asegúrate de subir luego el reporte firmado por el cliente en Documentación.')}
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-purple-500 text-white hover:bg-purple-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                          >
-                            {actionLoading ? 'Procesando...' : <><i className="bi bi-check-all"></i> Servicio Finalizado</>}
-                          </button>
-                        </div>
-                      )}
-                      {(!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && (
-                        <button onClick={() => handleAction('close_servicio', '¿Cerrar Operación por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
-                          {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
+
             </div>
 
             <div className="lg:col-span-1 sticky top-24 self-start">
@@ -1920,7 +1960,7 @@ Saludos cordiales.`}
                   <button type="button" className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors shadow-sm flex justify-center items-center gap-2" onClick={() => window.print()}>
                     <i className="bi bi-printer-fill"></i> Imprimir Documento
                   </button>
-                  {!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                  {canEdit && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
                     <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl transition-colors shadow-sm flex justify-center items-center gap-2" onClick={handleStartEditPacking}>
                       <i className="bi bi-pencil-fill"></i> Editar Packing List
                     </button>

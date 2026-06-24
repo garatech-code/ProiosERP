@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import LogoSpinner from './LogoSpinner';
 
-export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts, existingProductIds = [] }) {
+export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts, existingProductIds = [], categoryFilter }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -21,6 +21,7 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
         page,
         page_size: pageSize,
         ...(search && { search }),
+        ...(categoryFilter && { categoria: categoryFilter }),
         ordering: 'nombre',
       });
       const res = await axios.get(`/inventario/products/?${params}`);

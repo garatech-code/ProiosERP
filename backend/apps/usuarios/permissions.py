@@ -48,3 +48,32 @@ class RestrictedPasswordPermission(permissions.BasePermission):
                     return True
                 return False
         return True
+
+class IsOwnerOrCreatorSenior(permissions.BasePermission):
+    """
+    Permite acceso de modificación (PUT, PATCH, DELETE, POST que modifican) solo si el usuario es OWNER
+    o es el OPERADOR (Senior) que creó la operación.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Lecturas seguras permitidas
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # descargar_zip es un POST de solo lectura de archivos
+        if view.action == 'descargar_zip':
+            return True
+
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        # OWNER puede hacer cualquier modificación
+        if user.role == 'OWNER':
+            return True
+
+        # OPERADOR puede modificar solo sus propias creaciones
+        if user.role == 'OPERADOR':
+            return obj.creado_por == user
+
+        return False
+

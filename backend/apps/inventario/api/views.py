@@ -152,7 +152,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
 class ProductPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 10000
 
 
 # ================= FILTRO PERSONALIZADO PARA MÚLTIPLES CATEGORÍAS =================
@@ -181,6 +181,43 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Articulo.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        export = request.query_params.get('export')
+        if export in ['csv', 'excel']:
+            queryset = self.filter_queryset(self.get_queryset())
+            data = []
+            for art in queryset:
+                data.append({
+                    'nombre': art.nombre,
+                    'categoria': art.categoria,
+                    'cantidad': float(art.stock_actual),
+                    'unidad': getattr(art, 'unidad', ''),
+                    'ubicacion': getattr(art, 'ubicacion', ''),
+                    'estado': getattr(art, 'estado', ''),
+                    'serie_lote': getattr(art, 'serie_lote', ''),
+                    'observaciones': art.descripcion,
+                })
+            
+            if export == 'csv':
+                response = HttpResponse(content_type='text/csv')
+                response['Content-Disposition'] = 'attachment; filename="inventario_stock.csv"'
+                if data:
+                    writer = csv.DictWriter(response, fieldnames=data[0].keys())
+                    writer.writeheader()
+                    writer.writerows(data)
+                return response
+            else:
+                df = pd.DataFrame(data)
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Stock')
+                output.seek(0)
+                response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                response['Content-Disposition'] = 'attachment; filename="inventario_stock.xlsx"'
+                return response
+
+        return super().list(request, *args, **kwargs)
 
     def get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')

@@ -1,9 +1,108 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import AutocompleteCreate from './AutocompleteCreate';
 import LogoSpinner from './LogoSpinner';
 import * as XLSX from 'xlsx';
+
+// ================= COMPONENTE DE SELECCIÓN DE INGREDIENTE QUÍMICO =================
+const ChemicalSelectionModal = ({ isOpen, onClose, onSelect }) => {
+    const [chemicals, setChemicals] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchChemicals = async () => {
+                setLoading(true);
+                try {
+                    const res = await axios.get('/inventario/products/?categoria=quimicos&page_size=10000');
+                    const data = res.data.results || res.data;
+                    setChemicals(data || []);
+                } catch (err) {
+                    console.error('Error al cargar químicos:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchChemicals();
+        }
+    }, [isOpen]);
+
+    const filtered = useMemo(() => {
+        return chemicals.filter(c => 
+            c.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.presentacion?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [chemicals, searchTerm]);
+
+    if (!isOpen) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b bg-indigo-50 dark:bg-indigo-950/20 flex justify-between items-center">
+                    <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-400">
+                        Seleccionar Ingrediente Químico
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+                        <i className="bi bi-x-lg text-lg"></i>
+                    </button>
+                </div>
+                <div className="p-4 border-b">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Buscar químico por nombre o presentación..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                        />
+                        <i className="bi bi-search absolute left-3.5 top-3 text-gray-400"></i>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    {loading ? (
+                        <div className="flex justify-center py-8"><LogoSpinner size="w-8 h-8" /></div>
+                    ) : filtered.length === 0 ? (
+                        <p className="text-center text-sm text-gray-500 py-8 italic">No se encontraron productos químicos.</p>
+                    ) : (
+                        filtered.map(c => (
+                            <div 
+                                key={c.id} 
+                                onClick={() => onSelect(c)}
+                                className="flex justify-between items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-indigo-50/50 dark:hover:bg-slate-700/50 hover:border-indigo-200 dark:hover:border-slate-600 transition-all cursor-pointer group"
+                            >
+                                <div>
+                                    <h4 className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{c.nombre}</h4>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">Presentación: {c.presentacion}</p>
+                                </div>
+                                <div className="text-right flex items-center gap-3">
+                                    <div>
+                                        <span className="text-xs text-gray-400 block">Stock Actual</span>
+                                        <span className="text-sm font-black text-slate-700 dark:text-slate-300">{Number(c.stock_actual).toFixed(2)} {c.unidad || 'L'}</span>
+                                    </div>
+                                    <button className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors">
+                                        Elegir
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t flex justify-end bg-gray-50 dark:bg-slate-750">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
 
 // ================= COMPONENTE DE TARJETA PARA VISTA MÓVIL =================
 const ProductCard = ({ product, onEdit, onDelete, onMovimiento, onLogs, onRowClick }) => {
@@ -248,12 +347,16 @@ export default function InventoryManagement() {
     const [proveedorExcelFeedback, setProveedorExcelFeedback] = useState(null);
     const [productosCriticos, setProductosCriticos] = useState([]);
     const [selectedForBudget, setSelectedForBudget] = useState({});
+    const [showProviderSelectionModal, setShowProviderSelectionModal] = useState(false);
+    const [pendingBudgetProducts, setPendingBudgetProducts] = useState(null);
+    const [selectedProviderForBudget, setSelectedProviderForBudget] = useState('');
     const [showBudgetModal, setShowBudgetModal] = useState(false);
     const [budgetText, setBudgetText] = useState('');
     const [currentProveedor, setCurrentProveedor] = useState(null);
+    const [sendingEmail, setSendingEmail] = useState(false);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', costo: 0, precio_venta: 0, stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: 'otros' });
+    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: 'otros' });
     const [submitting, setSubmitting] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -262,10 +365,35 @@ export default function InventoryManagement() {
     const [selectedProducts, setSelectedProducts] = useState({});
     const [deletingMultipleChem, setDeletingMultipleChem] = useState(false);
     const [formulas, setFormulas] = useState([]);
+    const [editingFormula, setEditingFormula] = useState(null);
     const [showFormulaModal, setShowFormulaModal] = useState(false);
     const [selectedQuimico, setSelectedQuimico] = useState(null);
     const [formulaName, setFormulaName] = useState('');
     const [ingredients, setIngredients] = useState([]);
+    const [isChemicalBrowserOpen, setIsChemicalBrowserOpen] = useState(false);
+    const [activeIngredientIdx, setActiveIngredientIdx] = useState(null);
+
+    const handleSelectChemical = (chemical) => {
+        if (activeIngredientIdx === 'final') {
+            setSelectedQuimico(chemical);
+            if (!formulaName) {
+                setFormulaName(`Fórmula de ${chemical.nombre}`);
+            }
+        } else if (typeof activeIngredientIdx === 'number') {
+            const newIng = [...ingredients];
+            newIng[activeIngredientIdx] = {
+                ...newIng[activeIngredientIdx],
+                insumo_id: chemical.id,
+                obj: chemical
+            };
+            setIngredients(newIng);
+        }
+        setIsChemicalBrowserOpen(false);
+    };
+
+    const totalPercentage = useMemo(() => {
+        return ingredients.reduce((sum, ing) => sum + (parseFloat(ing.cantidad) || 0), 0);
+    }, [ingredients]);
     const [movimientosModal, setMovimientosModal] = useState({ open: false, producto: null, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '' }, page: 1, totalPages: 1, exportando: false });
     const [logsModal, setLogsModal] = useState({ open: false, producto: null, logs: [], loading: false });
     const [movimientosGlobal, setMovimientosGlobal] = useState({ open: false, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '', articulo_id: '' }, page: 1, totalPages: 1, exportando: false });
@@ -334,9 +462,39 @@ export default function InventoryManagement() {
             setTableLoading(false);
         }
     };
+
+    const [exportingStock, setExportingStock] = useState(false);
+    
+    const exportStockData = async () => {
+        setExportingStock(true);
+        try {
+            const params = new URLSearchParams({
+                export: 'excel',
+                ...(tableFilters.search && { search: tableFilters.search }),
+                ...(tableFilters.categoria && { categoria: tableFilters.categoria }),
+                ...(tableFilters.ubicacion && { ubicacion: tableFilters.ubicacion }),
+                ...(tableFilters.estado && { estado: tableFilters.estado }),
+                ...(tableFilters.ordering && { ordering: tableFilters.ordering }),
+            });
+            const response = await axios.get(`/inventario/products/?${params}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `inventario_stock.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            showToast('Stock exportado con éxito', 'success');
+        } catch (err) {
+            showToast('Error al exportar stock', 'error');
+        } finally {
+            setExportingStock(false);
+        }
+    };
     
     useEffect(() => {
-        if (activeTab === 'todo' || activeTab === 'productos') {
+        if (activeTab === 'todo') {
             fetchTableData();
         }
     }, [activeTab, tableFilters]);
@@ -398,8 +556,9 @@ export default function InventoryManagement() {
     const fetchProducts = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('/inventario/products/');
-            setProducts(res.data);
+            const res = await axios.get('/inventario/products/?page_size=10000');
+            const data = res.data.results || res.data;
+            setProducts(data || []);
             if (activeTab === 'quimicos') await fetchFormulas();
         } catch (err) {
             showToast('Error al cargar datos del inventario.', 'error');
@@ -411,7 +570,7 @@ export default function InventoryManagement() {
     const fetchProveedores = async () => {
         try {
             const res = await axios.get('/inventario/proveedores/');
-            setProveedores(res.data.results || res.data || []);
+            setProveedores(res.data);
         } catch (err) {
             showToast('Error al cargar proveedores', 'error');
         }
@@ -420,7 +579,7 @@ export default function InventoryManagement() {
     const fetchFormulas = async () => {
         try {
             const res = await axios.get('/produccion/formulas/');
-            setFormulas(res.data.results || res.data || []);
+            setFormulas(res.data);
         } catch (err) {}
     };
     
@@ -440,11 +599,12 @@ export default function InventoryManagement() {
     useEffect(() => {
         if (activeTab === 'proveedores') {
             fetchProveedores();
-        } else if (activeTab === 'quimicos') {
-            fetchProducts();
+        } else if (activeTab === 'formulas') {
+            fetchFormulas();
         } else if (activeTab === 'abastecimiento') {
             fetchProducts();
-        } else if (activeTab !== 'todo' && activeTab !== 'productos') {
+            fetchProveedores();
+        } else if (activeTab !== 'todo') {
             fetchProducts();
         }
     }, [activeTab]);
@@ -464,16 +624,19 @@ export default function InventoryManagement() {
         setFilteredProveedores(filtered);
     }, [searchTerm, proveedores, activeTab]);
     
-    useEffect(() => {
-        if (activeTab !== 'quimicos') return;
-        let filtered = products.filter(p => p.categoria === 'quimicos');
+    const filteredFormulas = useMemo(() => {
+        if (activeTab !== 'formulas') return [];
+        let filtered = formulas;
         if (searchTerm.trim() !== '') {
             const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(p => p.nombre.toLowerCase().includes(term) || p.presentacion.toLowerCase().includes(term));
+            filtered = formulas.filter(f => 
+                f.nombre.toLowerCase().includes(term) ||
+                (f.articulo_final_nombre && f.articulo_final_nombre.toLowerCase().includes(term)) ||
+                f.componentes.some(c => c.insumo_nombre && c.insumo_nombre.toLowerCase().includes(term))
+            );
         }
-        setFilteredProducts(filtered);
-        setSelectedProducts({});
-    }, [searchTerm, products, activeTab]);
+        return filtered;
+    }, [searchTerm, formulas, activeTab]);
     
     const filteredCriticos = productosCriticos.filter(p => !criticosSearchTerm || p.nombre.toLowerCase().includes(criticosSearchTerm.toLowerCase()) || p.presentacion.toLowerCase().includes(criticosSearchTerm.toLowerCase()));
     
@@ -553,46 +716,72 @@ export default function InventoryManagement() {
         }
     };
     
-    // ========== Abastecimiento (sin cambios) ==========
-    const toggleSelectForBudget = (productId, proveedorId = '') => {
+    // ========== Abastecimiento ==========
+    const toggleSelectForBudget = (productId) => {
         setSelectedForBudget(prev => {
             if (prev[productId]) { const newState = { ...prev }; delete newState[productId]; return newState; }
-            else return { ...prev, [productId]: { selected: true, cantidad: 1, proveedorId } };
+            else return { ...prev, [productId]: { selected: true, cantidad: 1 } };
         });
     };
     const updateCantidadForBudget = (productId, cantidad) => {
         setSelectedForBudget(prev => ({ ...prev, [productId]: { ...prev[productId], cantidad: parseFloat(cantidad) || 0 } }));
     };
-    const updateProveedorForBudget = (productId, proveedorId) => {
-        setSelectedForBudget(prev => ({ ...prev, [productId]: { ...prev[productId], proveedorId } }));
-    };
-    const openBudgetModalForSelected = () => {
+    const handleAskProviderForSelected = () => {
         const selectedIds = Object.keys(selectedForBudget);
         if (selectedIds.length === 0) { showToast('Seleccione al menos un producto', 'error'); return; }
-        const missingProveedor = selectedIds.some(id => !selectedForBudget[id].proveedorId);
-        if (missingProveedor) { showToast('Todos deben tener proveedor', 'error'); return; }
-        const proveedorIds = [...new Set(selectedIds.map(id => selectedForBudget[id].proveedorId))];
-        if (proveedorIds.length > 1) { showToast('Seleccione productos del mismo proveedor', 'error'); return; }
-        const proveedor = proveedores.find(p => p.id === proveedorIds[0]);
-        if (!proveedor) { showToast('Proveedor no encontrado', 'error'); return; }
-        const productos = selectedIds.map(id => { const prod = products.find(p => p.id === parseInt(id)); return { ...prod, cantidad: selectedForBudget[id].cantidad }; });
+        setPendingBudgetProducts('all-selected');
+        setSelectedProviderForBudget('');
+        setShowProviderSelectionModal(true);
+    };
+    const handleAskProviderForProduct = (product) => {
+        setPendingBudgetProducts(product);
+        setSelectedProviderForBudget('');
+        setShowProviderSelectionModal(true);
+    };
+    const proceedToBudget = () => {
+        if (!selectedProviderForBudget) { showToast('Debe seleccionar un proveedor', 'error'); return; }
+        const proveedor = proveedores.find(p => String(p.id) === String(selectedProviderForBudget));
+        if (!proveedor) return;
+
+        let productos = [];
+        if (pendingBudgetProducts === 'all-selected') {
+            const selectedIds = Object.keys(selectedForBudget);
+            productos = selectedIds.map(id => { const prod = products.find(p => p.id === parseInt(id)); return { ...prod, cantidad: selectedForBudget[id].cantidad }; });
+        } else if (pendingBudgetProducts) {
+            productos = [{ ...pendingBudgetProducts, cantidad: selectedForBudget[pendingBudgetProducts.id]?.cantidad || 1 }];
+        }
+
+        if (productos.length === 0) return;
+
         const texto = `Solicitud de cotización para ${proveedor.nombre}\n\n` +
             productos.map(p => `- ${p.nombre} (${p.presentacion}): ${p.cantidad} unidad(es) - Stock actual: ${p.stock_actual}, Stock mínimo: ${p.stock_minimo || 'N/A'}, Stock máximo: ${p.stock_maximo || 'N/A'}`).join('\n') +
             `\n\nPor favor, enviar presupuesto a: [tu email]`;
         setBudgetText(texto);
         setCurrentProveedor(proveedor);
+        setShowProviderSelectionModal(false);
         setShowBudgetModal(true);
     };
-    const openIndividualBudget = (product, proveedorId) => {
-        if (!proveedorId) { showToast('Seleccione un proveedor', 'error'); return; }
-        const proveedor = proveedores.find(p => p.id === proveedorId);
-        if (!proveedor) return;
-        const texto = `Solicitud de cotización para ${proveedor.nombre}\n\n` +
-            `- ${product.nombre} (${product.presentacion}): 1 unidad - Stock actual: ${product.stock_actual}, Stock mínimo: ${product.stock_minimo || 'N/A'}, Stock máximo: ${product.stock_maximo || 'N/A'}` +
-            `\n\nPor favor, enviar presupuesto a: [tu email]`;
-        setBudgetText(texto);
-        setCurrentProveedor(proveedor);
-        setShowBudgetModal(true);
+    const handleSendDirectEmail = async () => {
+        if (!currentProveedor?.email) {
+            showToast('El proveedor no tiene un email configurado', 'error');
+            return;
+        }
+        setSendingEmail(true);
+        try {
+            await axios.post('/correos/inbox/send_email/', {
+                subject: 'Solicitud de Presupuesto',
+                body: budgetText,
+                recipient: currentProveedor.email,
+                operacion_id: ''
+            });
+            showToast('Email encolado para envío correctamente', 'success');
+            setShowBudgetModal(false);
+        } catch (err) {
+            console.error("Error al enviar email:", err);
+            showToast('Error al enviar el email', 'error');
+        } finally {
+            setSendingEmail(false);
+        }
     };
     const copyBudgetToClipboard = () => { navigator.clipboard.writeText(budgetText); showToast('Copiado', 'success'); };
     
@@ -601,9 +790,9 @@ export default function InventoryManagement() {
         setEditingProduct(null);
         let defaultCategoria = activeTab === 'quimicos' ? 'quimicos' : 'otros';
         const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
-        if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0, costo: draft.costo || 0, precio_venta: draft.precio_venta || 0 }); }
-        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', costo: 0, precio_venta: 0, stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria }); }
-        else setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', costo: 0, precio_venta: 0, stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
+        if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0 }); }
+        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria }); }
+        else setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
         setValidationError('');
         setShowProductModal(true);
     };
@@ -614,8 +803,6 @@ export default function InventoryManagement() {
             descripcion: product.descripcion || '',
             presentacion: product.presentacion,
             peso_kg: product.peso_kg,
-            costo: product.costo || 0,
-            precio_venta: product.precio_venta || 0,
             stock_actual: product.stock_actual,
             stock_minimo: product.stock_minimo || 0,
             stock_maximo: product.stock_maximo || 0,
@@ -644,8 +831,6 @@ export default function InventoryManagement() {
                 presentacion: formData.presentacion.trim(),
                 categoria: formData.categoria,
                 peso_kg: peso,
-                costo: parseFloat(formData.costo) || 0,
-                precio_venta: parseFloat(formData.precio_venta) || 0,
                 stock_actual: Number(formData.stock_actual) || 0,
                 stock_minimo: stockMinimo,
                 stock_maximo: stockMaximo,
@@ -726,38 +911,84 @@ export default function InventoryManagement() {
         }
     };
     
-    // ========== Fórmulas BOM (sin cambios) ==========
-    const getFormulaFor = (quimicoId) => formulas.find(f => f.articulo_final_id === quimicoId);
-    const openFormulaConfig = (quimico) => {
-        const existing = getFormulaFor(quimico.id);
-        setSelectedQuimico(quimico);
-        if (existing) {
-            setFormulaName(existing.nombre);
-            setIngredients(existing.componentes.map(c => ({ insumo_id: c.insumo_id, cantidad: c.cantidad_requerida.toString(), obj: { id: c.insumo_id, nombre: c.insumo_nombre } })));
-        } else {
-            setFormulaName(`Fórmula de ${quimico.nombre}`);
-            setIngredients([]);
-        }
+    // ========== Fórmulas BOM ==========
+    const openCreateFormula = () => {
+        setEditingFormula(null);
+        setSelectedQuimico(null);
+        setFormulaName('');
+        setIngredients([]);
         setShowFormulaModal(true);
     };
+    
+    const openEditFormula = (formula) => {
+        setEditingFormula(formula);
+        setSelectedQuimico({ id: formula.articulo_final_id, nombre: formula.articulo_final_nombre });
+        setFormulaName(formula.nombre);
+        setIngredients(formula.componentes.map(c => ({
+            insumo_id: c.insumo_id,
+            cantidad: Number((parseFloat(c.cantidad_requerida) * 100).toFixed(4)).toString(),
+            obj: { id: c.insumo_id, nombre: c.insumo_nombre, presentacion: c.insumo_presentacion || '' }
+        })));
+        setShowFormulaModal(true);
+    };
+
     const saveFormula = async () => {
-        if (!formulaName || ingredients.length === 0) { showToast('Nombre e ingredientes requeridos', 'error'); return; }
-        const payload = { nombre: formulaName, articulo_final_id: selectedQuimico.id, activa: true, componentes: ingredients.map(ing => ({ insumo_id: ing.insumo_id, cantidad_requerida: parseFloat(ing.cantidad) })) };
+        if (!formulaName || ingredients.length === 0) {
+            showToast('Nombre e ingredientes requeridos', 'error');
+            return;
+        }
+        if (!selectedQuimico) {
+            showToast('Debe seleccionar el artículo final', 'error');
+            return;
+        }
+        
+        const invalidIng = ingredients.some(ing => !ing.insumo_id || isNaN(parseFloat(ing.cantidad)) || parseFloat(ing.cantidad) <= 0);
+        if (invalidIng) {
+            showToast('Todos los ingredientes deben tener cantidad válida mayor a cero', 'error');
+            return;
+        }
+
+        if (Math.abs(totalPercentage - 100) > 0.001) {
+            showToast('El total de los porcentajes de ingredientes debe ser exactamente 100%', 'error');
+            return;
+        }
+
+        const payload = {
+            nombre: formulaName,
+            articulo_final_id: selectedQuimico.id,
+            activa: true,
+            componentes: ingredients.map(ing => ({
+                insumo_id: ing.insumo_id,
+                cantidad_requerida: parseFloat(ing.cantidad) / 100
+            }))
+        };
         setSubmitting(true);
         try {
-            const existing = getFormulaFor(selectedQuimico.id);
-            if (existing) await axios.put(`/produccion/formulas/${existing.id}/`, payload);
-            else await axios.post('/produccion/formulas/', payload);
-            showToast('Fórmula guardada', 'success');
+            if (editingFormula) {
+                await axios.put(`/produccion/formulas/${editingFormula.id}/`, payload);
+            } else {
+                await axios.post('/produccion/formulas/', payload);
+            }
+            showToast('Fórmula guardada correctamente', 'success');
             setShowFormulaModal(false);
             fetchFormulas();
-        } catch { showToast('Error al guardar', 'error'); }
-        finally { setSubmitting(false); }
+        } catch (err) {
+            const errorMsg = err.response?.data?.articulo_final_id || err.response?.data?.componentes || 'Error al guardar la fórmula';
+            showToast(Array.isArray(errorMsg) ? errorMsg[0] : errorMsg, 'error');
+        } finally {
+            setSubmitting(false);
+        }
     };
+
     const deleteFormula = async (id) => {
-        if (!window.confirm("¿Eliminar fórmula?")) return;
-        try { await axios.delete(`/produccion/formulas/${id}/`); showToast("Eliminada", "success"); fetchFormulas(); }
-        catch { showToast("Error", "error"); }
+        if (!window.confirm("¿Está seguro de eliminar esta fórmula?")) return;
+        try {
+            await axios.delete(`/produccion/formulas/${id}/`);
+            showToast("Fórmula eliminada con éxito", "success");
+            fetchFormulas();
+        } catch {
+            showToast("Error al eliminar la fórmula", "error");
+        }
     };
     
     // ========== Movimientos y Logs (sin cambios) ==========
@@ -919,11 +1150,8 @@ export default function InventoryManagement() {
                     <button onClick={() => { setActiveTab('todo'); setSearchTerm(''); }} className={`py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'todo' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                         <i className="bi bi-database-fill text-lg"></i> Todos los artículos
                     </button>
-                    <button onClick={() => { setActiveTab('productos'); setSearchTerm(''); }} className={`py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'productos' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        <i className="bi bi-box-seam text-lg"></i> Insumos y Productos
-                    </button>
-                    <button onClick={() => { setActiveTab('quimicos'); setSearchTerm(''); }} className={`py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'quimicos' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        <i className="bi bi-flask-fill text-lg"></i> Químicos y Fórmulas
+                    <button onClick={() => { setActiveTab('formulas'); setSearchTerm(''); }} className={`py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'formulas' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                        <i className="bi bi-flask-fill text-lg"></i> Fórmulas de producción
                     </button>
                     <button onClick={() => { setActiveTab('proveedores'); setSearchTerm(''); }} className={`py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'proveedores' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                         <i className="bi bi-people-fill text-lg"></i> Proveedores
@@ -939,34 +1167,38 @@ export default function InventoryManagement() {
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900 leading-tight">
                         {activeTab === 'todo' && 'Inventario completo'}
-                        {activeTab === 'productos' && 'Materia Prima e Insumos'}
-                        {activeTab === 'quimicos' && 'Catálogo de Químicos (BOM)'}
+                        {activeTab === 'formulas' && 'Fórmulas de producción (BOM)'}
                         {activeTab === 'proveedores' && 'Gestión de Proveedores'}
                         {activeTab === 'abastecimiento' && 'Productos para Abastecer'}
                     </h2>
-                    <p className="text-sm text-gray-500 mt-1">...</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                        {activeTab === 'todo' && 'Catálogo general de insumos, herramientas y materias primas.'}
+                        {activeTab === 'formulas' && 'Gestione las recetas de fabricación para sus compuestos químicos.'}
+                        {activeTab === 'proveedores' && 'Administre la información de contacto y condiciones de sus proveedores.'}
+                        {activeTab === 'abastecimiento' && 'Monitoree artículos con stock crítico y genere cotizaciones.'}
+                    </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                    {activeTab !== 'proveedores' && activeTab !== 'abastecimiento' && (
+                    {activeTab === 'todo' && (
                         <>
                             <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
                                 {uploadingExcel ? 'Subiendo...' : <><i className="bi bi-file-earmark-spreadsheet mr-1 text-green-600"></i> Importar Excel</>}
                                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} disabled={uploadingExcel} />
                             </label>
-                            {(activeTab === 'todo' || activeTab === 'productos') && (
-                                <button
-                                    onClick={handleMultiDeleteTable}
-                                    disabled={selectedRowsCount === 0 || deletingMultiple}
-                                    className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-xl shadow-sm text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
-                                >
-                                    {deletingMultiple ? 'Borrando...' : <><i className="bi bi-trash mr-1"></i> Borrar seleccionados ({selectedRowsCount})</>}
-                                </button>
-                            )}
-                            {activeTab === 'quimicos' && (
-                                <button onClick={openMultiDeleteModal} className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-xl shadow-sm text-red-700 bg-white hover:bg-red-50">
-                                    <i className="bi bi-trash mr-1"></i> Multi-Borrado
-                                </button>
-                            )}
+                            <button
+                                onClick={exportStockData}
+                                disabled={exportingStock}
+                                className="inline-flex items-center px-4 py-2 border border-emerald-300 text-sm font-medium rounded-xl shadow-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
+                            >
+                                {exportingStock ? 'Descargando...' : <><i className="bi bi-file-earmark-excel mr-1 text-emerald-600"></i> Exportar Excel</>}
+                            </button>
+                            <button
+                                onClick={handleMultiDeleteTable}
+                                disabled={selectedRowsCount === 0 || deletingMultiple}
+                                className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-xl shadow-sm text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
+                            >
+                                {deletingMultiple ? 'Borrando...' : <><i className="bi bi-trash mr-1"></i> Borrar seleccionados ({selectedRowsCount})</>}
+                            </button>
                             <button onClick={downloadStandardTemplate} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50">
                                 <i className="bi bi-download mr-1 text-emerald-600"></i> Plantilla Excel
                             </button>
@@ -974,6 +1206,11 @@ export default function InventoryManagement() {
                                 <i className="bi bi-plus-lg mr-1"></i> Nuevo artículo
                             </button>
                         </>
+                    )}
+                    {activeTab === 'formulas' && (
+                        <button onClick={openCreateFormula} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                            <i className="bi bi-plus-lg mr-1"></i> Nueva fórmula
+                        </button>
                     )}
                     {activeTab === 'proveedores' && (
                         <>
@@ -1015,18 +1252,18 @@ export default function InventoryManagement() {
             )}
             
             {/* Search solo para las pestañas que lo usan */}
-            {(activeTab === 'proveedores' || activeTab === 'abastecimiento' || activeTab === 'quimicos') && (
+            {(activeTab === 'proveedores' || activeTab === 'abastecimiento' || activeTab === 'formulas') && (
                 <div className="mb-6 relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="bi bi-search text-gray-400"></i></div>
-                    <input type="text" placeholder={activeTab === 'proveedores' ? 'Buscar proveedor...' : activeTab === 'abastecimiento' ? 'Buscar producto crítico...' : 'Buscar en químicos...'}
+                    <input type="text" placeholder={activeTab === 'proveedores' ? 'Buscar proveedor...' : activeTab === 'abastecimiento' ? 'Buscar producto crítico...' : 'Buscar fórmulas...'}
                         value={activeTab === 'abastecimiento' ? criticosSearchTerm : searchTerm}
                         onChange={(e) => { if (activeTab === 'abastecimiento') setCriticosSearchTerm(e.target.value); else setSearchTerm(e.target.value); }}
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl bg-white focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                 </div>
             )}
             
-            {/* ========== VISTA TABLA PARA 'todo' y 'productos' ========== */}
-            {(activeTab === 'todo' || activeTab === 'productos') && (
+            {/* ========== VISTA TABLA PARA 'todo' ========== */}
+            {activeTab === 'todo' && (
                 <>
                     <div className="flex justify-end mb-2">
                         <button
@@ -1079,71 +1316,79 @@ export default function InventoryManagement() {
                 </>
             )}
             
-            {/* ========== VISTA DE TARJETAS PARA QUÍMICOS ========== */}
-            {activeTab === 'quimicos' && (
+            {/* ========== LISTADO DE FÓRMULAS ========== */}
+            {activeTab === 'formulas' && (
                 <>
-                    {loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-12 h-12" /></div> :
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {filteredProducts.map(product => {
-                                const formula = getFormulaFor(product.id);
-                                const cardBg = getCardColorClass(product);
-                                const barColor = getStockBarColor(product);
-                                const borderColor = getCardBorderColor(product);
-                                const stockNum = Number(product.stock_actual);
-                                const minStockNum = Number(product.stock_minimo) || 0;
-                                const maxStockNum = Number(product.stock_maximo) || 0;
-                                return (
-                                    <div key={product.id} className={`rounded-xl shadow-sm border overflow-hidden hover:shadow-lg transition-shadow flex flex-col group ${cardBg} dark:bg-slate-800 ${borderColor} dark:border-slate-700`}>
-                                        <div className="p-5 flex-1 relative">
-                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${barColor}`}></div>
-                                            <div className="pl-2">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 transition-colors">{product.nombre}</h3>
-                                                    <div className="flex gap-1 shrink-0">
-                                                        <button onClick={() => openEditModal(product)} className="text-indigo-300 hover:text-indigo-600" title="Editar"><i className="bi bi-pencil-square"></i></button>
-                                                        <button onClick={() => confirmDelete(product)} className="text-red-300 hover:text-red-600" title="Eliminar"><i className="bi bi-trash"></i></button>
-                                                        <button onClick={() => openMovimientosModal(product)} className="text-blue-300 hover:text-blue-600 ml-1" title="Ver movimientos"><i className="bi bi-clock-history"></i></button>
-                                                        <button onClick={() => fetchLogs(product.id)} className="text-gray-400 hover:text-gray-600 ml-1" title="Ver historial de cambios"><i className="bi bi-file-text"></i></button>
-                                                        <button onClick={() => setMovimientoModal({ open: true, producto: product, tipo: 'INGRESO', cantidad: 1, razon: '' })} className="text-emerald-500 hover:text-emerald-700 ml-1" title="Registrar movimiento"><i className="bi bi-plus-circle"></i></button>
+                    {loading ? (
+                        <div className="flex justify-center py-20"><LogoSpinner size="w-12 h-12" /></div>
+                    ) : (
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                                    <thead className="bg-gray-50 dark:bg-slate-700/50">
+                                        <tr>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Nombre de la Receta</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Artículo Final (Producto)</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Ingredientes (BOM)</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Estado</th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                        {filteredFormulas.map(formula => (
+                                            <tr key={formula.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">{formula.nombre}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-slate-300">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">
+                                                        <i className="bi bi-flask-fill"></i>
+                                                        {formula.articulo_final_nombre}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-slate-300">
+                                                    <div className="flex flex-wrap gap-1.5 max-w-md">
+                                                        {formula.componentes && formula.componentes.length > 0 ? (
+                                                            formula.componentes.map((c, i) => (
+                                                                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600">
+                                                                    {c.insumo_nombre}: <strong className="ml-1 text-slate-900 dark:text-white">{c.cantidad_requerida} kg</strong>
+                                                                </span>
+                                                            ))
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400 italic">Sin ingredientes definidos</span>
+                                                        )}
                                                     </div>
-                                                </div>
-                                                <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 space-y-1 mb-3">
-                                                    <p><span className="font-semibold text-gray-400">Presentación:</span> {product.presentacion}</p>
-                                                    <p><span className="font-semibold text-gray-400">Peso Base:</span> {parseFloat(product.peso_kg).toFixed(2)} kg</p>
-                                                    <p><span className="font-semibold text-gray-400">Costo:</span> ${parseFloat(product.costo || 0).toFixed(4)}</p>
-                                                    <p><span className="font-semibold text-gray-400">Precio Venta:</span> ${parseFloat(product.precio_venta || 0).toFixed(2)}</p>
-                                                    {product.categoria && <p><span className="font-semibold text-gray-400">Categoría:</span> {product.categoria}</p>}
-                                                    {product.proveedor_nombre && <p><span className="font-semibold text-gray-400">Proveedor:</span> {product.proveedor_nombre}</p>}
-                                                    <p><span className="font-semibold text-gray-400">Stock Actual:</span> 
-                                                        <span className={`ml-1 font-bold ${stockNum === 0 ? 'text-red-600' : (minStockNum > 0 && stockNum <= minStockNum ? 'text-yellow-700' : (maxStockNum > 0 && stockNum >= maxStockNum ? 'text-orange-600' : 'text-green-600'))}`}>
-                                                            {stockNum.toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                    {formula.activa ? (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800">
+                                                            Activa
                                                         </span>
-                                                    </p>
-                                                    {minStockNum > 0 && <p className="text-xs text-gray-500"><span className="font-semibold text-gray-400">Stock Mínimo:</span> {minStockNum.toFixed(2)}</p>}
-                                                    {maxStockNum > 0 && <p className="text-xs text-gray-500"><span className="font-semibold text-gray-400">Stock Máximo:</span> {maxStockNum.toFixed(2)}</p>}
-                                                </div>
-                                                <div className="mt-4 pt-4 border-t border-gray-100">
-                                                    {formula ? (() => {
-                                                        const costoPrep = parseFloat(formula.costo_total) || 0;
-                                                        const ganancia = parseFloat(product.precio_venta || 0) - costoPrep;
-                                                        return (
-                                                        <div><div className="flex items-center justify-between mb-2"><span className="text-[10px] bg-green-100 text-green-800 font-extrabold uppercase px-2 py-0.5 rounded-md">BOM Activo</span><button onClick={() => deleteFormula(formula.id)} className="text-[10px] text-red-500 hover:underline">Revocar</button></div>
-                                                        <div className="mb-2 text-xs bg-gray-50 p-2 rounded-lg">
-                                                            <div className="flex justify-between"><span className="text-gray-500">Costo Prep:</span> <span className="font-bold">${costoPrep.toFixed(4)}</span></div>
-                                                            <div className="flex justify-between"><span className="text-gray-500">Ganancia:</span> <span className={`font-bold ${ganancia > 0 ? 'text-green-600' : 'text-red-600'}`}>${ganancia.toFixed(4)}</span></div>
-                                                        </div>
-                                                        <ul className="text-xs text-gray-500 space-y-0.5 max-h-16 overflow-hidden">{(formula.componentes || []).slice(0, 2).map((c, i) => <li key={i} className="truncate">• {c.insumo_nombre}</li>)}</ul></div>
-                                                    )})() : <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold uppercase px-2 py-0.5 rounded-md inline-block mb-2">Sin Receta</span>}
-                                                    <button onClick={() => openFormulaConfig(product)} className="w-full mt-2 py-1.5 bg-slate-50 hover:bg-slate-100 text-indigo-600 text-xs font-bold rounded-lg transition-colors border border-slate-200">{formula ? 'Modificar Fórmula' : 'Crear Fórmula'}</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                                                            Inactiva
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                                                    <button onClick={() => openEditFormula(formula)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-4 font-bold">
+                                                        <i className="bi bi-pencil-square mr-1"></i>Editar
+                                                    </button>
+                                                    <button onClick={() => deleteFormula(formula.id)} className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-bold">
+                                                        <i className="bi bi-trash mr-1"></i>Eliminar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    }
-                    {filteredProducts.length === 0 && !loading && <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300"><p className="text-gray-500">No se encontraron registros.</p></div>}
+                    )}
+                    {filteredFormulas.length === 0 && !loading && (
+                        <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-700">
+                            <i className="bi bi-flask text-4xl text-gray-300 dark:text-slate-600 mb-3 block"></i>
+                            <p className="text-gray-500 dark:text-slate-400">No se encontraron fórmulas de producción.</p>
+                        </div>
+                    )}
                 </>
             )}
             
@@ -1184,7 +1429,7 @@ export default function InventoryManagement() {
                             {selectedBudgetCount > 0 && (
                                 <div className="mb-4 p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex justify-between items-center border border-indigo-100">
                                     <span className="text-sm font-medium text-indigo-800">{selectedBudgetCount} producto(s) seleccionado(s)</span>
-                                    <button onClick={openBudgetModalForSelected} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">Solicitar presupuesto</button>
+                                    <button onClick={handleAskProviderForSelected} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">Solicitar presupuesto</button>
                                 </div>
                             )}
                             <div className="grid grid-cols-1 gap-4">
@@ -1192,7 +1437,6 @@ export default function InventoryManagement() {
                                     const stockNum = Number(product.stock_actual);
                                     const minStockNum = Number(product.stock_minimo) || 0;
                                     const isSelected = !!selectedForBudget[product.id];
-                                    const selectedProveedorId = selectedForBudget[product.id]?.proveedorId || '';
                                     const cantidad = selectedForBudget[product.id]?.cantidad || 1;
                                     return (
                                         <div key={product.id} className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border overflow-hidden transition-shadow ${isSelected ? 'border-indigo-300 dark:border-indigo-500 ring-1 ring-indigo-300' : 'border-gray-200 dark:border-slate-700'}`}>
@@ -1208,10 +1452,9 @@ export default function InventoryManagement() {
                                                             {minStockNum > 0 && <div className="text-center"><span className="text-xs text-gray-500">Stock mínimo</span><p className="font-bold text-gray-700">{minStockNum}</p></div>}
                                                         </div>
                                                         <div className="w-32"><label className="block text-xs text-gray-500">Cantidad</label><input type="number" min="0" step="1" value={cantidad} onChange={(e) => updateCantidadForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border rounded text-center" /></div>
-                                                        <div className="w-48"><label className="block text-xs text-gray-500">Proveedor</label><select value={selectedProveedorId} onChange={(e) => updateProveedorForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border rounded"><option value="">Seleccionar</option>{proveedores.map(prov => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}</select></div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => toggleSelectForBudget(product.id, selectedProveedorId)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{isSelected ? 'Seleccionado' : 'Seleccionar'}</button>
-                                                            <button onClick={() => openIndividualBudget(product, selectedProveedorId)} disabled={!selectedProveedorId} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200 disabled:opacity-50"><i className="bi bi-envelope-paper me-1"></i>Presupuesto</button>
+                                                        <div className="flex items-end gap-2">
+                                                            <button onClick={() => toggleSelectForBudget(product.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{isSelected ? 'Seleccionado' : 'Seleccionar'}</button>
+                                                            <button onClick={() => handleAskProviderForProduct(product)} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200"><i className="bi bi-envelope-paper me-1"></i>Presupuesto</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1261,10 +1504,6 @@ export default function InventoryManagement() {
                                     <div><label className="block text-sm font-bold mb-1">Stock Físico</label><input type="number" step="0.01" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-bold mb-1">Costo (USD)</label><input type="number" step="0.01" min="0" value={formData.costo} onChange={e => setFormData({...formData, costo: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
-                                    <div><label className="block text-sm font-bold mb-1">Precio Venta (USD)</label><input type="number" step="0.01" min="0" value={formData.precio_venta} onChange={e => setFormData({...formData, precio_venta: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
                                     <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta amarilla" /></div>
                                     <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta naranja" /></div>
                                 </div>
@@ -1278,11 +1517,58 @@ export default function InventoryManagement() {
                 document.body
             )}
             
+            {showProviderSelectionModal && createPortal(
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowProviderSelectionModal(false)}>
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b flex justify-between items-center bg-indigo-50 dark:bg-slate-700">
+                            <h3 className="text-lg font-bold">¿A qué proveedor querés mandárselo?</h3>
+                            <button onClick={() => setShowProviderSelectionModal(false)}><i className="bi bi-x-lg"></i></button>
+                        </div>
+                        <div className="p-6">
+                            <label className="block text-sm font-bold mb-2">Seleccione un proveedor:</label>
+                            <select 
+                                value={selectedProviderForBudget} 
+                                onChange={(e) => setSelectedProviderForBudget(e.target.value)} 
+                                className="w-full border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600"
+                            >
+                                <option value="">Seleccionar...</option>
+                                {proveedores.map(prov => <option key={prov.id} value={prov.id}>{prov.nombre}</option>)}
+                            </select>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button onClick={() => setShowProviderSelectionModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button>
+                                <button onClick={proceedToBudget} disabled={!selectedProviderForBudget} className="px-4 py-2 bg-indigo-600 text-white rounded-lg disabled:opacity-50">Continuar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            
             {showBudgetModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBudgetModal(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
                         <div className="px-6 py-4 border-b bg-indigo-50 flex justify-between items-center"><h3 className="text-lg font-black">Solicitar presupuesto a {currentProveedor?.nombre}</h3><button onClick={() => setShowBudgetModal(false)}><i className="bi bi-x-lg"></i></button></div>
-                        <div className="p-6 flex-1 overflow-y-auto"><textarea rows={12} value={budgetText} onChange={(e) => setBudgetText(e.target.value)} className="w-full border rounded-lg p-3 font-mono text-sm"></textarea><div className="flex justify-end gap-3 mt-4"><button onClick={copyBudgetToClipboard} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">Copiar</button><button onClick={() => setShowBudgetModal(false)} className="px-4 py-2 bg-gray-200 rounded-lg">Cerrar</button></div></div>
+                        <div className="p-6 flex-1 overflow-y-auto">
+                            <textarea rows={12} value={budgetText} onChange={(e) => setBudgetText(e.target.value)} className="w-full border rounded-lg p-3 font-mono text-sm dark:bg-slate-700 dark:text-white dark:border-slate-600"></textarea>
+                            <div className="flex justify-end gap-3 mt-4">
+                                {currentProveedor?.email && (
+                                    <button 
+                                        onClick={handleSendDirectEmail}
+                                        disabled={sendingEmail}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+                                    >
+                                        {sendingEmail ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-envelope-fill"></i>}
+                                        {sendingEmail ? 'Enviando...' : 'Enviar por Email'}
+                                    </button>
+                                )}
+                                <button onClick={copyBudgetToClipboard} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-2 shadow-sm transition-colors">
+                                    <i className="bi bi-clipboard"></i> Copiar
+                                </button>
+                                <button onClick={() => setShowBudgetModal(false)} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-slate-600 dark:hover:bg-slate-500 text-gray-800 dark:text-white font-bold rounded-lg shadow-sm transition-colors">
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>,
                 document.body
@@ -1314,44 +1600,178 @@ export default function InventoryManagement() {
             {showFormulaModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowFormulaModal(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b bg-indigo-50 flex justify-between items-center"><h3 className="text-lg font-black">BOM: {selectedQuimico?.nombre}</h3><button onClick={() => setShowFormulaModal(false)}><i className="bi bi-x-lg"></i></button></div>
-                        <div className="p-6 flex-1 overflow-y-auto">
-                            <div className="mb-4"><label className="block text-xs font-bold uppercase">Nombre de la Receta</label><input type="text" value={formulaName} onChange={e => setFormulaName(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
-                            <div className="mb-4 flex justify-between items-end"><label className="text-xs font-bold uppercase">Ingredientes</label><button onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '' }])} className="text-xs bg-indigo-50 px-3 py-1.5 rounded-lg">+ Agregar</button></div>
-                            <div className="space-y-3">{ingredients.map((ing, idx) => {
-                                const insumoDetails = products.find(p => p.id === parseInt(ing.insumo_id));
-                                const costoInsumo = insumoDetails ? parseFloat(insumoDetails.costo) || 0 : 0;
-                                const subtotal = (parseFloat(ing.cantidad) || 0) * costoInsumo;
-                                return (
-                                <div key={idx} className="flex gap-2 items-start bg-slate-50 p-2 rounded-xl">
-                                    <div className="flex-1"><AutocompleteCreate label="Insumo" endpoint="/inventario/products/?categoria=otros" value={ing.insumo_id} nameField="nombre" onSelect={(item) => { const newIng = [...ingredients]; newIng[idx].insumo_id = item.id; setIngredients(newIng); }} createFields={[]} extraCreateData={{ categoria: 'otros' }} /></div>
-                                    <div className="w-24"><label className="block text-[10px] font-bold">Cant.</label><input type="number" step="0.01" value={ing.cantidad} onChange={e => { const newIng = [...ingredients]; newIng[idx].cantidad = e.target.value; setIngredients(newIng); }} className="w-full border rounded px-2 py-1" /></div>
-                                    <div className="w-24 pt-1"><label className="block text-[10px] font-bold text-gray-500">Costo</label><div className="text-sm font-bold text-gray-700">${subtotal.toFixed(4)}</div></div>
-                                    <div className="pt-5"><button onClick={() => { const newIng = [...ingredients]; newIng.splice(idx, 1); setIngredients(newIng); }} className="text-red-400"><i className="bi bi-trash"></i></button></div>
-                                </div>
-                                );
-                            })}</div>
+                        <div className="px-6 py-4 border-b bg-indigo-50 dark:bg-indigo-950/20 flex justify-between items-center">
+                            <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-400">
+                                {editingFormula ? `Editar Receta: ${editingFormula.nombre}` : 'Nueva Fórmula de Producción'}
+                            </h3>
+                            <button onClick={() => setShowFormulaModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+                                <i className="bi bi-x-lg text-lg"></i>
+                            </button>
                         </div>
-                        <div className="px-6 py-4 border-t flex justify-between items-center bg-gray-50">
-                            {(() => {
-                                const costoTotalReceta = ingredients.reduce((sum, ing) => {
-                                    const ins = products.find(p => p.id === parseInt(ing.insumo_id));
-                                    return sum + (parseFloat(ing.cantidad) || 0) * (ins ? parseFloat(ins.costo) || 0 : 0);
-                                }, 0);
-                                const ganancia = parseFloat(selectedQuimico?.precio_venta || 0) - costoTotalReceta;
-                                return (
-                                    <div className="text-sm">
-                                        <p><span className="font-bold text-gray-600">Costo Total:</span> <span className="font-black text-indigo-700">${costoTotalReceta.toFixed(4)}</span></p>
-                                        <p><span className="font-bold text-gray-600">Ganancia (s/ PV ${parseFloat(selectedQuimico?.precio_venta || 0).toFixed(2)}):</span> <span className={`font-black ${ganancia > 0 ? 'text-green-600' : 'text-red-600'}`}>${ganancia.toFixed(4)}</span></p>
+                        <div className="p-6 flex-1 overflow-y-auto space-y-4">
+                            {/* Artículo Final */}
+                            <div>
+                                {editingFormula ? (
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase text-gray-500 dark:text-slate-400 mb-1">Artículo Final (Químico)</label>
+                                        <div className="bg-gray-100 dark:bg-slate-700 px-3 py-2 rounded-lg text-sm font-semibold text-gray-800 dark:text-slate-200 border border-gray-200 dark:border-slate-600">
+                                            {selectedQuimico?.nombre}
+                                        </div>
                                     </div>
-                                );
-                            })()}
-                            <div className="flex gap-3"><button onClick={() => setShowFormulaModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button onClick={saveFormula} disabled={submitting} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase text-gray-500 dark:text-slate-400 mb-1">Artículo Final (Producto Químico) *</label>
+                                        {selectedQuimico ? (
+                                            <div className="flex justify-between items-center bg-white dark:bg-slate-800 border rounded-lg px-3 py-2 text-sm dark:border-slate-600 dark:text-white border-slate-200">
+                                                <span className="font-semibold">{selectedQuimico.nombre} ({selectedQuimico.presentacion})</span>
+                                                <button 
+                                                    onClick={() => {
+                                                        setActiveIngredientIdx('final');
+                                                        setIsChemicalBrowserOpen(true);
+                                                    }}
+                                                    className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline text-xs"
+                                                >
+                                                    Cambiar
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => {
+                                                    setActiveIngredientIdx('final');
+                                                    setIsChemicalBrowserOpen(true);
+                                                }}
+                                                className="w-full text-left bg-white dark:bg-slate-800 border border-dashed border-gray-300 hover:border-indigo-400 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-all"
+                                            >
+                                                <i className="bi bi-search mr-2"></i> Seleccionar Producto Químico Final...
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Nombre de la Receta */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-slate-400 mb-1">Nombre de la Receta *</label>
+                                <input
+                                    type="text"
+                                    value={formulaName}
+                                    onChange={e => setFormulaName(e.target.value)}
+                                    placeholder="Ej: Mezcla A - Concentración Alta"
+                                    className="w-full border rounded-lg px-3 py-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                />
+                            </div>
+
+                            {/* Ingredientes / Componentes */}
+                            <div>
+                                <div className="mb-2 flex justify-between items-center">
+                                    <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400">Ingredientes (BOM) *</label>
+                                    <button
+                                        onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '', obj: null }])}
+                                        className="text-xs bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                                    >
+                                        + Agregar ingrediente
+                                    </button>
+                                </div>
+                                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                                    {ingredients.map((ing, idx) => (
+                                        <div key={idx} className="flex gap-2 items-start bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                                            <div className="flex-1">
+                                                <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Ingrediente Químico *</label>
+                                                {ing.insumo_id ? (
+                                                    <div className="flex justify-between items-center bg-white dark:bg-slate-800 border rounded-lg px-3 py-1.5 text-sm dark:border-slate-600 dark:text-white border-slate-200">
+                                                        <span className="font-medium">{ing.obj?.nombre || 'Químico seleccionado'} ({ing.obj?.presentacion || ''})</span>
+                                                        <button 
+                                                            onClick={() => {
+                                                                setActiveIngredientIdx(idx);
+                                                                setIsChemicalBrowserOpen(true);
+                                                            }}
+                                                            className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline text-xs ml-2"
+                                                        >
+                                                            Cambiar
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setActiveIngredientIdx(idx);
+                                                            setIsChemicalBrowserOpen(true);
+                                                        }}
+                                                        className="w-full text-left bg-white dark:bg-slate-800 border border-dashed border-gray-300 hover:border-indigo-400 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-all"
+                                                    >
+                                                        <i className="bi bi-search mr-2"></i> Seleccionar Químico...
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="w-28">
+                                                <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Porcentaje (%)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={ing.cantidad}
+                                                    onChange={e => {
+                                                        const newIng = [...ingredients];
+                                                        newIng[idx].cantidad = e.target.value;
+                                                        setIngredients(newIng);
+                                                    }}
+                                                    placeholder="0.00"
+                                                    className="w-full border rounded px-2.5 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                                />
+                                            </div>
+                                            <div className="pt-7 shrink-0">
+                                                <button
+                                                    onClick={() => {
+                                                        const newIng = [...ingredients];
+                                                        newIng.splice(idx, 1);
+                                                        setIngredients(newIng);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                                >
+                                                    <i className="bi bi-trash text-lg"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {ingredients.length === 0 && (
+                                        <p className="text-xs text-gray-400 italic text-center py-4">No se han agregado ingredientes a la receta.</p>
+                                    )}
+                                </div>
+
+                                {/* Indicador de Total de Porcentajes */}
+                                <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Total Porcentajes Ingredientes:
+                                    </span>
+                                    <span className={`text-base font-black ${Math.abs(totalPercentage - 100) < 0.001 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                        {totalPercentage.toFixed(2)}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 dark:bg-slate-750">
+                            <button
+                                onClick={() => setShowFormulaModal(false)}
+                                className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={saveFormula}
+                                disabled={submitting}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                            >
+                                {submitting ? 'Guardando...' : 'Guardar Fórmula'}
+                            </button>
                         </div>
                     </div>
                 </div>,
                 document.body
             )}
+
+            <ChemicalSelectionModal
+                isOpen={isChemicalBrowserOpen}
+                onClose={() => setIsChemicalBrowserOpen(false)}
+                onSelect={handleSelectChemical}
+            />
             
             {movimientosModal.open && createPortal(
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4" onClick={() => setMovimientosModal({ open: false, producto: null, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '' }, page: 1, totalPages: 1, exportando: false })}>

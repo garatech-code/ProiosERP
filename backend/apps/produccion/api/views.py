@@ -1,8 +1,10 @@
+# pyrefly: ignore [missing-import]
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from decimal import Decimal
 from apps.produccion.models import FormulaBOM, OrdenFabricacion
 from apps.inventario.models import Articulo, MovimientoStock
 from apps.usuarios.models import User
@@ -109,31 +111,35 @@ class OrdenFabricacionViewSet(viewsets.ModelViewSet):
             # Consumir insumos (SALIDA)
             for comp in componentes:
                 insumo = insumos_map[comp.insumo_id]
-                cantidad_necesaria = comp.cantidad_requerida * orden.cantidad_a_producir
+                cantidad_necesaria = (comp.cantidad_requerida * orden.cantidad_a_producir).quantize(Decimal('0.0001'))
+                stock_resultante = (insumo.stock_actual - cantidad_necesaria).quantize(Decimal('0.0001'))
                 
                 MovimientoStock.objects.create(
                     articulo=insumo,
                     tipo='SALIDA',
                     cantidad=cantidad_necesaria,
-                    stock_resultante=insumo.stock_actual - cantidad_necesaria,
+                    stock_resultante=stock_resultante,
                     operacion_id=orden.operacion_id,
                     razon=f"Consumo de insumo por Orden de Fabricación #{orden.id}",
                     usuario=user
                 )
-                insumo.stock_actual -= cantidad_necesaria
+                insumo.stock_actual = stock_resultante
                 insumo.save()
             
             # Incrementar stock del artículo final (INGRESO)
+            cantidad_final = orden.cantidad_a_producir.quantize(Decimal('0.0001'))
+            stock_resultante_final = (articulo_final.stock_actual + cantidad_final).quantize(Decimal('0.0001'))
+            
             MovimientoStock.objects.create(
                 articulo=articulo_final,
                 tipo='INGRESO',
-                cantidad=orden.cantidad_a_producir,
-                stock_resultante=articulo_final.stock_actual + orden.cantidad_a_producir,
+                cantidad=cantidad_final,
+                stock_resultante=stock_resultante_final,
                 operacion_id=orden.operacion_id,
                 razon=f"Ingreso de producto terminado por Orden de Fabricación #{orden.id}",
                 usuario=user
             )
-            articulo_final.stock_actual += orden.cantidad_a_producir
+            articulo_final.stock_actual = stock_resultante_final
             articulo_final.save()
             
             # Marcar orden completada

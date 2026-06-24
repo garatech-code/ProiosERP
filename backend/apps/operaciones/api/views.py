@@ -16,6 +16,8 @@ from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, Agend
 from apps.usuarios.models import User
 from apps.operaciones.services import get_or_create_ship_from_imo, get_or_create_port_from_name
 from apps.produccion.models import OrdenFabricacion
+from rest_framework.permissions import IsAuthenticated
+from apps.usuarios.permissions import IsOwnerOrCreatorSenior
 
 from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
@@ -48,6 +50,7 @@ class AgencyViewSet(viewsets.ModelViewSet):
 
 class OperacionViewSet(viewsets.ModelViewSet):
     serializer_class = OperacionSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrCreatorSenior]
 
     def get_queryset(self):
         user = self.request.user
@@ -348,22 +351,72 @@ class OperacionViewSet(viewsets.ModelViewSet):
         operacion = self.get_object()
         ok, errores = operacion.verificar_stock()
 
+        def get_formula_shortage(articulo, shortage_qty):
+            from apps.produccion.models import FormulaBOM
+            from apps.inventario.models import Articulo
+            from decimal import Decimal
+            formula = FormulaBOM.objects.filter(articulo_final_id=articulo.id, activa=True).first()
+            if not formula:
+                return []
+            
+            shortage_qty_dec = Decimal(str(shortage_qty))
+            shortage_list = []
+            for comp in formula.componentes.all():
+                try:
+                    ing = Articulo.objects.get(id=comp.insumo_id)
+                    necesario_ing = shortage_qty_dec * comp.cantidad_requerida
+                    if ing.stock_actual < necesario_ing:
+                        falta_ing = necesario_ing - ing.stock_actual
+                        shortage_list.append({
+                            'insumo_id': ing.id,
+                            'nombre': ing.nombre,
+                            'presentacion': ing.presentacion,
+                            'unidad': ing.unidad or 'L',
+                            'necesario': float(necesario_ing),
+                            'disponible': float(ing.stock_actual),
+                            'falta': float(falta_ing)
+                        })
+                except Articulo.DoesNotExist:
+                    pass
+            return shortage_list
+
+        # Enriquecer errores
+        from apps.inventario.models import Articulo
+        for err in errores:
+            articulo_id = err.get('articulo_id')
+            if articulo_id:
+                try:
+                    articulo = Articulo.objects.get(id=articulo_id)
+                    err['unidad'] = articulo.unidad or 'L'
+                    if articulo.categoria == 'quimicos':
+                        shortage_qty = err['necesario'] - err['disponible']
+                        err['formula_shortage'] = get_formula_shortage(articulo, shortage_qty)
+                except Articulo.DoesNotExist:
+                    pass
+
         detalles_data = []
         for detalle in operacion.detalles.all():
-            from apps.inventario.models import Articulo
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
                 suficiente = True if not articulo.controlar_stock else (articulo.stock_actual >= detalle.cantidad)
+                
+                formula_shortage = []
+                if not suficiente and articulo.categoria == 'quimicos':
+                    shortage_qty = detalle.cantidad - articulo.stock_actual
+                    formula_shortage = get_formula_shortage(articulo, shortage_qty)
+
                 detalles_data.append({
                     'id': detalle.id,
                     'articulo_id': detalle.articulo_id,
                     'nombre': articulo.nombre,
                     'presentacion': articulo.presentacion,
+                    'unidad': articulo.unidad or 'L',
                     'cantidad_necesaria': detalle.cantidad,
                     'stock_actual': float(articulo.stock_actual),
                     'suficiente': suficiente,
                     'controlar_stock': articulo.controlar_stock,
-                    'error': None
+                    'error': None,
+                    'formula_shortage': formula_shortage
                 })
             except Articulo.DoesNotExist:
                 detalles_data.append({
@@ -375,7 +428,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     'stock_actual': 0,
                     'suficiente': False,
                     'controlar_stock': True,
-                    'error': "Producto no existe en inventario"
+                    'error': "Producto no existe en inventario",
+                    'formula_shortage': []
                 })
 
         return Response({

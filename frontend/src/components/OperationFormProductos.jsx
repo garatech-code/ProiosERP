@@ -142,6 +142,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
   const [searchingImo, setSearchingImo] = useState(false);
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
+  const [hasPermission, setHasPermission] = useState(true);
 
   // Estado para el modal de selección múltiple
   const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
@@ -205,6 +206,13 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
         if (id) {
           const res = await axios.get(`/operaciones/operations/${id}/`);
           const op = res.data;
+
+          if (currentUser.role !== 'OWNER' && !(currentUser.role === 'OPERADOR' && op.creado_por === currentUser.id)) {
+            setError('No tiene permisos para editar esta operación. Solo el creador y el Owner pueden modificarla.');
+            setHasPermission(false);
+            setFetchingData(false);
+            return;
+          }
 
           const formatToDatetimeLocal = (isoString) => {
             if (!isoString) return '';
@@ -381,6 +389,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!hasPermission) return;
     setLoading(true);
     setError(null);
 
@@ -908,9 +917,9 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
           <button
             type="submit"
             form="operation-form"
-            disabled={loading || hasStockIssues()}
-            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${hasStockIssues() ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-            title={hasStockIssues() ? "Hay productos sin stock suficiente o sin seleccionar" : ""}
+            disabled={loading || hasStockIssues() || !hasPermission}
+            className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-colors flex items-center gap-2 ${hasStockIssues() || !hasPermission ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            title={!hasPermission ? "No tiene permisos para modificar esta operación" : hasStockIssues() ? "Hay productos sin stock suficiente o sin seleccionar" : ""}
           >
             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
             {id ? 'Guardar Cambios' : 'Confirmar Operación'}

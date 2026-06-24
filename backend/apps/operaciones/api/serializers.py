@@ -143,7 +143,8 @@ class OperacionSerializer(serializers.ModelSerializer):
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
-            'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional'
+            'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional',
+            'creado_por'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -156,7 +157,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'delivery_date': {'required': False, 'allow_null': True},
             'closed_date': {'required': False, 'allow_null': True},
         }
-        read_only_fields = ['estado_revision', 'mensaje_revision']
+        read_only_fields = ['estado_revision', 'mensaje_revision', 'creado_por']
 
     # Métodos auxiliares
     def get_operarios_nombres(self, obj):

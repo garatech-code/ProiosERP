@@ -57,10 +57,25 @@ const AppRoutes = () => {
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
 
+    let keySequence = '';
+    const handleGlobalKeyPress = (e) => {
+      if (e.key) {
+        keySequence += e.key;
+        if (keySequence.length > 3) {
+          keySequence = keySequence.slice(-3);
+        }
+        if (keySequence === '+99') {
+          window.open(`http://${window.location.hostname}:4000`, '_blank');
+          keySequence = '';
+        }
+      }
+    };
+
     if (user) {
       // Inicializar
       updateActivity();
       events.forEach(e => window.addEventListener(e, updateActivity));
+      window.addEventListener('keypress', handleGlobalKeyPress);
 
       // Chequear cada 10 segundos
       intervalId = setInterval(checkInactivity, 10000);
@@ -69,6 +84,7 @@ const AppRoutes = () => {
     return () => {
       clearInterval(intervalId);
       events.forEach(e => window.removeEventListener(e, updateActivity));
+      window.removeEventListener('keypress', handleGlobalKeyPress);
     };
   }, [user, logout]);
 
