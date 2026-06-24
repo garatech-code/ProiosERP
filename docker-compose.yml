@@ -30,14 +30,16 @@ services:
     container_name: proios_backend
     restart: always
     command: gunicorn proios.wsgi:application --bind 0.0.0.0:8000
-    volumes:
-      - ./backend:/app
-      - static_volume:/app/static
-      - media_volume:/app/media
+    # volumes:
+    #  - ./backend:/app
+    #  - static_volume:/app/static
+    #  - media_volume:/app/media
     env_file:
       - .env
     environment:
       - DB_HOST=db
+      - DB_PORT=5432
+      - DB_SSLMODE=disable
       - REDIS_URL=redis://redis:6379/0
     ports:
       - "8000:8000"
@@ -52,12 +54,14 @@ services:
     container_name: proios_celery_worker
     restart: always
     command: celery -A proios worker -l info
-    volumes:
-      - ./backend:/app
+    # volumes:
+    #  - ./backend:/app
     env_file:
       - .env
     environment:
       - DB_HOST=db
+      - DB_PORT=5432
+      - DB_SSLMODE=disable
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - backend
@@ -70,12 +74,14 @@ services:
     container_name: proios_celery_beat
     restart: always
     command: celery -A proios beat -l info
-    volumes:
-      - ./backend:/app
+    # volumes:
+    #  - ./backend:/app
     env_file:
       - .env
     environment:
       - DB_HOST=db
+      - DB_PORT=5432
+      - DB_SSLMODE=disable
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - backend
