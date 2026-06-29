@@ -1,4 +1,4 @@
-Django==5.0.3
+﻿Django==5.0.3
 djangorestframework==3.15.1
 djangorestframework-simplejwt==5.3.1
 celery==5.3.6
@@ -21,3 +21,6 @@ holidays==0.45
 whitenoise==6.6.0
 reportlab==4.5.1
 pypdf==4.2.0
+python-docx==1.1.0
+
+

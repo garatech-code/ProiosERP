@@ -139,6 +139,96 @@ const ProductCard = ({ product, onEdit, onDelete, onMovimiento, onLogs, onRowCli
     );
 };
 
+// ================= COMPONENTE DE PRODUCTOS INCOMPLETOS =================
+const IncompleteProductsModal = ({ isOpen, onClose, onEdit, onRowClick }) => {
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchIncomplete = async () => {
+                setLoading(true);
+                try {
+                    const res = await axios.get('/inventario/products/?page_size=10000');
+                    const data = res.data.results || res.data;
+                    const filtered = data.filter(p => {
+                        return (
+                            !p.unidad || p.unidad === '-' || p.unidad === 'xx' ||
+                            !p.ubicacion || p.ubicacion === '-' || p.ubicacion === 'xx' ||
+                            !p.estado || p.estado === '-' || p.estado === 'xx' ||
+                            !p.stock_minimo || Number(p.stock_minimo) === 0 ||
+                            !p.stock_maximo || Number(p.stock_maximo) === 0
+                        );
+                    });
+                    setProducts(filtered);
+                } catch (err) {
+                    console.error('Error', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchIncomplete();
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b dark:border-slate-700 flex justify-between items-center bg-orange-50 dark:bg-orange-900/30">
+                    <h3 className="text-lg font-bold text-orange-800 dark:text-orange-400">
+                        <i className="bi bi-exclamation-triangle mr-2"></i>
+                        Productos con datos faltantes
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"><i className="bi bi-x-lg"></i></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    {loading ? (
+                        <div className="flex justify-center py-8"><LogoSpinner size="w-8 h-8" /></div>
+                    ) : products.length === 0 ? (
+                        <p className="text-center text-gray-500 dark:text-slate-400 py-8">No hay productos con datos faltantes.</p>
+                    ) : (
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead className="bg-gray-50 dark:bg-slate-700">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase">Nombre</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase">Faltantes probables</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-300 uppercase">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                {products.map(p => {
+                                    const faltantes = [];
+                                    if (!p.unidad || p.unidad === '-' || p.unidad === 'xx') faltantes.push('Unidad');
+                                    if (!p.ubicacion || p.ubicacion === '-' || p.ubicacion === 'xx') faltantes.push('Ubicación');
+                                    if (!p.estado || p.estado === '-' || p.estado === 'xx') faltantes.push('Estado');
+                                    if (!p.stock_minimo || Number(p.stock_minimo) === 0) faltantes.push('Min');
+                                    if (!p.stock_maximo || Number(p.stock_maximo) === 0) faltantes.push('Max');
+                                    
+                                    return (
+                                        <tr key={p.id} className="hover:bg-orange-50/50 dark:hover:bg-slate-700 cursor-pointer" onClick={() => onRowClick(p)}>
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-slate-200">{p.nombre}</td>
+                                            <td className="px-6 py-4 text-sm text-red-600 dark:text-red-400 font-semibold">{faltantes.join(', ')}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button onClick={(e) => { e.stopPropagation(); onEdit(p); }} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 font-medium">Editar</button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t dark:border-slate-700 flex justify-end bg-gray-50 dark:bg-slate-750">
+                    <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700">Cerrar</button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
+
 // ================= COMPONENTE DE TABLA PROFESIONAL =================
 const StockTableView = ({ products, loading, error, filters, onFilterChange, onSort, onPageChange, totalCount, onEdit, onDelete, onMovimiento, onLogs, onRowClick, onSelectRow, selectedRows, onSelectAll, allSelected, allCategorias }) => {
     const getStockBadge = (stock, minStock, maxStock) => {
@@ -160,20 +250,20 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
     const totalPages = Math.ceil(totalCount / filters.page_size);
 
     return (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
             {/* Barra de filtros */}
-            <div className="p-4 border-b flex flex-wrap gap-4 items-center">
+            <div className="p-4 border-b dark:border-slate-700 flex flex-wrap gap-4 items-center">
                 <input
                     type="text"
                     placeholder="Buscar por nombre..."
                     value={filters.search}
                     onChange={(e) => onFilterChange('search', e.target.value)}
-                    className="border rounded-md px-3 py-2 w-64 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    className="border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md px-3 py-2 w-64 text-sm focus:ring-indigo-500 focus:border-indigo-500"
                 />
                 <select
                     value={filters.categoria}
                     onChange={(e) => onFilterChange('categoria', e.target.value)}
-                    className="border rounded-md px-3 py-2 text-sm"
+                    className="border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md px-3 py-2 text-sm"
                 >
                     <option value="">Todas las categorías</option>
                     {allCategorias.map(cat => (
@@ -183,7 +273,7 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
                 <select
                     value={filters.ubicacion}
                     onChange={(e) => onFilterChange('ubicacion', e.target.value)}
-                    className="border rounded-md px-3 py-2 text-sm"
+                    className="border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md px-3 py-2 text-sm"
                 >
                     <option value="">Todas las ubicaciones</option>
                     {ubicacionesUnicas.map(ubic => <option key={ubic} value={ubic}>{ubic}</option>)}
@@ -191,59 +281,59 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
                 <select
                     value={filters.estado}
                     onChange={(e) => onFilterChange('estado', e.target.value)}
-                    className="border rounded-md px-3 py-2 text-sm"
+                    className="border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md px-3 py-2 text-sm"
                 >
                     <option value="">Todos los estados</option>
                     {estadosUnicos.map(est => <option key={est} value={est}>{est}</option>)}
                 </select>
-                <div className="ml-auto text-sm text-gray-600">Total: {totalCount} productos</div>
+                <div className="ml-auto text-sm text-gray-600 dark:text-gray-300">Total: {totalCount} productos</div>
             </div>
 
             {/* Tabla responsiva con checkboxes */}
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                    <thead className="bg-gray-50 dark:bg-slate-700/50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                 <input type="checkbox" checked={allSelected} onChange={onSelectAll} />
                             </th>
-                            <th onClick={() => onSort('nombre')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Nombre</th>
-                            <th onClick={() => onSort('presentacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Presentación</th>
-                            <th onClick={() => onSort('stock_actual')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Stock</th>
-                            <th onClick={() => onSort('stock_minimo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Stock Mínimo</th>
-                            <th onClick={() => onSort('stock_maximo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Stock Máximo</th>
-                            <th onClick={() => onSort('categoria')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Categoría</th>
-                            <th onClick={() => onSort('ubicacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Ubicación</th>
-                            <th onClick={() => onSort('estado')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Estado</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            <th onClick={() => onSort('nombre')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Nombre</th>
+                            <th onClick={() => onSort('presentacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Presentación</th>
+                            <th onClick={() => onSort('stock_actual')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Stock</th>
+                            <th onClick={() => onSort('stock_minimo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Stock Mínimo</th>
+                            <th onClick={() => onSort('stock_maximo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Stock Máximo</th>
+                            <th onClick={() => onSort('categoria')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Categoría</th>
+                            <th onClick={() => onSort('ubicacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Ubicación</th>
+                            <th onClick={() => onSort('estado')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Estado</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                         {products.map(product => (
-                            <tr key={product.id} className="hover:bg-gray-50 cursor-pointer">
+                            <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer">
                                 <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                     <input type="checkbox" checked={!!selectedRows[product.id]} onChange={() => onSelectRow(product.id)} />
                                 </td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.nombre}</td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.presentacion}</td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{product.nombre}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.presentacion}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                     <div className="flex items-center space-x-2">
                                         <span>{product.stock_actual}</span>
                                         {getStockBadge(product.stock_actual, product.stock_minimo, product.stock_maximo)}
                                     </div>
                                 </td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.stock_minimo}</td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.stock_maximo}</td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.stock_minimo}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.stock_maximo}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                     {allCategorias.find(c => c.value === product.categoria)?.label || product.categoria}
                                 </td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.ubicacion || '-'}</td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.estado || '-'}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.ubicacion || '-'}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.estado || '-'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={e => e.stopPropagation()}>
-                                    <button onClick={() => onEdit(product)} className="text-indigo-600 hover:text-indigo-900 mr-2">Editar</button>
-                                    <button onClick={() => onDelete(product)} className="text-red-600 hover:text-red-900 mr-2">Eliminar</button>
-                                    <button onClick={() => onMovimiento(product)} className="text-green-600 hover:text-green-900">Movimiento</button>
-                                    <button onClick={() => onLogs(product.id)} className="text-gray-600 hover:text-gray-900 ml-2">Logs</button>
+                                    <button onClick={() => onEdit(product)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-2">Editar</button>
+                                    <button onClick={() => onDelete(product)} className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 mr-2">Eliminar</button>
+                                    <button onClick={() => onMovimiento(product)} className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300">Movimiento</button>
+                                    <button onClick={() => onLogs(product.id)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white ml-2">Logs</button>
                                 </td>
                             </tr>
                         ))}
@@ -252,17 +342,17 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
             </div>
 
             {/* Paginación */}
-            <div className="px-6 py-4 flex items-center justify-between border-t">
+            <div className="px-6 py-4 flex items-center justify-between border-t dark:border-slate-700">
                 <div className="flex-1 flex justify-between sm:hidden">
-                    <button onClick={() => onPageChange(filters.page - 1)} disabled={filters.page === 1} className="px-4 py-2 border rounded-md disabled:opacity-50">Anterior</button>
-                    <button onClick={() => onPageChange(filters.page + 1)} disabled={filters.page === totalPages} className="px-4 py-2 border rounded-md disabled:opacity-50">Siguiente</button>
+                    <button onClick={() => onPageChange(filters.page - 1)} disabled={filters.page === 1} className="px-4 py-2 border dark:border-slate-600 rounded-md disabled:opacity-50 dark:text-white">Anterior</button>
+                    <button onClick={() => onPageChange(filters.page + 1)} disabled={filters.page === totalPages} className="px-4 py-2 border dark:border-slate-600 rounded-md disabled:opacity-50 dark:text-white">Siguiente</button>
                 </div>
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <p className="text-sm text-gray-700">Mostrando {products.length} de {totalCount} resultados</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">Mostrando {products.length} de {totalCount} resultados</p>
                     <nav className="inline-flex rounded-md shadow-sm -space-x-px">
-                        <button onClick={() => onPageChange(filters.page - 1)} disabled={filters.page === 1} className="px-3 py-1 border rounded-l-md disabled:opacity-50">Anterior</button>
-                        <span className="px-4 py-1 border-t border-b">{filters.page} / {totalPages}</span>
-                        <button onClick={() => onPageChange(filters.page + 1)} disabled={filters.page === totalPages} className="px-3 py-1 border rounded-r-md disabled:opacity-50">Siguiente</button>
+                        <button onClick={() => onPageChange(filters.page - 1)} disabled={filters.page === 1} className="px-3 py-1 border dark:border-slate-600 rounded-l-md disabled:opacity-50 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600">Anterior</button>
+                        <span className="px-4 py-1 border-t border-b dark:border-slate-600 dark:bg-slate-700 dark:text-white">{filters.page} / {totalPages}</span>
+                        <button onClick={() => onPageChange(filters.page + 1)} disabled={filters.page === totalPages} className="px-3 py-1 border dark:border-slate-600 rounded-r-md disabled:opacity-50 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600">Siguiente</button>
                     </nav>
                 </div>
             </div>
@@ -356,7 +446,7 @@ export default function InventoryManagement() {
     const [sendingEmail, setSendingEmail] = useState(false);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: 'otros' });
+    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-' });
     const [submitting, setSubmitting] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -372,6 +462,7 @@ export default function InventoryManagement() {
     const [ingredients, setIngredients] = useState([]);
     const [isChemicalBrowserOpen, setIsChemicalBrowserOpen] = useState(false);
     const [activeIngredientIdx, setActiveIngredientIdx] = useState(null);
+    const [showIncompleteModal, setShowIncompleteModal] = useState(false);
 
     const handleSelectChemical = (chemical) => {
         if (activeIngredientIdx === 'final') {
@@ -551,6 +642,28 @@ export default function InventoryManagement() {
         setSelectedRows({});
         fetchTableData();
         setDeletingMultiple(false);
+    };
+
+    const handleDeleteAllProducts = async () => {
+        const confirm1 = window.confirm('ATENCIÓN: Esto eliminará TODOS los productos del inventario y sus historiales.\\n¿Está completamente seguro?');
+        if (!confirm1) return;
+        const confirm2 = window.prompt('Para confirmar, escriba "ELIMINAR TODO" en mayúsculas:');
+        if (confirm2 !== 'ELIMINAR TODO') {
+            showToast('Eliminación masiva cancelada.', 'info');
+            return;
+        }
+        
+        setDeletingMultiple(true);
+        try {
+            const res = await axios.delete('/inventario/products/delete_all/');
+            showToast(res.data.message || 'Todos los productos eliminados con éxito.', 'success');
+            setSelectedRows({});
+            fetchTableData();
+        } catch (err) {
+            showToast('Error al eliminar todos los productos.', 'error');
+        } finally {
+            setDeletingMultiple(false);
+        }
     };
     
     const fetchProducts = async () => {
@@ -883,8 +996,8 @@ export default function InventoryManagement() {
     
     // ========== Importación de Excel ==========
     const downloadStandardTemplate = () => {
-        const columnas = ['nombre', 'categoria', 'cantidad', 'unidad', 'ubicacion', 'estado', 'serie_lote', 'observaciones'];
-        const ejemplo = ['Cloro 100%', 'quimicos', 1000, 'L', 'Depósito Químicos', 'Bueno', 'LOTE-001', 'Producto líquido'];
+        const columnas = ['nombre', 'categoria', 'cantidad', 'unidad', 'ubicacion', 'estado', 'serie_lote', 'observaciones', 'min', 'max'];
+        const ejemplo = ['Cloro 100%', 'quimicos', 1000, 'L', 'Depósito Químicos', 'Bueno', 'LOTE-001', 'Producto líquido', 10, 500];
         const data = [columnas, ejemplo];
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(data);
@@ -1193,12 +1306,28 @@ export default function InventoryManagement() {
                                 {exportingStock ? 'Descargando...' : <><i className="bi bi-file-earmark-excel mr-1 text-emerald-600"></i> Exportar Excel</>}
                             </button>
                             <button
-                                onClick={handleMultiDeleteTable}
-                                disabled={selectedRowsCount === 0 || deletingMultiple}
-                                className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-xl shadow-sm text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
+                                onClick={() => setShowIncompleteModal(true)}
+                                className="inline-flex items-center px-4 py-2 border border-orange-300 text-sm font-medium rounded-xl shadow-sm text-orange-700 bg-orange-50 hover:bg-orange-100"
                             >
-                                {deletingMultiple ? 'Borrando...' : <><i className="bi bi-trash mr-1"></i> Borrar seleccionados ({selectedRowsCount})</>}
+                                <i className="bi bi-exclamation-triangle mr-1 text-orange-600"></i> Faltan datos
                             </button>
+                            <div className="flex rounded-xl shadow-sm" role="group">
+                                <button
+                                    onClick={handleMultiDeleteTable}
+                                    disabled={selectedRowsCount === 0 || deletingMultiple}
+                                    className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-l-xl text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
+                                >
+                                    {deletingMultiple ? 'Borrando...' : <><i className="bi bi-trash mr-1"></i> Borrar seleccionados ({selectedRowsCount})</>}
+                                </button>
+                                <button
+                                    onClick={handleDeleteAllProducts}
+                                    disabled={deletingMultiple}
+                                    className="inline-flex items-center px-3 py-2 border border-l-0 border-red-300 text-sm font-bold rounded-r-xl text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                                    title="Borrar TODOS los productos del inventario"
+                                >
+                                    Borrar TODO
+                                </button>
+                            </div>
                             <button onClick={downloadStandardTemplate} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50">
                                 <i className="bi bi-download mr-1 text-emerald-600"></i> Plantilla Excel
                             </button>
@@ -1265,6 +1394,12 @@ export default function InventoryManagement() {
             {/* ========== VISTA TABLA PARA 'todo' ========== */}
             {activeTab === 'todo' && (
                 <>
+                    <IncompleteProductsModal 
+                        isOpen={showIncompleteModal} 
+                        onClose={() => setShowIncompleteModal(false)} 
+                        onEdit={(p) => { setShowIncompleteModal(false); openEditModal(p); }} 
+                        onRowClick={(p) => { setShowIncompleteModal(false); handleRowClick(p); }} 
+                    />
                     <div className="flex justify-end mb-2">
                         <button
                             onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
@@ -1507,7 +1642,12 @@ export default function InventoryManagement() {
                                     <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta amarilla" /></div>
                                     <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta naranja" /></div>
                                 </div>
-                                <div><label className="block text-sm font-bold mb-1">Categoría</label><select value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border rounded-lg px-3 py-2">{categoriaOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
+                                <div><label className="block text-sm font-bold mb-1">Categoría</label>
+                                    <input type="text" list="categorias-list" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Ej: insumos" />
+                                    <datalist id="categorias-list">
+                                        {allCategorias.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
+                                    </datalist>
+                                </div>
                                 <div><label className="block text-sm font-bold mb-1">Proveedor (opcional)</label><AutocompleteCreate endpoint="/inventario/proveedores/" value={formData.proveedor} onSelect={(item) => setFormData({...formData, proveedor: item?.id || ''})} nameField="nombre" placeholder="Seleccionar o crear proveedor..." createFields={[{ name: 'nombre', label: 'Razón Social', required: true }, { name: 'contacto', label: 'Contacto' }, { name: 'telefono', label: 'Teléfono' }, { name: 'email', label: 'Email' }, { name: 'direccion', label: 'Dirección' }, { name: 'rubro', label: 'Rubro' }, { name: 'condicion_pago', label: 'Condición de Pago', type: 'select', options: condicionPagoOptions }]} extraCreateData={{}} /></div>
                                 <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setShowProductModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" disabled={submitting} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">{submitting ? 'Guardando...' : 'Guardar'}</button></div>
                             </form>

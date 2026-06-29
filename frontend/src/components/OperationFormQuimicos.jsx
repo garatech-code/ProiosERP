@@ -4,6 +4,7 @@ import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { formatUserName } from '../utils/formatters';
 import AutocompleteCreate from './AutocompleteCreate';
+import ProductMultiSelectModal from './ProductMultiSelectModal';
 
 function ProductRow({ product, index, onUpdate, onRemove }) {
   const [selectedProduct, setSelectedProduct] = useState(
@@ -134,6 +135,8 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
   const [imoSuccess, setImoSuccess] = useState(false);
   const [autoCompleteFlag, setAutoCompleteFlag] = useState('');
 
+  const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
+
   const DRAFT_KEY = 'draft_op_quimicos';
 
   const [formData, setFormData] = useState(() => {
@@ -173,10 +176,10 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
             axios.get('/usuarios/users/'),
             axios.get('/usuarios/plantel/?activo=true')
           ]);
-          
+
           const fetchedUsers = usersRes.data?.results || usersRes.data;
           if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
-          
+
           const fetchedStaff = staffRes.data?.results || staffRes.data;
           if (Array.isArray(fetchedStaff)) setAvailableStaff(fetchedStaff);
         }
@@ -264,10 +267,10 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
     });
   };
 
-  const addProduct = () => {
+  const handleAddMultipleProducts = (newProducts) => {
     setFormData(prev => ({
       ...prev,
-      products: [...prev.products, { product: '', quantity: 1, unit_price: 0, stock_actual: 0 }],
+      products: [...prev.products, ...newProducts],
     }));
   };
 
@@ -607,7 +610,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
               <div>
                 <div className="flex justify-between items-center border-b dark:border-slate-600 pb-2 mb-4">
                   <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Equipo Asignado</h3>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setShowStaffAssignment(!showStaffAssignment)}
                     className={`text-[10px] font-black px-3 py-1 rounded-full transition-all border ${showStaffAssignment ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`}
@@ -617,7 +620,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">Seleccione quiénes tendrán acceso y participación en esta orden.</p>
-                
+
                 <div className={`grid grid-cols-1 ${showStaffAssignment ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 transition-all duration-300`}>
                   {/* COLUMNA 1: OPERADORES (LOGÍSTICA) */}
                   <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col h-[300px]">
@@ -625,9 +628,9 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
                       <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">1. Logística (Operadores)</span>
                     </div>
                     <div className="p-2 border-b border-gray-100 dark:border-slate-600">
-                      <input 
-                        type="text" 
-                        placeholder="Buscar operador..." 
+                      <input
+                        type="text"
+                        placeholder="Buscar operador..."
                         className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg"
                         onChange={(e) => setFilterOp(e.target.value)}
                       />
@@ -656,9 +659,9 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
                       <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">2. Operarios (Usuarios App)</span>
                     </div>
                     <div className="p-2 border-b border-gray-100 dark:border-slate-600">
-                      <input 
-                        type="text" 
-                        placeholder="Buscar usuario..." 
+                      <input
+                        type="text"
+                        placeholder="Buscar usuario..."
                         className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg"
                         onChange={(e) => setFilterUserOp(e.target.value)}
                       />
@@ -688,9 +691,9 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
                         <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">3. Plantel (Staff Legajo)</span>
                       </div>
                       <div className="p-2 border-b border-gray-100 dark:border-slate-600 space-y-2">
-                        <input 
-                          type="text" 
-                          placeholder="Buscar por nombre, DNI o Rol..." 
+                        <input
+                          type="text"
+                          placeholder="Buscar por nombre, DNI o Rol..."
                           className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg"
                           onChange={(e) => setFilterStaffSearch(e.target.value)}
                         />
@@ -713,15 +716,15 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
                         {availableStaff.filter(s => {
                           const search = normalize(filterStaffSearch);
                           const roleFilter = normalize(filterStaffRole);
-                          
-                          const matchesSearch = !search || 
-                            normalize(s.nombres).includes(search) || 
+
+                          const matchesSearch = !search ||
+                            normalize(s.nombres).includes(search) ||
                             normalize(s.apellidos).includes(search) ||
                             s.dni?.includes(search) ||
                             normalize(s.rol).includes(search);
-                          
+
                           const matchesRole = !roleFilter || normalize(s.rol).includes(roleFilter);
-                          
+
                           return matchesSearch && matchesRole;
                         }).map(s => (
                           <label key={s.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors border-b border-gray-50 dark:border-slate-600 last:border-0">
@@ -754,13 +757,15 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
             <div>
               <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">
                 <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Carga (Productos)</h3>
-                <button
-                  type="button"
-                  onClick={addProduct}
-                  className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <span>+</span> Añadir Ítem
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowMultiSelectModal(true)}
+                    className="text-sm font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    Añadir items
+                  </button>
+                </div>
               </div>
 
               {formData.products.length === 0 ? (
@@ -865,6 +870,16 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
           </button>
         </div>
       </div>
+
+      {showMultiSelectModal && (
+        <ProductMultiSelectModal
+          isOpen={showMultiSelectModal}
+          onClose={() => setShowMultiSelectModal(false)}
+          onAddProducts={handleAddMultipleProducts}
+          existingProductIds={formData.products.map(p => p.product).filter(id => id)}
+          categoryFilter="quimicos"
+        />
+      )}
 
       <style dangerouslySetInnerHTML={{
         __html: `

@@ -189,14 +189,16 @@ class ProductViewSet(viewsets.ModelViewSet):
             data = []
             for art in queryset:
                 data.append({
-                    'nombre': art.nombre,
-                    'categoria': art.categoria,
-                    'cantidad': float(art.stock_actual),
-                    'unidad': getattr(art, 'unidad', ''),
-                    'ubicacion': getattr(art, 'ubicacion', ''),
-                    'estado': getattr(art, 'estado', ''),
-                    'serie_lote': getattr(art, 'serie_lote', ''),
-                    'observaciones': art.descripcion,
+                    'nombre': getattr(art, 'nombre', None) or '-',
+                    'categoria': getattr(art, 'categoria', None) or '-',
+                    'cantidad': float(getattr(art, 'stock_actual', 0) or 0),
+                    'unidad': getattr(art, 'unidad', None) or '-',
+                    'ubicacion': getattr(art, 'ubicacion', None) or '-',
+                    'estado': getattr(art, 'estado', None) or '-',
+                    'serie_lote': getattr(art, 'serie_lote', None) or '-',
+                    'observaciones': getattr(art, 'descripcion', None) or '-',
+                    'min': float(getattr(art, 'stock_minimo', 0) or 0),
+                    'max': float(getattr(art, 'stock_maximo', 0) or 0),
                 })
             
             if export == 'csv':
@@ -291,6 +293,12 @@ class ProductViewSet(viewsets.ModelViewSet):
             ip=self.get_client_ip(self.request)
         )
         instance.delete()
+
+    @action(detail=False, methods=['delete'], url_path='delete_all')
+    def delete_all(self, request):
+        count = self.get_queryset().count()
+        self.get_queryset().delete()
+        return Response({'message': f'Se eliminaron {count} productos exitosamente.'}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
     def movimiento(self, request):
@@ -432,16 +440,15 @@ class ProductViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='categorias')
     def listar_categorias(self, request):
         categorias = Articulo.objects.values_list('categoria', flat=True).distinct().order_by('categoria')
-        CAT_DISPLAY = dict(Articulo.CATEGORIA_CHOICES)
-        data = [{'value': cat, 'label': CAT_DISPLAY.get(cat, cat.capitalize())} for cat in categorias]
+        data = [{'value': cat, 'label': cat.capitalize()} for cat in categorias if cat]
         return Response(data)
 
     @action(detail=False, methods=['post'], url_path='upload_excel')
     def upload_excel(self, request):
         """
         Importa artículos desde un Excel estándar.
-        Columnas exactas: nombre, categoria, cantidad, unidad, ubicacion, estado, serie_lote, observaciones
-        Los valores "xx" se convierten a cadena vacía.
+        Columnas exactas: nombre, categoria, cantidad, unidad, ubicacion, estado, serie_lote, observaciones, min, max
+        Los valores "xx" o "-" se convierten a cadena vacía o 0 dependiendo de si es texto o número.
         """
         file = request.FILES.get('file')
         if not file:
@@ -457,7 +464,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         df.columns = [str(col).strip().lower().replace(' ', '_') for col in df.columns]
 
-        required_cols = ['nombre', 'categoria', 'cantidad', 'unidad', 'ubicacion', 'estado', 'serie_lote', 'observaciones']
+        required_cols = ['nombre', 'categoria', 'cantidad', 'unidad', 'ubicacion', 'estado', 'serie_lote', 'observaciones', 'min', 'max']
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
             return Response({'error': f'Faltan columnas: {missing}'}, status=400)
@@ -469,24 +476,13 @@ class ProductViewSet(viewsets.ModelViewSet):
             s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
             return s
 
-        def clean_xx(val):
-            if pd.notna(val) and str(val).strip().lower() == 'xx':
-                return ''
-            return str(val).strip() if pd.notna(val) else ''
-
-        cat_map = {
-            'quimicos': 'quimicos',
-            'insumos': 'insumos', 'insumo': 'insumos',
-            'anclas': 'anclas',
-            'cadenas': 'otros',
-            'herramientas': 'otros',
-            'patio': 'otros',
-            'cadenas y accesorios': 'insumos',
-            'accesorios': 'insumos',
-            'accesorios de cadena': 'insumos',
-            'xx': 'otros',
-        }
-        cat_map_norm = {normalize_text(k): v for k, v in cat_map.items()}
+        def clean_empty(val):
+            if pd.notna(val):
+                v_str = str(val).strip()
+                if v_str == '-':
+                    return ''
+                return v_str
+            return ''
 
         creados = 0
         actualizados = 0
@@ -499,13 +495,12 @@ class ProductViewSet(viewsets.ModelViewSet):
                 continue
 
             cat_input_raw = str(row['categoria']).strip() if pd.notna(row['categoria']) else ''
-            cat_input_norm = normalize_text(cat_input_raw)
-            categoria = cat_map_norm.get(cat_input_norm, 'otros')
-            if cat_input_raw and categoria == 'otros' and cat_input_norm not in cat_map_norm:
-                errores.append(f"Fila {idx+2}: categoría '{cat_input_raw}' no reconocida, se usó 'otros'")
+            categoria = cat_input_raw.lower() if cat_input_raw and cat_input_raw != '-' else '-'
 
             try:
-                cantidad = float(row['cantidad']) if pd.notna(row['cantidad']) else 0.0
+                c_val = str(row['cantidad']).strip()
+                if c_val == '-': c_val = '0'
+                cantidad = float(c_val) if pd.notna(row['cantidad']) else 0.0
                 if cantidad < 0:
                     errores.append(f"Fila {idx+2}: cantidad negativa")
                     continue
@@ -513,11 +508,25 @@ class ProductViewSet(viewsets.ModelViewSet):
                 errores.append(f"Fila {idx+2}: cantidad no numérica")
                 continue
 
-            unidad = clean_xx(row['unidad'])
-            ubicacion = clean_xx(row['ubicacion'])
-            estado = clean_xx(row['estado'])
-            serie_lote = clean_xx(row['serie_lote'])
-            observaciones = clean_xx(row['observaciones'])
+            try:
+                m_val = str(row['min']).strip()
+                if m_val == '-': m_val = '0'
+                min_val = float(m_val) if 'min' in df.columns and pd.notna(row['min']) else 0.0
+            except:
+                min_val = 0.0
+
+            try:
+                mx_val = str(row['max']).strip()
+                if mx_val == '-': mx_val = '0'
+                max_val = float(mx_val) if 'max' in df.columns and pd.notna(row['max']) else 0.0
+            except:
+                max_val = 0.0
+
+            unidad = clean_empty(row['unidad'])
+            ubicacion = clean_empty(row['ubicacion'])
+            estado = clean_empty(row['estado'])
+            serie_lote = clean_empty(row['serie_lote'])
+            observaciones = clean_empty(row['observaciones'])
 
             presentacion = unidad if unidad else 'unidad'
             peso_kg = 1.0
@@ -527,8 +536,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 'presentacion': presentacion,
                 'peso_kg': peso_kg,
                 'stock_actual': cantidad,
-                'stock_minimo': 0,
-                'stock_maximo': 0,
+                'stock_minimo': min_val,
+                'stock_maximo': max_val,
                 'categoria': categoria,
                 'controlar_stock': True,
                 'unidad': unidad,
@@ -590,8 +599,16 @@ class StockItemViewSet(viewsets.ModelViewSet):
         actualizados = 0
         errores = []
 
+        def clean_empty_stock(val):
+            if pd.notna(val):
+                v_str = str(val).strip()
+                if v_str == '-':
+                    return ''
+                return v_str
+            return ''
+
         for idx, row in df.iterrows():
-            nombre = str(row['nombre']).strip() if pd.notna(row['nombre']) else ''
+            nombre = clean_empty_stock(row['nombre'])
             if not nombre:
                 errores.append(f"Fila {idx+2}: nombre vacío")
                 continue
@@ -601,23 +618,25 @@ class StockItemViewSet(viewsets.ModelViewSet):
                 errores.append(f"Fila {idx+2}: categoria '{categoria}' no válida")
                 continue
 
-            unidad = row['unidad']
+            unidad = clean_empty_stock(row['unidad'])
             if unidad not in dict(StockItem.UNIDAD_CHOICES):
                 errores.append(f"Fila {idx+2}: unidad '{unidad}' no válida")
                 continue
 
-            ubicacion = row['ubicacion']
+            ubicacion = clean_empty_stock(row['ubicacion'])
             if ubicacion not in dict(StockItem.UBICACION_CHOICES):
                 errores.append(f"Fila {idx+2}: ubicacion '{ubicacion}' no válida")
                 continue
 
-            estado = row['estado']
+            estado = clean_empty_stock(row['estado'])
             if estado not in dict(StockItem.ESTADO_CHOICES):
                 errores.append(f"Fila {idx+2}: estado '{estado}' no válido")
                 continue
 
             try:
-                cantidad = float(row['cantidad'])
+                c_val = str(row['cantidad']).strip()
+                if c_val == '-': c_val = '0'
+                cantidad = float(c_val)
                 if cantidad < 0:
                     errores.append(f"Fila {idx+2}: cantidad negativa")
                     continue
@@ -625,8 +644,8 @@ class StockItemViewSet(viewsets.ModelViewSet):
                 errores.append(f"Fila {idx+2}: cantidad no numérica")
                 continue
 
-            serie_lote = str(row['serie_lote']).strip() if pd.notna(row['serie_lote']) else None
-            observaciones = str(row['observaciones']).strip() if pd.notna(row['observaciones']) else None
+            serie_lote = clean_xx(row['serie_lote'])
+            observaciones = clean_xx(row['observaciones'])
 
             defaults = {
                 'categoria': categoria,

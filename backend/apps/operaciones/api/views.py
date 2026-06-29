@@ -944,6 +944,26 @@ class OperacionViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=500)
 
     @action(detail=True, methods=['get'])
+    def generate_cotizacion_docx(self, request, pk=None):
+        op = self.get_object()
+        offer_validity = request.query_params.get('offer_validity', '15 days')
+        payment_terms = request.query_params.get('payment_terms', '30 days from invoice date')
+        warranty = request.query_params.get('warranty', 'As per manufacturer')
+
+        from apps.operaciones.services_docx import generar_cotizacion_docx
+        try:
+            docx_content = generar_cotizacion_docx(op, offer_validity, payment_terms, warranty)
+            response = HttpResponse(
+                docx_content, 
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="cotizacion_OP{op.id}.docx"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando cotizacion docx")
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['get'])
     def generate_permiso_pna(self, request, pk=None):
         op = self.get_object()
         tipo_trabajo = request.query_params.get('tipo', 'frio')

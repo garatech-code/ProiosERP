@@ -85,6 +85,14 @@ export default function OperationDetail() {
   const [cotizacionAdicional, setCotizacionAdicional] = useState('');
   const [detalleServicio, setDetalleServicio] = useState('');
   const [pnaText, setPnaText] = useState('');
+  
+  // Parametros para generar Word
+  const [offerValidityIsManual, setOfferValidityIsManual] = useState(false);
+  const [offerValidity, setOfferValidity] = useState('15 days');
+  const [paymentTermsIsManual, setPaymentTermsIsManual] = useState(false);
+  const [paymentTerms, setPaymentTerms] = useState('30 days from invoice date');
+  const [warrantyIsManual, setWarrantyIsManual] = useState(false);
+  const [warranty, setWarranty] = useState('As per manufacturer');
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -371,6 +379,34 @@ export default function OperationDetail() {
     } catch (err) {
       console.error(err);
       showToast('Error al guardar los datos de cotización', 'error');
+    }
+  };
+
+  const handleDownloadCotizacionWord = async () => {
+    try {
+      setActionLoading(true);
+      const params = new URLSearchParams({
+        offer_validity: offerValidity,
+        payment_terms: paymentTerms,
+        warranty: warranty
+      }).toString();
+
+      const response = await axios.get(`/operaciones/operations/${id}/generate_cotizacion_docx/?${params}`, {
+        responseType: 'blob',
+      });
+      const fileUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.setAttribute('download', `Cotizacion_OP${id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(fileUrl);
+    } catch (error) {
+      console.error("Error descargando cotización Word:", error);
+      showToast('Error al descargar la cotización en Word', 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1020,6 +1056,135 @@ export default function OperationDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
             <div className="lg:col-span-2 space-y-6">
+
+              {/* Added Generate Word Button Here as Requested */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 mb-6">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white">Generar Cotización (Word)</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Personaliza las condiciones comerciales que se incluirán en el documento.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Offer Validity</label>
+                      {!offerValidityIsManual ? (
+                        <select 
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                          value={offerValidity}
+                          onChange={(e) => {
+                            if (e.target.value === 'manual') {
+                              setOfferValidityIsManual(true);
+                              setOfferValidity('');
+                            } else {
+                              setOfferValidity(e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="15 days">15 days</option>
+                          <option value="30 days">30 days</option>
+                          <option value="manual">Otro (Manual)...</option>
+                        </select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${offerValidity.length > 35 ? 'border-orange-500' : ''}`} 
+                            value={offerValidity}
+                            onChange={(e) => setOfferValidity(e.target.value)}
+                            placeholder="Escriba..."
+                            autoFocus
+                          />
+                          <button onClick={() => {setOfferValidityIsManual(false); setOfferValidity('15 days');}} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                        </div>
+                      )}
+                      {offerValidityIsManual && offerValidity.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Payment Terms</label>
+                      {!paymentTermsIsManual ? (
+                        <select 
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                          value={paymentTerms}
+                          onChange={(e) => {
+                            if (e.target.value === 'manual') {
+                              setPaymentTermsIsManual(true);
+                              setPaymentTerms('');
+                            } else {
+                              setPaymentTerms(e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="30 days from invoice date">30 days from invoice date</option>
+                          <option value="In advance">In advance</option>
+                          <option value="On delivery">On delivery</option>
+                          <option value="manual">Otro (Manual)...</option>
+                        </select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${paymentTerms.length > 35 ? 'border-orange-500' : ''}`} 
+                            value={paymentTerms}
+                            onChange={(e) => setPaymentTerms(e.target.value)}
+                            placeholder="Escriba..."
+                            autoFocus
+                          />
+                          <button onClick={() => {setPaymentTermsIsManual(false); setPaymentTerms('30 days from invoice date');}} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                        </div>
+                      )}
+                      {paymentTermsIsManual && paymentTerms.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Warranty</label>
+                      {!warrantyIsManual ? (
+                        <select 
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                          value={warranty}
+                          onChange={(e) => {
+                            if (e.target.value === 'manual') {
+                              setWarrantyIsManual(true);
+                              setWarranty('');
+                            } else {
+                              setWarranty(e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="As per manufacturer">As per manufacturer</option>
+                          <option value="N/A for services">N/A for services</option>
+                          <option value="manual">Otro (Manual)...</option>
+                        </select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${warranty.length > 35 ? 'border-orange-500' : ''}`} 
+                            value={warranty}
+                            onChange={(e) => setWarranty(e.target.value)}
+                            placeholder="Escriba..."
+                            autoFocus
+                          />
+                          <button onClick={() => {setWarrantyIsManual(false); setWarranty('As per manufacturer');}} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                        </div>
+                      )}
+                      {warrantyIsManual && warranty.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
+                    </div>
+                  </div>
+                  <div className="flex justify-start pt-2">
+                    <button
+                      onClick={handleDownloadCotizacionWord}
+                      disabled={actionLoading}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                      title="Descargar cotización generada en formato Word"
+                    >
+                      <i className="bi bi-file-word-fill"></i> Descargar Word
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
                 <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">

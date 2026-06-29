@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import { formatUserName } from '../utils/formatters';
 
@@ -265,9 +266,9 @@ export default function UserManagement() {
             )}
 
             {/* Modal de Creación */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 my-auto">
+            {isModalOpen && createPortal(
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 my-auto">
                         {/* Cabecera Modal */}
                         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
@@ -301,7 +302,7 @@ export default function UserManagement() {
                                     value={formData.username}
                                     onChange={handleInputChange}
                                     required
-                                    className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
+                                    className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
                                     placeholder="Ej. 12345678 (Sin puntos)"
                                 />
                                 <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">
@@ -321,7 +322,7 @@ export default function UserManagement() {
                                         value={formData.first_name}
                                         onChange={handleInputChange}
                                         required
-                                        className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
+                                        className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
                                         placeholder="Ej. Juan"
                                     />
                                 </div>
@@ -335,7 +336,7 @@ export default function UserManagement() {
                                         value={formData.last_name}
                                         onChange={handleInputChange}
                                         required
-                                        className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
+                                        className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
                                         placeholder="Ej. Pérez"
                                     />
                                 </div>
@@ -349,7 +350,7 @@ export default function UserManagement() {
                                     name="role"
                                     value={formData.role}
                                     onChange={handleInputChange}
-                                    className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors cursor-pointer"
+                                    className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors cursor-pointer"
                                 >
                                     {Object.entries(ROLE_LABELS).map(([value, label]) => (
                                         <option key={value} value={value}>
@@ -387,7 +388,8 @@ export default function UserManagement() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

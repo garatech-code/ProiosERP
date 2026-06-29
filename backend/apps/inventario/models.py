@@ -29,12 +29,6 @@ class Proveedor(models.Model):
 
 
 class Articulo(models.Model):
-    CATEGORIA_CHOICES = (
-        ('quimicos', 'Químicos'),
-        ('anclas', 'Anclas'),
-        ('otros', 'Otros'),
-        ('insumos', 'Insumos'),
-    )
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True, help_text="Observaciones o descripción del producto")
     presentacion = models.CharField(max_length=100)
@@ -44,7 +38,7 @@ class Articulo(models.Model):
     stock_actual = models.DecimalField(max_digits=15, decimal_places=4, default=0.0)
     stock_minimo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Stock mínimo para alerta (amarillo)")
     stock_maximo = models.DecimalField(max_digits=15, decimal_places=4, default=0.0, help_text="Stock máximo (opcional)")
-    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='otros')
+    categoria = models.CharField(max_length=50, default='-')
     controlar_stock = models.BooleanField(
         default=True,
         help_text="Si se desmarca, el artículo no requerirá stock en inventario y no bloqueará confirmaciones."
