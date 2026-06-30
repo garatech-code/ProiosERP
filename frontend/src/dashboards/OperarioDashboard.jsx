@@ -32,7 +32,7 @@ export default function OperarioDashboard() {
       const res = await axios.get('/operaciones/operations/');
       setOperaciones(res.data);
       setError(null);
-      
+
       const ordersMap = {};
       for (const op of res.data) {
         try {
@@ -225,7 +225,7 @@ export default function OperarioDashboard() {
                   const ordenes = productionOrders[op.id] || [];
                   const tieneRemito = !!op.remito_file;
                   const productos = op.products || [];
-                  
+
                   return (
                     <div key={op.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden transition-all hover:shadow-md">
                       {/* Cabecera de operación */}
@@ -262,7 +262,7 @@ export default function OperarioDashboard() {
                               </p>
                             )}
                             <p className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap">
-                              <span className="font-bold text-gray-900 dark:text-white">Detalle:</span><br/> 
+                              <span className="font-bold text-gray-900 dark:text-white">Detalle:</span><br />
                               {op.detalle_servicio || <span className="italic text-gray-500">Sin detalle especificado</span>}
                             </p>
                             {op.herramientas_solicitud_particular && (
@@ -284,7 +284,7 @@ export default function OperarioDashboard() {
                                         );
                                       }
                                       return <span className="italic text-gray-500">No hay herramientas registradas</span>;
-                                    } catch(e) {
+                                    } catch (e) {
                                       return <span className="whitespace-pre-wrap">{op.herramientas_solicitud_particular}</span>;
                                     }
                                   })()}

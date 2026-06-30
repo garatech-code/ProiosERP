@@ -85,7 +85,7 @@ export default function OperationDetail() {
   const [cotizacionAdicional, setCotizacionAdicional] = useState('');
   const [detalleServicio, setDetalleServicio] = useState('');
   const [pnaText, setPnaText] = useState('');
-  
+
   // Parametros para generar Word
   const [offerValidityIsManual, setOfferValidityIsManual] = useState(false);
   const [offerValidity, setOfferValidity] = useState('15 days');
@@ -93,6 +93,17 @@ export default function OperationDetail() {
   const [paymentTerms, setPaymentTerms] = useState('30 days from invoice date');
   const [warrantyIsManual, setWarrantyIsManual] = useState(false);
   const [warranty, setWarranty] = useState('As per manufacturer');
+
+  // Parametros para generar PDF Servicios
+  const [servMobilization, setServMobilization] = useState('2-3 days after order confirmation.');
+  const [servExecution, setServExecution] = useState('1 day.');
+  const [servBankCharges, setServBankCharges] = useState('USD 50.00.');
+  const [servTaxes, setServTaxes] = useState('(ISS 3%): will be applied to the total invoice value accordingly.');
+  const [servPaymentTerms, setServPaymentTerms] = useState('To Be Negotiated.');
+  const [servTransport, setServTransport] = useState('Transportation of the rotor from the vessel to Barcarena/Belém and back (round trip) is to be arranged by and under the responsibility of the client/agents.');
+  const [servItems, setServItems] = useState([
+    { nombre: '', cantidad: 1, precio_unitario: '' }
+  ]);
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -365,20 +376,43 @@ export default function OperationDetail() {
     setShowCotizacionPdfModal(true);
   };
 
-  const handlePreviewCotizacionPdf = async () => {
+  const handleDownloadCotizacionServicio = async () => {
     try {
+      setActionLoading(true);
       if (detalleServicio !== operation?.detalle_servicio || cotizacionAdicional !== operation?.texto_cotizacion_adicional) {
-        await axios.patch(`/operaciones/operations/${id}/`, { 
+        await axios.patch(`/operaciones/operations/${id}/`, {
           detalle_servicio: detalleServicio,
           texto_cotizacion_adicional: cotizacionAdicional
         });
         fetchOperation();
       }
-      openPreview(`/api/operaciones/operations/${id}/generate_cotizacion_servicio/`);
+      const params = new URLSearchParams({
+        mobilization: servMobilization,
+        execution: servExecution,
+        bank_charges: servBankCharges,
+        taxes: servTaxes,
+        payment_terms: servPaymentTerms,
+        transport: servTransport,
+        custom_items: JSON.stringify(servItems.filter(i => i.nombre.trim() !== ''))
+      }).toString();
+      
+      const response = await axios.get(`/operaciones/operations/${id}/generate_cotizacion_servicio/?${params}`, {
+        responseType: 'blob',
+      });
+      const fileUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.setAttribute('download', `Cotizacion_Servicio_OP${id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
       setShowCotizacionPdfModal(false);
     } catch (err) {
       console.error(err);
-      showToast('Error al guardar los datos de cotización', 'error');
+      showToast('Error al descargar la cotización', 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -645,7 +679,7 @@ export default function OperationDetail() {
     try {
       const response = await axios.get(`/operaciones/operations/${id}/generate_solicitud_particular_pdf/`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      
+
       if (isDownload) {
         const link = document.createElement('a');
         link.href = url;
@@ -713,12 +747,29 @@ export default function OperationDetail() {
   const handleCotizarClick = async () => {
     setFetchingCotizacionFile(true);
     try {
-      const url = `/operaciones/operations/${id}/generate_cotizacion_servicio/`;
-      const response = await axios.get(url, { responseType: 'blob' });
-      const file = new File([response.data], `Cotizacion_OP${id}.pdf`, {
-        type: 'application/pdf'
-      });
-      setCotizacionEmailAttachment(file);
+      if (operation?.tipo === 'servicios') {
+        const paramsStr = new URLSearchParams({
+          mobilization: servMobilization,
+          execution: servExecution,
+          bank_charges: servBankCharges,
+          taxes: servTaxes,
+          payment_terms: servPaymentTerms,
+          transport: servTransport,
+        }).toString();
+        const url = `/operaciones/operations/${id}/generate_cotizacion_servicio/?${paramsStr}`;
+        const response = await axios.get(url, { responseType: 'blob' });
+        const file = new File([response.data], `Cotizacion_Servicio_OP${id}.docx`, {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+        setCotizacionEmailAttachment(file);
+      } else {
+        const url = `/operaciones/operations/${id}/generate_cotizacion_docx/`;
+        const response = await axios.get(url, { responseType: 'blob' });
+        const file = new File([response.data], `Cotizacion_OP${id}.docx`, {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+        setCotizacionEmailAttachment(file);
+      }
       setShowCotizacionEmailModal(true);
     } catch (error) {
       console.error(error);
@@ -1058,7 +1109,7 @@ export default function OperationDetail() {
             <div className="lg:col-span-2 space-y-6">
 
               {/* Added Generate Word Button Here as Requested */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 mb-6">
                   <div>
                     <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white">Generar Cotización (Word)</h3>
@@ -1070,7 +1121,7 @@ export default function OperationDetail() {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Offer Validity</label>
                       {!offerValidityIsManual ? (
-                        <select 
+                        <select
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                           value={offerValidity}
                           onChange={(e) => {
@@ -1088,15 +1139,15 @@ export default function OperationDetail() {
                         </select>
                       ) : (
                         <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${offerValidity.length > 35 ? 'border-orange-500' : ''}`} 
+                          <input
+                            type="text"
+                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${offerValidity.length > 35 ? 'border-orange-500' : ''}`}
                             value={offerValidity}
                             onChange={(e) => setOfferValidity(e.target.value)}
                             placeholder="Escriba..."
                             autoFocus
                           />
-                          <button onClick={() => {setOfferValidityIsManual(false); setOfferValidity('15 days');}} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                          <button onClick={() => { setOfferValidityIsManual(false); setOfferValidity('15 days'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
                         </div>
                       )}
                       {offerValidityIsManual && offerValidity.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
@@ -1105,7 +1156,7 @@ export default function OperationDetail() {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Payment Terms</label>
                       {!paymentTermsIsManual ? (
-                        <select 
+                        <select
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                           value={paymentTerms}
                           onChange={(e) => {
@@ -1124,15 +1175,15 @@ export default function OperationDetail() {
                         </select>
                       ) : (
                         <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${paymentTerms.length > 35 ? 'border-orange-500' : ''}`} 
+                          <input
+                            type="text"
+                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${paymentTerms.length > 35 ? 'border-orange-500' : ''}`}
                             value={paymentTerms}
                             onChange={(e) => setPaymentTerms(e.target.value)}
                             placeholder="Escriba..."
                             autoFocus
                           />
-                          <button onClick={() => {setPaymentTermsIsManual(false); setPaymentTerms('30 days from invoice date');}} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                          <button onClick={() => { setPaymentTermsIsManual(false); setPaymentTerms('30 days from invoice date'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
                         </div>
                       )}
                       {paymentTermsIsManual && paymentTerms.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
@@ -1141,7 +1192,7 @@ export default function OperationDetail() {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Warranty</label>
                       {!warrantyIsManual ? (
-                        <select 
+                        <select
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                           value={warranty}
                           onChange={(e) => {
@@ -1159,15 +1210,15 @@ export default function OperationDetail() {
                         </select>
                       ) : (
                         <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${warranty.length > 35 ? 'border-orange-500' : ''}`} 
+                          <input
+                            type="text"
+                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${warranty.length > 35 ? 'border-orange-500' : ''}`}
                             value={warranty}
                             onChange={(e) => setWarranty(e.target.value)}
                             placeholder="Escriba..."
                             autoFocus
                           />
-                          <button onClick={() => {setWarrantyIsManual(false); setWarranty('As per manufacturer');}} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                          <button onClick={() => { setWarrantyIsManual(false); setWarranty('As per manufacturer'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
                         </div>
                       )}
                       {warrantyIsManual && warranty.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
@@ -1181,6 +1232,119 @@ export default function OperationDetail() {
                       title="Descargar cotización generada en formato Word"
                     >
                       <i className="bi bi-file-word-fill"></i> Descargar Word
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PDF Settings for Services */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion === 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 mb-6">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-word-fill text-blue-500"></i> Generar Cotización de Servicio (Word)
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Configura los parámetros específicos que se incluirán en el documento de cotización de servicio.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tiempo de Movilización</label>
+                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servMobilization} onChange={(e) => setServMobilization(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tiempo de Ejecución</label>
+                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servExecution} onChange={(e) => setServExecution(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Cargos Bancarios (Bank charges)</label>
+                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servBankCharges} onChange={(e) => setServBankCharges(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Impuestos (Taxes)</label>
+                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servTaxes} onChange={(e) => setServTaxes(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Condiciones de Pago (Payment terms)</label>
+                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servPaymentTerms} onChange={(e) => setServPaymentTerms(e.target.value)} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Observaciones de Transporte</label>
+                      <textarea rows="2" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servTransport} onChange={(e) => setServTransport(e.target.value)} />
+                    </div>
+                    
+                    <div className="md:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
+                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ítems del Servicio (Aparecerán en la Sección "1. Items:")</label>
+                      {servItems.map((item, index) => (
+                        <div key={index} className="flex gap-2 mb-2 items-center">
+                          <input 
+                            type="text" 
+                            placeholder="Descripción (ej. Balancing...)" 
+                            className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 p-2 border sm:text-sm"
+                            value={item.nombre}
+                            onChange={(e) => {
+                              const newItems = [...servItems];
+                              newItems[index].nombre = e.target.value;
+                              setServItems(newItems);
+                            }}
+                          />
+                          <input 
+                            type="number" 
+                            placeholder="Cant." 
+                            className="w-20 rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 p-2 border sm:text-sm"
+                            value={item.cantidad}
+                            onChange={(e) => {
+                              const newItems = [...servItems];
+                              newItems[index].cantidad = e.target.value;
+                              setServItems(newItems);
+                            }}
+                          />
+                          <input 
+                            type="number" 
+                            placeholder="USD Unit." 
+                            className="w-28 rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 p-2 border sm:text-sm"
+                            value={item.precio_unitario}
+                            onChange={(e) => {
+                              const newItems = [...servItems];
+                              newItems[index].precio_unitario = e.target.value;
+                              setServItems(newItems);
+                            }}
+                          />
+                          <button 
+                            onClick={() => {
+                              const newItems = servItems.filter((_, i) => i !== index);
+                              setServItems(newItems);
+                            }}
+                            className="text-red-500 hover:text-red-700 p-2"
+                            title="Eliminar ítem"
+                          >
+                            <i className="bi bi-trash-fill"></i>
+                          </button>
+                        </div>
+                      ))}
+                      <button 
+                        onClick={() => setServItems([...servItems, { nombre: '', cantidad: 1, precio_unitario: '' }])}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1"
+                      >
+                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-start gap-4 pt-2">
+                    <button
+                      onClick={openCotizacionPdfModal}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <i className="bi bi-pencil-square"></i> Revisar Notas y Generar
+                    </button>
+                    <button
+                      onClick={handleDownloadCotizacionServicio}
+                      disabled={actionLoading}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2"
+                    >
+                      {actionLoading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <i className="bi bi-file-word-fill"></i>}
+                      Generar Directo (Word)
                     </button>
                   </div>
                 </div>
@@ -1260,102 +1424,102 @@ export default function OperationDetail() {
               {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
                   {!isOperario ? (
-                  <>
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                          <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
-                        </h3>
-                        {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                          <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white">
-                            {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
-                            Verificar Stock
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                        <thead>
-                          <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
-                            <th className="px-6 py-4 text-left">Producto</th>
-                            <th className="px-6 py-4 text-center">Cant.</th>
-                            <th className="px-6 py-4 text-center">Disponibilidad</th>
-                            <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
-                          {operation.products?.map((prod, idx) => {
-                            const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
-                            return (
-                              <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
-                                <td className="px-6 py-4">
-                                  <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
-                                </td>
-                                <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
-                                <td className="px-6 py-4 text-center">
-                                  {isSuficiente ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
-                                      <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase">
-                                      <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
-                                  ${(prod.quantity * prod.unit_price).toFixed(2)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
-                            <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
-                            <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                      <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                        <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
-                        <div>
-                          <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
-                          <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
-                            {stockVerification.errores?.map((err, idx) => (
-                              <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
-                                <div>
-                                  • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
-                                </div>
-                                {err.formula_shortage && err.formula_shortage.length > 0 && (
-                                  <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
-                                    <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
-                                      <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
-                                    </span>
-                                    <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
-                                      {err.formula_shortage.map((fS, fIdx) => (
-                                        <li key={fIdx}>
-                                          <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
+                    <>
+                      <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                            <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
+                          </h3>
+                          {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                            <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white">
+                              {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
+                              Verificar Stock
+                            </button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <OperarioActionPanel products={operation.products} />
-                )}
-              </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                          <thead>
+                            <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
+                              <th className="px-6 py-4 text-left">Producto</th>
+                              <th className="px-6 py-4 text-center">Cant.</th>
+                              <th className="px-6 py-4 text-center">Disponibilidad</th>
+                              <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+                            {operation.products?.map((prod, idx) => {
+                              const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
+                              return (
+                                <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
+                                  <td className="px-6 py-4">
+                                    <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
+                                  </td>
+                                  <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
+                                  <td className="px-6 py-4 text-center">
+                                    {isSuficiente ? (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
+                                        <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase">
+                                        <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
+                                    ${(prod.quantity * prod.unit_price).toFixed(2)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
+                              <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
+                              <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                        <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                          <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
+                          <div>
+                            <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
+                            <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
+                              {stockVerification.errores?.map((err, idx) => (
+                                <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
+                                  <div>
+                                    • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
+                                  </div>
+                                  {err.formula_shortage && err.formula_shortage.length > 0 && (
+                                    <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
+                                      <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
+                                        <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
+                                      </span>
+                                      <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
+                                        {err.formula_shortage.map((fS, fIdx) => (
+                                          <li key={fIdx}>
+                                            <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <OperarioActionPanel products={operation.products} />
+                  )}
+                </div>
               )}
 
               {(!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing' || productionOrders.length > 0)) && (
@@ -2203,13 +2367,13 @@ Saludos cordiales.`}
         </div>
       )}
 
-      {/* Modal para Editar Cotización PDF */}
+      {/* Modal para Editar Cotización PDF/Word */}
       {showCotizacionPdfModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
             <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
               <h3 className="text-lg leading-6 font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <i className="bi bi-file-earmark-pdf text-indigo-500"></i> Previsualizar / Editar Cotización
+                <i className="bi bi-file-word-fill text-blue-500"></i> Generar Documento de Cotización
               </h3>
               <button onClick={() => setShowCotizacionPdfModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
                 <i className="bi bi-x-lg"></i>
@@ -2243,10 +2407,11 @@ Saludos cordiales.`}
             <div className="px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 shrink-0">
               <button
                 type="button"
-                className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                onClick={handlePreviewCotizacionPdf}
+                className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                onClick={handleDownloadCotizacionServicio}
+                disabled={actionLoading}
               >
-                Previsualizar PDF
+                {actionLoading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : 'Descargar Word'}
               </button>
               <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowCotizacionPdfModal(false)}>
                 Cancelar

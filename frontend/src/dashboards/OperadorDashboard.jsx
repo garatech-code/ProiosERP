@@ -270,7 +270,7 @@ export default function OperadorDashboard() {
         <div className="animate-fadeIn bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 h-[700px] flex flex-col">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Agenda y Arribos Estimados (ETA)</h2>
-                <button 
+                <button
                     onClick={() => setAgendaEventModalState({ isOpen: true, eventToEdit: null })}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
                 >
@@ -360,8 +360,8 @@ export default function OperadorDashboard() {
                     </div>
                 ) : (
                     filteredOps?.map((op) => (
-                        <div 
-                            key={op.id} 
+                        <div
+                            key={op.id}
                             onClick={() => navigate(`/operations/${op.id}`)}
                             className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative cursor-pointer"
                         >

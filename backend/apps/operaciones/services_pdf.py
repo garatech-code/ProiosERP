@@ -19,10 +19,10 @@ def build_pdf_headers(doc, story, operacion, title):
     normal_style = styles['Normal']
     
     # Agregar logo si existe
-    logo_path = get_logo()
-    if logo_path:
-        img = RLImage(logo_path, width=4*cm, height=2*cm, kind='proportional')
-        story.append(img)
+    # logo_path = get_logo()
+    # if logo_path:
+    #     img = RLImage(logo_path, width=4*cm, height=2*cm, kind='proportional')
+    #     story.append(img)
     
     story.append(Spacer(1, 0.5*cm))
     story.append(Paragraph(title, title_style))
@@ -45,54 +45,116 @@ def build_pdf_headers(doc, story, operacion, title):
     story.append(Spacer(1, 1*cm))
     return story
 
-def generar_cotizacion_servicio_pdf(operacion):
+def generar_cotizacion_servicio_pdf(operacion, user, params):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
     story = []
     styles = getSampleStyleSheet()
     
-    story = build_pdf_headers(doc, story, operacion, "Cotización de Servicio")
+    # Custom styles
+    normal_style = styles['Normal']
+    normal_style.fontSize = 11
+    normal_style.leading = 14
+    bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName='Helvetica-Bold')
+    italic_style = ParagraphStyle('ItalicStyle', parent=normal_style, fontName='Helvetica-Oblique')
+    heading_style = ParagraphStyle('Heading', parent=normal_style, fontName='Helvetica-Bold', fontSize=12, spaceAfter=6, spaceBefore=12)
+    bullet_style = ParagraphStyle('Bullet', parent=normal_style, leftIndent=20, bulletIndent=10)
+
+    # Header Logo
+    # logo_path = get_logo()
+    # if logo_path:
+    #     img = RLImage(logo_path, width=5*cm, height=2.5*cm, kind='proportional')
+    #     # Center the logo using a table
+    #     t_logo = Table([[img]], colWidths=[17*cm])
+    #     t_logo.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+    #     story.append(t_logo)
     
-    # Detalle del servicio
-    story.append(Paragraph("<b>Detalle del Servicio:</b>", styles['Heading3']))
-    detalle = operacion.detalle_servicio or "No se especificaron detalles del servicio."
-    story.append(Paragraph(detalle.replace('\n', '<br/>'), styles['Normal']))
     story.append(Spacer(1, 1*cm))
     
-    forma_cotizacion = dict(operacion.COTIZACION_CHOICES).get(operacion.forma_cotizacion_servicio, operacion.forma_cotizacion_servicio)
-    story.append(Paragraph(f"<b>Forma de Cotización:</b> {forma_cotizacion}", styles['Normal']))
-    story.append(Spacer(1, 1*cm))
+    # Salutation
+    cliente_nombre = operacion.cliente.name if operacion.cliente else "Client"
+    story.append(Paragraph(f"Dear {cliente_nombre},", normal_style))
+    story.append(Spacer(1, 0.5*cm))
     
-    if operacion.texto_cotizacion_adicional:
-        story.append(Paragraph("<b>Condiciones / Notas Adicionales:</b>", styles['Heading3']))
-        story.append(Paragraph(operacion.texto_cotizacion_adicional.replace('\n', '<br/>'), styles['Normal']))
-        story.append(Spacer(1, 1*cm))
+    # Introduction
+    intro_text = operacion.detalle_servicio or "Please note below our quotation for the requested services."
+    story.append(Paragraph(intro_text.replace('\n', '<br/>'), normal_style))
+    story.append(Spacer(1, 0.5*cm))
     
-    # Precios
-    data = [['Descripción', 'Monto']]
+    # 1. Items
+    story.append(Paragraph("<b>1. Items:</b>", bold_style))
+    
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    items_data = []
+    
     total = 0
-    for det in operacion.detalles.all():
-        data.append([
-            f"{det.cantidad} x Item #{det.articulo_id}", 
-            f"USD {det.precio_unitario * det.cantidad:.2f}"
-        ])
-        total += (det.precio_unitario * det.cantidad)
+    for i, det in enumerate(operacion.detalles.all()):
+        letra = alphabet[i] if i < len(alphabet) else str(i+1)
+        nombre_item = det.articulo.nombre if det.articulo else f"Item #{det.articulo_id}"
+        precio_item = det.precio_unitario * det.cantidad
+        total += precio_item
+        texto_item = f"<b>{letra}.</b> {nombre_item} ({det.cantidad} un): <b>USD {precio_item:,.2f}</b> + taxes."
+        story.append(Paragraph(texto_item, bullet_style))
     
-    if len(data) > 1:
-        data.append(['TOTAL', f"USD {total:.2f}"])
-        t = Table(data, colWidths=[10*cm, 4*cm])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#093641')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 12),
-            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e2e8f0')),
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('GRID', (0,0), (-1,-1), 1, colors.black),
-        ]))
-        story.append(t)
+    story.append(Spacer(1, 0.5*cm))
+    
+    # Timings
+    if params.get('mobilization'):
+        story.append(Paragraph(f"<u>Estimated time for mobilization: {params['mobilization']}</u>", italic_style))
+    if params.get('execution'):
+        story.append(Paragraph(f"<u>Estimated time for the execution: {params['execution']}</u>", italic_style))
         
+    story.append(Spacer(1, 0.5*cm))
+    
+    # Notes / Additional Text (e.g. asterisks)
+    if operacion.texto_cotizacion_adicional:
+        # Reemplazar flechas si el usuario usa -> por la flecha del PDF
+        notas = operacion.texto_cotizacion_adicional.replace('->', '➔')
+        story.append(Paragraph(notas.replace('\n', '<br/>'), normal_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+    # 2. Administrative
+    story.append(Paragraph("<b>2. Administrative:</b>", bold_style))
+    if params.get('bank_charges'):
+        story.append(Paragraph(f"• Bank charges: {params['bank_charges']}", bullet_style))
+    if params.get('taxes'):
+        story.append(Paragraph(f"• Taxes {params['taxes']}", bullet_style))
+    if params.get('payment_terms'):
+        story.append(Paragraph(f"• Payment terms: {params['payment_terms']}", bullet_style))
+        
+    story.append(Spacer(1, 0.5*cm))
+    
+    # 3. Remarks
+    story.append(Paragraph("<b>3. Remarks:</b>", bold_style))
+    remark_1 = "<b><u>The final invoice may vary depending on actual service duration, onboard conditions, and any extra time or resources required.</u></b>"
+    story.append(Paragraph(f"• {remark_1}", bullet_style))
+    
+    if params.get('transport'):
+        remark_2 = f"<b><u>{params['transport']}</u></b>"
+        story.append(Paragraph(f"• {remark_2}", bullet_style))
+        
+    story.append(Spacer(1, 0.5*cm))
+    
+    story.append(Paragraph("Please check and advise.", normal_style))
+    story.append(Spacer(1, 1.5*cm))
+    
+    # Signature
+    story.append(Paragraph("Best regards,", normal_style))
+    story.append(Spacer(1, 0.5*cm))
+    
+    user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
+    user_email = user.email if user and user.email else ""
+    
+    firma_data = [
+        [Paragraph(f"<b>{user_name}</b><br/>Comercial / Operations<br/>{user_email}", normal_style)]
+    ]
+    t_firma = Table(firma_data, colWidths=[10*cm])
+    t_firma.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    story.append(t_firma)
+    
     doc.build(story)
     pdf = buffer.getvalue()
     buffer.close()

@@ -1,5 +1,7 @@
 import io
 import os
+import re
+import json
 from django.conf import settings
 from datetime import datetime
 from apps.inventario.models import Articulo
@@ -255,6 +257,242 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
     f_run.font.size = Pt(8)
     footer_p.add_run("\nPage X").font.size = Pt(8)
 
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    docx_bytes = buffer.getvalue()
+    buffer.close()
+    
+    return docx_bytes
+
+def generar_cotizacion_servicio_docx(operacion, user, params):
+    # Generar desde un docx en blanco
+    doc = Document()
+    
+    # Configurar márgenes si empezamos de cero (tamaño A4 estándar)
+    section = doc.sections[0]
+    section.page_width = Cm(21.0)
+    section.page_height = Cm(29.7)
+    section.top_margin = Cm(3.0)
+    section.bottom_margin = Cm(3.0)
+    section.left_margin = Cm(2.54)
+    section.right_margin = Cm(2.54)
+    
+    # Configurar logo en el header usando la función helper que ya tienes
+    insert_header_logo(doc)
+    
+    # Simular footer si empezamos de cero
+    footer = section.footer
+    fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = fp.add_run("Proios S.A. · Buenos Aires, Argentina · [address] | [tel.] | [email] | [web]")
+    run.font.color.rgb = RGBColor(0, 0, 255) # Azul
+    run.font.size = Pt(8)
+    run.font.name = 'Arial'
+
+    # Modificar el estilo "Normal" fue removido porque python-docx corrompe
+    # el XML base si se altera directamente el style.font.name sin configurar
+    # las fuentes eastAsia y complexScript correspondientes.
+    # Usaremos el helper add_run_arial para todas las inserciones.
+
+    # ------------------ HELPERS ------------------
+    def add_run_arial(paragraph, text, bold=False, italic=False, underline=False, color=None):
+        run = paragraph.add_run(text)
+        run.bold = bold
+        run.italic = italic
+        run.underline = underline
+        if color:
+            run.font.color.rgb = color
+        run.font.name = 'Arial'
+        return run
+
+    def add_text_with_red_asterisks(paragraph, text):
+        """Helper para resaltar (*) y (**) en color rojo (RGB: 255, 0, 0)"""
+        parts = re.split(r'(\(\*\*\)|\(\*\))', text)
+        for part in parts:
+            if part in ['(*)', '(**)']:
+                add_run_arial(paragraph, part, bold=True, color=RGBColor(255, 0, 0))
+            else:
+                add_run_arial(paragraph, part)
+
+    # ------------------ CONTENIDO ------------------
+    
+    # 1. Saludo
+    p_greeting = doc.add_paragraph()
+    cliente_nombre = operacion.cliente.name if operacion.cliente else "Client"
+    add_run_arial(p_greeting, f"Dear Ms./Mrs. {cliente_nombre},")
+    
+    doc.add_paragraph() # Espaciado
+    
+    # 2. Detalle del servicio
+    p_intro = doc.add_paragraph()
+    intro_text = operacion.detalle_servicio or "Please note below our quotation for the requested services."
+    add_run_arial(p_intro, intro_text)
+    
+    doc.add_paragraph() # Espaciado
+    
+    # 3. Transporte (antes de los items, según el screenshot)
+    if params.get('transport'):
+        p_transport = doc.add_paragraph()
+        add_run_arial(p_transport, params['transport'])
+        doc.add_paragraph()
+    
+    # 4. Items (Numeración y listado)
+    p_items_title = doc.add_paragraph()
+    add_run_arial(p_items_title, "1. Items:", bold=True)
+    
+    # Generar letras A, B, C... para los sub-items
+    letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    
+    custom_items_str = params.get('custom_items')
+    if custom_items_str:
+        try:
+            items_to_render = json.loads(custom_items_str)
+        except:
+            items_to_render = []
+    else:
+        # Fallback al original si existieran en DB
+        items_to_render = [
+            {'nombre': det.articulo.nombre if det.articulo else f"Item #{det.articulo_id}", 
+             'cantidad': det.cantidad, 
+             'precio_unitario': det.precio_unitario} 
+            for det in operacion.detalles.all()
+        ]
+        
+    for idx, item in enumerate(items_to_render):
+        p_item = doc.add_paragraph()
+        p_item.paragraph_format.left_indent = Cm(0.63) # Indentación para las letras
+        
+        letter = letters[idx] if idx < len(letters) else str(idx)
+        add_run_arial(p_item, f"{letter}. ", bold=True)
+        
+        # El nombre del artículo y los asteriscos
+        nombre_item = item.get('nombre', 'Item')
+        cantidad = float(item.get('cantidad', 1) or 1)
+        precio_unitario = float(item.get('precio_unitario', 0) or 0)
+        
+        add_text_with_red_asterisks(p_item, f"{nombre_item}: ")
+        
+        # Cálculo del precio, diferenciando si es tarifa diaria o valor total
+        if "/day" in nombre_item.lower():
+            add_run_arial(p_item, f"USD {precio_unitario:,.2f}/day", bold=True)
+        else:
+            total = precio_unitario * cantidad
+            add_run_arial(p_item, f"USD {total:,.2f}", bold=True)
+        
+        add_run_arial(p_item, " + taxes.")
+
+    doc.add_paragraph()
+    
+    # 5. Tiempos (mobilization / execution)
+    if params.get('mobilization'):
+        p_mob = doc.add_paragraph()
+        add_run_arial(p_mob, "Estimated time for mobilization: ", italic=True, underline=True)
+        add_run_arial(p_mob, f"{params.get('mobilization')}", italic=True, underline=True)
+        
+    if params.get('execution'):
+        p_exec = doc.add_paragraph()
+        add_run_arial(p_exec, "Estimated time for the execution: ", italic=True, underline=True)
+        add_run_arial(p_exec, f"{params.get('execution')}", italic=True, underline=True)
+    
+    # Agregar espacio solo si mostramos algún tiempo
+    if params.get('mobilization') or params.get('execution'):
+        doc.add_paragraph()
+
+    # 6. Texto de cotización adicional (Asteriscos, viñetas, notas rojas)
+    if operacion.texto_cotizacion_adicional:
+        for line in operacion.texto_cotizacion_adicional.split('\n'):
+            if line.strip():
+                # Hacemos un salto de página justo antes del texto que pediste para forzar la hoja 2
+                if "In case the execution of services during overtime" in line:
+                    doc.add_page_break()
+                    
+                p_add = doc.add_paragraph()
+                add_text_with_red_asterisks(p_add, line.strip())
+
+        doc.add_paragraph()
+
+    # 7. Administrative
+    p_admin = doc.add_paragraph()
+    add_run_arial(p_admin, "2. Administrative:", bold=True)
+    
+    admin_bullets = []
+    if params.get('bank_charges'): admin_bullets.append(f"Bank charges: {params['bank_charges']}")
+    if params.get('taxes'): admin_bullets.append(f"Taxes {params['taxes']}")
+    if params.get('payment_terms'): admin_bullets.append(f"Payment terms: {params['payment_terms']}")
+
+    for bullet in admin_bullets:
+        p_b = doc.add_paragraph()
+        p_b.paragraph_format.left_indent = Cm(1.0)
+        # Símbolo de viñeta (bullet) manual
+        add_run_arial(p_b, f"• {bullet}")
+        
+    doc.add_paragraph()
+
+    # 8. Remarks
+    p_rem = doc.add_paragraph()
+    add_run_arial(p_rem, "3. Remarks:", bold=True)
+    
+    remarks = [
+        "The final invoice may vary depending on actual service duration, onboard conditions, and any extra time or resources required.",
+        params.get('transport', '')
+    ]
+    for rem in remarks:
+        if rem.strip():
+            p_r = doc.add_paragraph()
+            p_r.paragraph_format.left_indent = Cm(1.0)
+            add_run_arial(p_r, "• ")
+            # Las notas de remarks en el PDF original están en negrita y subrayadas
+            add_run_arial(p_r, rem.strip(), bold=True, underline=True)
+
+    # 9. Cierre
+    p_check = doc.add_paragraph()
+    add_run_arial(p_check, "Please check and advise.")
+
+    # 10. Firma (Datos del User)
+    p_sig = doc.add_paragraph()
+    add_run_arial(p_sig, "Best regards,\n")
+    
+    # Para maquetar similar a la firma del screenshot (logo al lado del texto), 
+    # la opción más robusta por código es usar una tabla de 1 fila, 2 columnas, sin bordes.
+    sig_table = doc.add_table(rows=1, cols=2)
+    sig_table.autofit = False
+    
+    # Columna Izquierda (Espacio para el logo de la firma si hubiese)
+    cell_logo = sig_table.cell(0, 0)
+    cell_logo.width = Cm(5.0)
+    # cell_logo.paragraphs[0].add_run().add_picture('metalock_signature_logo.png', width=Cm(4.0))
+    
+    # Columna Derecha (Datos del User)
+    cell_data = sig_table.cell(0, 1)
+    cell_data.width = Cm(10.0)
+    p_data = cell_data.paragraphs[0]
+    
+    user_first_name = user.first_name if user and user.first_name else ""
+    user_last_name = user.last_name if user and user.last_name else ""
+    user_name = f"{user_first_name} {user_last_name}".strip() or (user.username if user else "Proios Representative")
+    
+    add_run_arial(p_data, f"{user_name}\n", bold=True)
+    add_run_arial(p_data, "Comercial\n", bold=True)
+    add_run_arial(p_data, "Tel.: +55 13 3226-4686\n") # Teléfono fijo de la empresa
+    add_run_arial(p_data, "Cel.: +55 13 99697-3059\n") # Celular (podría venir de user en el futuro)
+    
+    user_email = user.email if user and user.email else ""
+    if user_email:
+        run_email = add_run_arial(p_data, f"{user_email}")
+        run_email.font.color.rgb = RGBColor(0, 0, 255)
+        run_email.underline = True
+    
+    # Word requires the document to end with a paragraph, not a table.
+    # We add an empty paragraph to avoid the "Unreadable content" error.
+    last_p = doc.add_paragraph()
+    last_p.paragraph_format.space_after = Pt(0)
+    last_p.paragraph_format.space_before = Pt(0)
+    last_run = last_p.add_run()
+    last_run.font.size = Pt(1)
+    
+    # ==========================================
+    # GUARDAR DOCUMENTO
+    # ==========================================
     buffer = io.BytesIO()
     doc.save(buffer)
     docx_bytes = buffer.getvalue()

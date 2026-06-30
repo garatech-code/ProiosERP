@@ -89,7 +89,7 @@ export default function OwnerDashboard() {
                 const unread = res.data.filter(e => e.direction === 'inbound' && !e.is_read);
                 setUnreadEmailsCount(unread.length);
             }
-        } catch(err) {
+        } catch (err) {
             console.error(err);
         }
     };
@@ -366,7 +366,7 @@ export default function OwnerDashboard() {
                             <option key={op.id} value={op.id}>{formatUserName(op)}</option>
                         ))}
                     </select>
-                    <button 
+                    <button
                         onClick={() => setAgendaEventModalState({ isOpen: true, eventToEdit: null })}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
                     >
@@ -458,8 +458,8 @@ export default function OwnerDashboard() {
                     </div>
                 ) : (
                     opsToRender?.map((op) => (
-                        <div 
-                            key={op.id} 
+                        <div
+                            key={op.id}
                             onClick={() => navigate(`/operations/${op.id}`)}
                             className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all flex flex-col group relative cursor-pointer"
                         >
@@ -720,12 +720,12 @@ export default function OwnerDashboard() {
                             {activeTab === 'users' && 'Gestión de Usuarios'}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
-                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' : 
-                             activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' : 
-                             activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' :
-                             activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' : 
-                             activeTab === 'users' ? 'Crea y administra las cuentas de acceso web para tus empleados.' :
-                             'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                            {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' :
+                                activeTab === 'approvals' ? 'Verifica los reportes y aprueba los pasos administrativos de los operadores.' :
+                                    activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' :
+                                        activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' :
+                                            activeTab === 'users' ? 'Crea y administra las cuentas de acceso web para tus empleados.' :
+                                                'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">

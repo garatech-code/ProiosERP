@@ -812,7 +812,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                     onClick={() => setShowMultiSelectModal(true)}
                     className="text-sm font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                   >
-                    <span></span> Añadir items
+                    Añadir items
                   </button>
                 </div>
               </div>

@@ -933,11 +933,25 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def generate_cotizacion_servicio(self, request, pk=None):
         op = self.get_object()
-        from apps.operaciones.services_pdf import generar_cotizacion_servicio_pdf
+        from apps.operaciones.services_docx import generar_cotizacion_servicio_docx
+        
+        # Obtener parametros para el PDF
+        params = {
+            'mobilization': request.query_params.get('mobilization', '2-3 days after order confirmation.'),
+            'execution': request.query_params.get('execution', '1 day.'),
+            'bank_charges': request.query_params.get('bank_charges', 'USD 50.00.'),
+            'taxes': request.query_params.get('taxes', '(ISS 3%): will be applied to the total invoice value accordingly.'),
+            'payment_terms': request.query_params.get('payment_terms', 'To Be Negotiated.'),
+            'transport': request.query_params.get('transport', 'Transportation of the rotor from the vessel to Barcarena/Belém and back (round trip) is to be arranged by and under the responsibility of the client/agents.'),
+        }
+
         try:
-            pdf_content = generar_cotizacion_servicio_pdf(op)
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="cotizacion_OP{op.id}.pdf"'
+            docx_content = generar_cotizacion_servicio_docx(op, request.user, params)
+            response = HttpResponse(
+                docx_content, 
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            response['Content-Disposition'] = f'attachment; filename="cotizacion_servicio_OP{op.id}.docx"'
             return response
         except Exception as e:
             logger.exception("Error generando cotizacion de servicio")
