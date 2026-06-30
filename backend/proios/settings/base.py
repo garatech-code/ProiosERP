@@ -8,6 +8,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Cargar variables de entorno
 load_dotenv(BASE_DIR.parent / '.env')
 
+# Variables para MS Graph API (Correos)
+MS_GRAPH_TENANT_ID = os.environ.get("MS_GRAPH_TENANT_ID")
+MS_GRAPH_CLIENT_ID = os.environ.get("MS_GRAPH_CLIENT_ID")
+MS_GRAPH_CLIENT_SECRET = os.environ.get("MS_GRAPH_CLIENT_SECRET")
+MS_GRAPH_USER_EMAIL = os.environ.get("MS_GRAPH_USER_EMAIL", "operations@proios.com")
+
+
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-cambiame-en-prod')
 
 # DEBUG debe ser False en producción

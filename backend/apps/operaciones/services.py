@@ -75,12 +75,7 @@ class OperacionService:
 # Servicios de scraping y autocompletado por IMO
 # ----------------------------------------------------------------------
 def scrape_vessel_info(imo):
-    """
-    Extrae nombre, bandera, destino (puerto) y ETA de VesselFinder.
-    Retorna un dict con los datos o None si hay error.
-    - La lógica de ETA se mantiene exactamente como la versión que funciona bien.
-    - El resto (nombre, bandera, destino) se ha mejorado con múltiples estrategias y limpieza.
-    """
+  
     import re
     from datetime import datetime
     import requests
@@ -203,7 +198,7 @@ def scrape_vessel_info(imo):
         if dest_div:
             destino = dest_div.get_text(strip=True)
 
-    # ---------- ETA (EXACTAMENTE IGUAL A TU CÓDIGO QUE FUNCIONA) ----------
+    # ---------- ETA---------------------------------------------------
     eta_str = None
     eta_iso = None
     # Método 1: del párrafo "expected to arrive there on Apr 8, 14:00"
@@ -230,7 +225,7 @@ def scrape_vessel_info(imo):
             if match_eta:
                 eta_str = match_eta.group(1).strip()
 
-    # Parsear ETA a ISO (mismo código que usas)
+    # Parsear ETA a ISO 
     if eta_str:
         logger.info(f"ETA raw para IMO {imo}: {eta_str}")
         eta_clean = eta_str.replace('.', '').strip()
@@ -481,4 +476,4 @@ def generar_y_guardar_packing_list(op, proveedor="PROIOS SA", pais_destino="arge
     output.seek(0)
     
     filename = f"packing_list_{op.id}.xlsx"
-    op.packing_list_file.save(filename, ContentFile(output.getvalue()), save=True)
+    op.packing_list_file.save(filename, ContentFile(output.getvalue()), save=True)

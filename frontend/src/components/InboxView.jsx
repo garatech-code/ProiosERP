@@ -8,8 +8,10 @@ import LogoSpinner from './LogoSpinner';
 
 const getEmailPreview = (htmlOrText) => {
     if (!htmlOrText) return '(Sin contenido)';
+    // DOMPurify with ALLOWED_TAGS: [] drops all tags, including <style> and <script> contents
+    const cleanHtml = DOMPurify.sanitize(htmlOrText, { ALLOWED_TAGS: [] });
     const temp = document.createElement("div");
-    temp.innerHTML = htmlOrText;
+    temp.innerHTML = cleanHtml;
     const text = (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
     return text.length > 50 ? text.slice(0, 50) + '...' : text;
 };
@@ -26,11 +28,19 @@ export default function InboxView() {
   const [syncMessage, setSyncMessage] = useState('');
   const [isManageTemplatesOpen, setIsManageTemplatesOpen] = useState(false);
 
+  const processEmails = (data) => {
+    return data.map(e => ({
+      ...e,
+      _preview: getEmailPreview(e.body_html || e.body_text)
+    }));
+  };
+
   const fetchEmails = async () => {
     try {
       setLoading(true);
       const res = await axios.get('/correos/inbox/');
-      setEmails(res.data);
+      const data = res.data.results ? res.data.results : res.data;
+      setEmails(processEmails(data));
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,7 +52,10 @@ export default function InboxView() {
     fetchEmails();
     // Pooling cada silencioso 60 segundos por si entran nuevos
     const interval = setInterval(() => {
-      axios.get('/correos/inbox/').then((res) => setEmails(res.data)).catch(console.error);
+      axios.get('/correos/inbox/').then((res) => {
+        const data = res.data.results ? res.data.results : res.data;
+        setEmails(processEmails(data));
+      }).catch(console.error);
     }, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -164,7 +177,7 @@ export default function InboxView() {
                 </div>
                 <h4 className="text-sm text-gray-800 dark:text-slate-200 truncate">{email.subject || '(Sin Asunto)'}</h4>
                 <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-1">
-                  {getEmailPreview(email.body_html || email.body_text)}
+                  {email._preview}
                 </p>
                 {email.operacion && (
                   <span className="inline-block mt-2 px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-bold rounded">

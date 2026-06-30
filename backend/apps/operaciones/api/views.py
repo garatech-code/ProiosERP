@@ -108,18 +108,68 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
         qs = Operacion.objects.all()
 
-        total = qs.count()
-        en_proceso = qs.exclude(estado__in=[
+        # Operaciones
+        total_ops = qs.count()
+        ops_en_proceso = qs.exclude(estado__in=[
             Operacion.ESTADO_ENTREGADA,
             Operacion.ESTADO_CANCELADA
         ]).count()
-        finalizadas = qs.filter(estado=Operacion.ESTADO_ENTREGADA).count()
+        ops_finalizadas = qs.filter(estado=Operacion.ESTADO_ENTREGADA).count()
+        ops_canceladas = qs.filter(estado=Operacion.ESTADO_CANCELADA).count()
+        ops_revision = qs.filter(estado_revision=Operacion.ESTADO_REVISION_PENDING).count()
+
+        ops_productos = qs.filter(tipo_operacion='productos').count()
+        ops_quimicos = qs.filter(tipo_operacion='quimicos').count()
+        ops_servicios = qs.filter(tipo_operacion='servicios').count()
+        ops_otros = qs.filter(tipo_operacion='otros').count()
+
+        # Usuarios
         usuarios_activos = User.objects.filter(is_active=True).count()
+        usuarios_owner = User.objects.filter(is_active=True, role=User.Role.OWNER).count()
+        
+        # Safe handling of roles that might not exist in older migrations
+        operador_jr_role = getattr(User.Role, 'OPERADOR_JR', 'OPERADOR_JR')
+        usuarios_operador = User.objects.filter(is_active=True, role__in=[User.Role.OPERADOR, operador_jr_role]).count()
+        usuarios_operario = User.objects.filter(is_active=True, role=User.Role.OPERARIO).count()
+
+        # Inventario
+        from apps.inventario.models import Articulo
+        from django.db.models import F
+        total_articulos = Articulo.objects.count()
+        articulos_bajo_stock = Articulo.objects.filter(controlar_stock=True, stock_actual__lte=F('stock_minimo')).count()
+        articulos_quimicos = Articulo.objects.filter(categoria='quimicos').count()
+        articulos_otros = total_articulos - articulos_quimicos
 
         return Response({
-            'total': total,
-            'en_proceso': en_proceso,
-            'finalizadas': finalizadas,
+            'operaciones': {
+                'total': total_ops,
+                'en_proceso': ops_en_proceso,
+                'finalizadas': ops_finalizadas,
+                'canceladas': ops_canceladas,
+                'revision': ops_revision,
+                'por_tipo': {
+                    'productos': ops_productos,
+                    'quimicos': ops_quimicos,
+                    'servicios': ops_servicios,
+                    'otros': ops_otros
+                }
+            },
+            'usuarios': {
+                'activos': usuarios_activos,
+                'owner': usuarios_owner,
+                'operadores': usuarios_operador,
+                'operarios': usuarios_operario
+            },
+            'inventario': {
+                'total_articulos': total_articulos,
+                'bajo_stock': articulos_bajo_stock,
+                'quimicos': articulos_quimicos,
+                'otros': articulos_otros
+            },
+            # Retrocompatibilidad
+            'total': total_ops,
+            'en_proceso': ops_en_proceso,
+            'finalizadas': ops_finalizadas,
             'usuarios_activos': usuarios_activos
         })
 

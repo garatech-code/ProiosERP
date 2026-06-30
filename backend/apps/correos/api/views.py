@@ -5,6 +5,12 @@ from rest_framework.response import Response
 from django.db.models import Q
 from apps.correos.models import EmailMessage, EmailTemplate
 from apps.correos.api.serializers import EmailMessageSerializer, EmailTemplateSerializer
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 500
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:  # type: ignore
@@ -21,6 +27,7 @@ class EmailTemplateViewSet(viewsets.ModelViewSet):
 class EmailMessageViewSet(viewsets.ModelViewSet):
     queryset = EmailMessage.objects.all().order_by('-date_received')  # type: ignore
     serializer_class = EmailMessageSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -54,8 +61,9 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='sync_now')
     def sync_now(self, request):
         from apps.correos.tasks import sync_outlook_inbox
-        msg = sync_outlook_inbox()  # type: ignore
-        return Response({'status': msg})
+        # Ejecutar de forma asíncrona para no bloquear la interfaz
+        sync_outlook_inbox.delay() 
+        return Response({'status': 'Sincronización solicitada'})
 
     @action(detail=False, methods=['post'], url_path='send_email')
     def send_email(self, request):
