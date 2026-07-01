@@ -351,12 +351,19 @@ def generar_cotizacion_servicio_docx(operacion, user, params):
             items_to_render = []
     else:
         # Fallback al original si existieran en DB
-        items_to_render = [
-            {'nombre': det.articulo.nombre if det.articulo else f"Item #{det.articulo_id}", 
-             'cantidad': det.cantidad, 
-             'precio_unitario': det.precio_unitario} 
-            for det in operacion.detalles.all()
-        ]
+        from apps.inventario.models import Articulo
+        items_to_render = []
+        for det in operacion.detalles.all():
+            try:
+                articulo = Articulo.objects.get(id=det.articulo_id)
+                nombre = articulo.nombre
+            except Articulo.DoesNotExist:
+                nombre = f"Item #{det.articulo_id}"
+            items_to_render.append({
+                'nombre': nombre,
+                'cantidad': det.cantidad,
+                'precio_unitario': det.precio_unitario
+            })
         
     for idx, item in enumerate(items_to_render):
         p_item = doc.add_paragraph()
@@ -499,3 +506,66 @@ def generar_cotizacion_servicio_docx(operacion, user, params):
     buffer.close()
     
     return docx_bytes
+
+from docxtpl import DocxTemplate
+
+def generar_remito_docx(operacion):
+    """
+    Genera el remito manteniendo 100% los espacios y formato originales.
+    Utiliza docxtpl para renderizar sobre una plantilla sin romper la maquetación.
+    """
+    # Cargar la plantilla.
+    template_path = os.path.join(settings.BASE_DIR, 'static_local', 'REMITO_TEMPLATE.docx')
+    if not os.path.exists(template_path):
+        template_path = os.path.join(settings.BASE_DIR, 'REMITO_TEMPLATE.docx')
+        
+    doc = DocxTemplate(template_path)
+    
+    now = datetime.now()
+    dia = now.strftime("%d")
+    mes = now.strftime("%m")
+    anio = now.strftime("%Y")
+    
+    buque = operacion.ship.name if operacion.ship else ''
+    puerto = operacion.port.name if operacion.port else ''
+    buque_y_puerto = f"{buque} / {puerto}"
+    
+    from apps.inventario.models import Articulo
+    
+    detalles = list(operacion.detalles.all())
+    items = []
+    for idx, det in enumerate(detalles, start=1):
+        try:
+            articulo = Articulo.objects.get(id=det.articulo_id)
+            nombre = articulo.nombre
+        except Articulo.DoesNotExist:
+            nombre = f"Articulo #{det.articulo_id}"
+            
+        cantidad = det.cantidad
+        items.append(f"ITEM {idx} : {nombre} : {cantidad} UNIDADES")
+        
+    texto_items = "\n\n".join(items)
+    
+    # Rellenar con saltos de línea si hay menos de 5 ítems para mantener la firma fija
+    items_faltantes = 5 - len(detalles)
+    if items_faltantes > 0:
+        # Por cada ítem faltante, agregamos su espacio (un doble salto de línea)
+        texto_items += "\n\n" * items_faltantes
+        
+    context = {
+        'dia': dia,
+        'mes': mes,
+        'anio': anio,
+        'buque_y_puerto': buque_y_puerto,
+        'items': texto_items
+    }
+    
+    doc.render(context)
+    
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    docx_bytes = buffer.getvalue()
+    buffer.close()
+    
+    return docx_bytes
+

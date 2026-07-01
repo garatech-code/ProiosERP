@@ -90,8 +90,9 @@ export default function OwnerDashboard() {
     const fetchUnreadEmails = async () => {
         try {
             const res = await axios.get('/correos/inbox/?unread=true');
-            if (res.data && Array.isArray(res.data)) {
-                const unread = res.data.filter(e => e.direction === 'inbound' && !e.is_read);
+            const data = res.data.results || res.data;
+            if (data && Array.isArray(data)) {
+                const unread = data.filter(e => e.direction === 'inbound' && !e.is_read);
                 setUnreadEmailsCount(unread.length);
             }
         } catch (err) {

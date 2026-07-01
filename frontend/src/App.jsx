@@ -7,6 +7,7 @@ import DashboardRouter from './components/DashboardRouter';
 import OperationFormProductos from './components/OperationFormProductos';
 import OperationDetail from './components/OperationDetail';
 import ChangePassword from './components/ChangePassword';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -96,7 +97,7 @@ const AppRoutes = () => {
       <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
       <Route path="/operations/new" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id/edit" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
-      <Route path="/operations/:id" element={<ProtectedRoute><OperationDetail /></ProtectedRoute>} />
+      <Route path="/operations/:id" element={<ProtectedRoute><ErrorBoundary><OperationDetail /></ErrorBoundary></ProtectedRoute>} />
     </Routes>
   );
 };

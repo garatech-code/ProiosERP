@@ -88,9 +88,14 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
     items_data = []
     
     total = 0
+    from apps.inventario.models import Articulo
     for i, det in enumerate(operacion.detalles.all()):
         letra = alphabet[i] if i < len(alphabet) else str(i+1)
-        nombre_item = det.articulo.nombre if det.articulo else f"Item #{det.articulo_id}"
+        try:
+            articulo = Articulo.objects.get(id=det.articulo_id)
+            nombre_item = articulo.nombre
+        except Articulo.DoesNotExist:
+            nombre_item = f"Item #{det.articulo_id}"
         precio_item = det.precio_unitario * det.cantidad
         total += precio_item
         texto_item = f"<b>{letra}.</b> {nombre_item} ({det.cantidad} un): <b>USD {precio_item:,.2f}</b> + taxes."

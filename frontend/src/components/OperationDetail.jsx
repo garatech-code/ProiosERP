@@ -125,7 +125,7 @@ export default function OperationDetail() {
   const fetchEmails = async () => {
     try {
       const res = await axios.get(`/correos/inbox/?operacion_id=${id}`);
-      setEmails(res.data);
+      setEmails(res.data.results || res.data || []);
     } catch (err) {
       console.error("Error fetching emails:", err);
     }
@@ -441,6 +441,24 @@ export default function OperationDetail() {
       showToast('Error al descargar la cotización en Word', 'error');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleGenerateRemito = async () => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/generate_remito_docx/`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Remito_OP${id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Error generando remito:", error);
+      showToast('Error al generar el remito. Verifique que exista la plantilla.', 'error');
     }
   };
 
@@ -1036,6 +1054,12 @@ export default function OperationDetail() {
               )}
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                onClick={handleGenerateRemito}
+                className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                PROBAR DOCX
+              </button>
               <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 hidden sm:block">Hola, {formatUserName(user)}</span>
               <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors" title="Cerrar sesión">
                 <i className="bi bi-box-arrow-right text-lg"></i>

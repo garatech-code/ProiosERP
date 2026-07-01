@@ -387,6 +387,24 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
     }
   };
 
+  const handleGenerateRemito = async () => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/generate_remito_docx/`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Remito_OP${id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Error generando remito:", error);
+      alert("Error al generar el remito. Verifique que exista la plantilla.");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!hasPermission) return;
@@ -503,9 +521,20 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
             {id ? `Editar Operación #${id}` : 'Nueva Operación'}
           </h2>
-          <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+          <div className="flex gap-3 items-center">
+            {id && (
+              <button
+                type="button"
+                onClick={handleGenerateRemito}
+                className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                PROBAR DOCX
+              </button>
+            )}
+            <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 dark:bg-slate-600 hover:bg-gray-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
@@ -875,10 +904,19 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                         <a href={existingFiles.remito_file} target="_blank" rel="noreferrer" className="text-emerald-600 text-xs font-medium hover:underline">Ver Archivo</a>
                       ) : <span className="text-xs text-gray-400">Sin archivo</span>}
                     </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
-                    </label>
+                    <div className="flex flex-col gap-2 mt-3">
+                      <label className="cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                        {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleGenerateRemito}
+                        className="bg-indigo-50 text-indigo-700 py-1.5 px-3 text-center rounded text-xs font-bold hover:bg-indigo-100 transition-colors"
+                      >
+                        Generar DOCX
+                      </button>
+                    </div>
                   </div>
 
                   <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">

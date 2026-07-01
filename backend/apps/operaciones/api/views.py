@@ -351,6 +351,20 @@ class OperacionViewSet(viewsets.ModelViewSet):
             logger.exception("Error generando PDF de solicitud particular")
             return Response({'error': str(e)}, status=400)
 
+    @action(detail=True, methods=['get'], url_path='generate_remito_docx')
+    def generate_remito_docx(self, request, pk=None):
+        op = self.get_object()
+        from apps.operaciones.services_docx import generar_remito_docx
+        try:
+            docx_bytes = generar_remito_docx(op)
+            from django.http import HttpResponse
+            response = HttpResponse(docx_bytes, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            response['Content-Disposition'] = f'attachment; filename="Remito_OP{op.id}.docx"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando Remito DOCX")
+            return Response({'error': str(e)}, status=400)
+
     @action(detail=True, methods=['get'], url_path='packing_list_json')
     def packing_list_json(self, request, pk=None):
         op = self.get_object()

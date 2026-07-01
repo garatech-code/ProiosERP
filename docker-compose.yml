@@ -30,10 +30,10 @@ services:
     container_name: proios_backend
     restart: always
     command: gunicorn proios.wsgi:application --bind 0.0.0.0:8000
-    # volumes:
-    #  - ./backend:/app
-    #  - static_volume:/app/static
-    #  - media_volume:/app/media
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
     env_file:
       - .env
     environment:
@@ -54,8 +54,8 @@ services:
     container_name: proios_celery_worker
     restart: always
     command: celery -A proios worker -l info
-    # volumes:
-    #  - ./backend:/app
+    volumes:
+      - ./backend:/app
     env_file:
       - .env
     environment:
@@ -74,8 +74,8 @@ services:
     container_name: proios_celery_beat
     restart: always
     command: celery -A proios beat -l info
-    # volumes:
-    #  - ./backend:/app
+    volumes:
+      - ./backend:/app
     env_file:
       - .env
     environment:

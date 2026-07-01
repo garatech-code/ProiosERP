@@ -21,7 +21,7 @@ export default function OperationEmails({ operacionId, defaultRecipient, openPre
 
     const fetchEmails = useCallback(() => {
         axios.get(`/correos/inbox/?operacion_id=${operacionId}`)
-            .then(res => setEmails(res.data))
+            .then(res => setEmails(res.data.results || res.data || []))
             .catch(console.error);
     }, [operacionId]);
 
