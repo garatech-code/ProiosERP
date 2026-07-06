@@ -19,6 +19,12 @@ try:
         DEFAULT_FONT = 'Tahoma'
         DEFAULT_FONT_BOLD = 'Tahoma-Bold'
         DEFAULT_FONT_OBLIQUE = 'Tahoma-Oblique'
+        
+        from reportlab.lib.fonts import addMapping
+        addMapping('Tahoma', 0, 0, 'Tahoma')
+        addMapping('Tahoma', 1, 0, 'Tahoma-Bold')
+        addMapping('Tahoma', 0, 1, 'Tahoma-Oblique')
+        addMapping('Tahoma', 1, 1, 'Tahoma-Oblique')
     else:
         DEFAULT_FONT = 'Helvetica'
         DEFAULT_FONT_BOLD = 'Helvetica-Bold'
@@ -319,173 +325,796 @@ from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
 import io
 from datetime import datetime
 
-def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]"):
+def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21"):
+    import os
+    import io
+    from datetime import datetime
+    from django.conf import settings
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, KeepTogether
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+    from reportlab.lib.units import cm
+    from reportlab.lib.pagesizes import A4
+    
     buffer = io.BytesIO()
-    # Margins: Top, Bottom, Left, Right
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2.5*cm)
+    # Margins: A4 is 21cm x 29.7cm.
+    # Left/Right 1.5cm = 18cm content width.
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=3*cm)
     story = []
     
     styles = getSampleStyleSheet()
     normal_style = styles['Normal']
-    normal_style.fontSize = 10
-    normal_style.leading = 14
+    normal_style.fontSize = 9
+    normal_style.leading = 13
+    normal_style.textColor = HexColor('#1e293b') # Dark slate instead of pure black
     normal_style.fontName = DEFAULT_FONT
     
     bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD)
-    title_style = ParagraphStyle('TitleStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=14, alignment=TA_CENTER, spaceAfter=20)
-    right_style = ParagraphStyle('RightStyle', parent=normal_style, alignment=TA_RIGHT)
-    total_style = ParagraphStyle('TotalStyle', parent=normal_style, alignment=TA_RIGHT, fontName=DEFAULT_FONT_BOLD, fontSize=12)
-    footer_style = ParagraphStyle('FooterStyle', parent=normal_style, alignment=TA_CENTER, fontSize=8, textColor=colors.gray)
     
-    # 1. Header Information
+    title_style = ParagraphStyle('TitleStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=28, leading=32, textColor=HexColor('#003366'), alignment=TA_LEFT, spaceAfter=0)
+    
+    card_title_style = ParagraphStyle('CardTitle', parent=bold_style, fontSize=8, textColor=HexColor('#64748b'), spaceAfter=6, textTransform='uppercase')
+    
+    # --- 1. HEADER (TITLE & LOGO) ---
+    logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
+    logo_img = ""
+    if os.path.exists(logo_path):
+        logo_img = Image(logo_path, width=4.5*cm, height=4.5*cm, kind='proportional')
+        
+    header_top = Table([
+        [Paragraph("QUOTATION", title_style), logo_img]
+    ], colWidths=[13*cm, 5*cm])
+    header_top.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+    ]))
+    story.append(header_top)
+    story.append(Spacer(1, 0.5*cm))
+    
+    # --- 2. HEADER CARDS (FROM / TO / DETAILS) ---
     buque = operacion.ship.name if operacion.ship else "[Vessel Name]"
     puerto = operacion.port.name if operacion.port else "[Port]"
     eta_str = operacion.eta.strftime("%d/%m/%Y") if operacion.eta else "[ETA]"
-    agencia = operacion.agency.name if operacion.agency else "[Agency]"
     cliente_nombre = operacion.cliente.name if operacion.cliente else "[Client Name]"
+    current_date = datetime.now().strftime('%d %b %Y')
     
-    # Left Header
-    story.append(Paragraph(f"<b>To:</b> {cliente_nombre}", normal_style))
-    story.append(Paragraph(f"<b>Attn.:</b> Operations / Technical Department", normal_style))
-    story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph(f"<b>M/V:</b> {buque}", normal_style))
-    story.append(Paragraph(f"<b>Port:</b> {puerto}", normal_style))
-    story.append(Paragraph(f"<b>ETA:</b> {eta_str}", normal_style))
-    story.append(Paragraph(f"<b>Agency:</b> {agencia}", normal_style))
-    story.append(Spacer(1, 0.5*cm))
+    from_html = "<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>Tel:</font> +549 11 57265031<br/><font color='#64748b'>Email:</font> eva@proios.com"
+    to_html = f"<b>{cliente_nombre}</b><br/><br/><br/><font color='#64748b'>Attn:</font><br/>{attn}"
+    details_html = f"<b>No. PS-COT-{operacion.id:04d}</b><br/>Date: {current_date}<br/>Valid: {offer_validity}<br/><br/>Vessel: <b>{buque}</b><br/>Port: {puerto}<br/>ETA: {eta_str}"
     
-    # Right Header
-    story.append(Paragraph("<b>From:</b> Eva Proios", normal_style))
-    story.append(Paragraph("Operations Department", normal_style))
-    story.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%B %d, %Y')}", normal_style))
+    card_from = [Paragraph("FROM", card_title_style), Paragraph(from_html, normal_style)]
+    card_to = [Paragraph("TO", card_title_style), Paragraph(to_html, normal_style)]
+    card_details = [Paragraph("DETAILS", card_title_style), Paragraph(details_html, normal_style)]
+    
+    # 18cm total width = 5.6cm + 0.6cm + 5.6cm + 0.6cm + 5.6cm
+    cards_table = Table([
+        [card_from, "", card_to, "", card_details]
+    ], colWidths=[5.6*cm, 0.6*cm, 5.6*cm, 0.6*cm, 5.6*cm])
+    
+    cards_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        # Card 1
+        ('BACKGROUND', (0,0), (0,0), HexColor('#f8fafc')),
+        ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')),
+        ('TOPPADDING', (0,0), (0,0), 12), ('BOTTOMPADDING', (0,0), (0,0), 12),
+        ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
+        # Card 2
+        ('BACKGROUND', (2,0), (2,0), HexColor('#f8fafc')),
+        ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')),
+        ('TOPPADDING', (2,0), (2,0), 12), ('BOTTOMPADDING', (2,0), (2,0), 12),
+        ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
+        # Card 3
+        ('BACKGROUND', (4,0), (4,0), HexColor('#f8fafc')),
+        ('BOX', (4,0), (4,0), 0.5, HexColor('#e2e8f0')),
+        ('TOPPADDING', (4,0), (4,0), 12), ('BOTTOMPADDING', (4,0), (4,0), 12),
+        ('LEFTPADDING', (4,0), (4,0), 12), ('RIGHTPADDING', (4,0), (4,0), 12),
+    ]))
+    story.append(cards_table)
     story.append(Spacer(1, 1*cm))
     
-    # 2. Title
-    story.append(Paragraph("QUOTATION", title_style))
+    from apps.inventario.models import Articulo
+    import json
     
-    # 3. Intro
-    tipo = operacion.tipo_operacion or ""
+    grupos = {}
+    detalles = list(operacion.detalles.all())
+    for det in detalles:
+        try:
+            articulo = Articulo.objects.get(id=det.articulo_id)
+            cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
+            desc = articulo.nombre
+            unit = str(articulo.unidad) if articulo.unidad else "u"
+        except Articulo.DoesNotExist:
+            cat = "GENERAL"
+            desc = f"Item #{det.articulo_id}"
+            unit = "u"
+
+        cat = cat.upper()
+        if cat not in grupos:
+            grupos[cat] = []
+        grupos[cat].append({
+            'desc': desc,
+            'qty': float(det.cantidad),
+            'unit': unit,
+            'price': float(det.precio_unitario) if det.precio_unitario else 0.0
+        })
+
+    try:
+        if isinstance(custom_items, str):
+            custom_items_list = json.loads(custom_items)
+        else:
+            custom_items_list = custom_items
+            
+        print(f"DEBUG custom_items parsed: {custom_items_list}")
+            
+        if isinstance(custom_items_list, list):
+            if 'SERVICES' not in grupos:
+                grupos['SERVICES'] = []
+            for c_item in custom_items_list:
+                qty = c_item.get('cantidad', 1)
+                if not qty or str(qty).strip() == '': qty = 1
+                price = c_item.get('precio_unitario', 0)
+                if not price or str(price).strip() == '': price = 0
+                
+                qty = float(qty)
+                price = float(price)
+                grupos['SERVICES'].append({
+                    'desc': c_item.get('nombre', ''),
+                    'qty': qty,
+                    'unit': 'UN',
+                    'price': price,
+                    'amount': qty * price
+                })
+        print(f"DEBUG grupos after custom items: {grupos}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"DEBUG ERROR custom_items: {e}")
+
+    has_items = sum(len(items) for items in grupos.values()) > 0
+    total_general = 0
+
+    # --- 3. ITEMS INTRO ---
     tipo_mapped = "products"
-    if tipo == 'quimicos': tipo_mapped = "chemicals"
-    elif tipo == 'servicios': tipo_mapped = "services"
-    elif tipo == 'otros': tipo_mapped = "spare parts"
+    if operacion.tipo_operacion == 'quimicos': tipo_mapped = "chemicals"
+    elif operacion.tipo_operacion == 'servicios': tipo_mapped = "services"
+    elif operacion.tipo_operacion == 'otros': tipo_mapped = "spare parts"
     
-    story.append(Paragraph(f"We are pleased to submit our quotation for the supply of <b>{tipo_mapped}</b>, as detailed below:", normal_style))
+    intro_style = ParagraphStyle('Intro', parent=normal_style, fontSize=10, textColor=HexColor('#334155'))
+    story.append(Paragraph(f"We are pleased to submit our quotation for the supply of <b>{tipo_mapped}</b>, as detailed below:", intro_style))
     story.append(Spacer(1, 0.5*cm))
     
-    # 4. Items Table
-    table_data = [["No.", "Description", "Category", "Qty.", "Unit", "Unit price", "Total amount"]]
-    total_usd = 0.0
-    detalles = operacion.detalles.all()
+    # --- 4. ITEMS TABLE (MODERN EDITORIAL) ---
+    th_style = ParagraphStyle('TH', parent=bold_style, textColor=colors.white, fontSize=9)
+    th_right = ParagraphStyle('THR', parent=th_style, alignment=TA_RIGHT)
+    th_center = ParagraphStyle('THC', parent=th_style, alignment=TA_CENTER)
+    
+    table_data = []
+    table_data.append([
+        Paragraph("No.", th_center),
+        Paragraph("Description", th_style),
+        Paragraph("Qty", th_center),
+        Paragraph("Unit", th_center),
+        Paragraph("Unit price (USD)", th_right),
+        Paragraph("Amount (USD)", th_right)
+    ])
     
     from apps.inventario.models import Articulo
+    grupos = {}
+    detalles = list(operacion.detalles.all())
+    for det in detalles:
+        try:
+            articulo = Articulo.objects.get(id=det.articulo_id)
+            cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
+            desc = articulo.nombre
+            unit = str(articulo.unidad) if articulo.unidad else "u"
+        except Articulo.DoesNotExist:
+            cat = "GENERAL"
+            desc = f"Item #{det.articulo_id}"
+            unit = "u"
+            
+        cat = cat.upper()
+        if cat not in grupos:
+            grupos[cat] = []
+        grupos[cat].append({
+            'desc': desc,
+            'qty': float(det.cantidad),
+            'unit': unit,
+            'price': float(det.precio_unitario) if det.precio_unitario else 0.0
+        })
+        
+    total_general = 0
+    idx = 1
     
-    if detalles:
-        for idx, det in enumerate(detalles, start=1):
-            qty = det.cantidad
-            price = float(det.precio_unitario)
-            amount = qty * price
-            total_usd += amount
-            try:
-                articulo = Articulo.objects.get(id=det.articulo_id)
-                desc = articulo.nombre
-                cat = str(articulo.categoria) if articulo.categoria else ""
-                unit = str(articulo.unidad) if articulo.unidad else "u"
-            except Articulo.DoesNotExist:
-                desc = f"Articulo #{det.articulo_id}"
-                cat = ""
-                unit = "u"
-            table_data.append([str(idx), desc, cat, str(qty), str(unit), f"{price:.2f}", f"{amount:.2f}"])
-    else:
-        table_data.append(["1", operacion.detalle_servicio or "[Description of product]", "[Chemicals]", "0", "u", "0.00", "0.00"])
-        table_data.append(["", "", "", "", "", "", ""])
-        table_data.append(["", "", "", "", "", "", ""])
+    tr_style = ParagraphStyle('TR', parent=normal_style)
+    tr_right = ParagraphStyle('TRR', parent=tr_style, alignment=TA_RIGHT)
+    tr_center = ParagraphStyle('TRC', parent=tr_style, alignment=TA_CENTER)
+    
+    for cat_name, items in grupos.items():
+        table_data.append([Paragraph(f"<b>{cat_name}</b>", ParagraphStyle('Cat', parent=bold_style, textColor=HexColor('#003366'))), "", "", "", "", ""])
+        subtotal_cat = 0
+        for item in items:
+            qty = item['qty']
+            price = item['price']
+            sub = qty * price
+            subtotal_cat += sub
+            total_general += sub
+            
+            table_data.append([
+                Paragraph(str(idx), tr_center),
+                Paragraph(item['desc'], tr_style),
+                Paragraph(str(int(qty) if qty.is_integer() else qty), tr_center),
+                Paragraph(item['unit'], tr_center),
+                Paragraph(f"{price:,.2f}", tr_right),
+                Paragraph(f"{sub:,.2f}", tr_right)
+            ])
+            idx += 1
+            
+        table_data.append([
+            Paragraph(f"Subtotal {cat_name.lower()}", ParagraphStyle('SubCat', parent=normal_style, textColor=HexColor('#64748b'))),
+            "", "", "", "",
+            Paragraph(f"<b>{subtotal_cat:,.2f}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
+        ])
 
-    t = Table(table_data, colWidths=[1*cm, 6*cm, 3*cm, 1.5*cm, 1.5*cm, 2*cm, 2*cm])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-        ('FONTNAME', (0,0), (-1,0), DEFAULT_FONT_BOLD),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
-        ('BOX', (0,0), (-1,-1), 0.25, colors.black),
-    ]))
-    story.append(t)
-    story.append(Spacer(1, 0.5*cm))
+    # 18cm total width
+    col_widths = [1.2*cm, 7.8*cm, 1.5*cm, 1.5*cm, 2.8*cm, 3.2*cm]
+    t = Table(table_data, colWidths=col_widths)
     
-    # 5. Totals
-    if str(include_vat).lower() == 'true' or include_vat is True:
-        story.append(Paragraph(f"Subtotal:       {total_usd:.2f}", right_style))
-        story.append(Paragraph(f"VAT (21%):      {(float(total_usd) * 0.21):.2f}", right_style))
-        story.append(Paragraph(f"TOTAL USD:      {(float(total_usd) * 1.21):.2f}", total_style))
-    else:
-        story.append(Paragraph(f"TOTAL USD:      {float(total_usd):.2f}", total_style))
-    
-    story.append(PageBreak())
-    
-    # 6. TERMS
-    story.append(Paragraph("<b>TERMS</b>", bold_style))
-    terms_data = [
-        ["Currency", "USD / ARS"],
-        ["Offer validity", offer_validity],
-        ["Payment terms", payment_terms],
-        ["Delivery time", f"{delivery_time} days" if delivery_time else "[e.g. 5 business days from PO]"],
-        ["Place of delivery", f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse / on board M/V ____]"]
-    ]
-    
-    t_terms = Table(terms_data, colWidths=[4*cm, 13*cm])
-    t_terms.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (0,-1), DEFAULT_FONT_BOLD),
+    ts = TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), HexColor('#003366')), # Header blue
         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('TOPPADDING', (0,0), (-1,0), 8),
+    ])
+    
+    row_idx = 1
+    for cat_name, items in grupos.items():
+        # Category header
+        ts.add('BACKGROUND', (0, row_idx), (-1, row_idx), HexColor('#f1f5f9'))
+        ts.add('SPAN', (0, row_idx), (-1, row_idx))
+        ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+        ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+        row_idx += 1
+        
+        # Items
+        for _ in items:
+            ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+            ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
+            ts.add('LINEBELOW', (0, row_idx), (-1, row_idx), 0.5, HexColor('#e2e8f0'))
+            row_idx += 1
+            
+        # Subtotal
+        ts.add('SPAN', (0, row_idx), (4, row_idx))
+        ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+        ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
+        row_idx += 1
+
+    t.setStyle(ts)
+    story.append(t)
+    story.append(Spacer(1, 0.8*cm))
+    
+    # --- 5. TOTALS PANEL (FINANCIAL HIGHLIGHT) ---
+    # We want a card-like total block aligned to the right.
+    tot_label_style = ParagraphStyle('TotL', parent=normal_style, alignment=TA_RIGHT, textColor=HexColor('#475569'))
+    tot_val_style = ParagraphStyle('TotV', parent=normal_style, alignment=TA_RIGHT)
+    tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_RIGHT, fontSize=12, textColor=HexColor('#003366'))
+    tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=14, textColor=HexColor('#003366'))
+    
+    if str(include_vat).lower() == 'true' or include_vat is True:
+        tot_data = [
+            [Paragraph("Subtotal:", tot_label_style), Paragraph(f"USD {total_general:,.2f}", tot_val_style)],
+            [Paragraph("VAT (21%):", tot_label_style), Paragraph(f"USD {(float(total_general) * 0.21):,.2f}", tot_val_style)],
+            [Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {(float(total_general) * 1.21):,.2f}", tot_final_val)]
+        ]
+    else:
+        tot_data = [
+            [Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)]
+        ]
+
+    # Create an inner table for the numbers, then put it in a master table to align it right.
+    t_tot_inner = Table(tot_data, colWidths=[3.5*cm, 4*cm])
+    t_tot_inner.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-2), 4),
+        ('TOPPADDING', (0,0), (-1,-2), 4),
+        ('BOTTOMPADDING', (0,-1), (-1,-1), 10),
+        ('TOPPADDING', (0,-1), (-1,-1), 10),
+        ('LINEABOVE', (0,-1), (-1,-1), 1, HexColor('#cbd5e1')),
     ]))
-    story.append(t_terms)
-    story.append(Spacer(1, 0.5*cm))
     
-    # 7. SCOPE
-    story.append(Paragraph("<b>SCOPE</b>", bold_style))
-    story.append(Paragraph("<b>Includes:</b>", normal_style))
-    story.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
-    story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("<b>Excludes:</b>", normal_style))
-    story.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
-    story.append(Spacer(1, 0.5*cm))
+    # Wrap in a card
+    t_tot_outer = Table([
+        ["", t_tot_inner]
+    ], colWidths=[10*cm, 8*cm])
     
-    # 8. NOTES
-    story.append(Paragraph("<b>NOTES</b>", bold_style))
-    notes_lines = [
+    t_tot_outer.setStyle(TableStyle([
+        ('BACKGROUND', (1,0), (1,0), HexColor('#f8fafc')),
+        ('BOX', (1,0), (1,0), 1, HexColor('#003366')),
+        # Left border extra thick for styling
+        ('LINEBEFORE', (1,0), (1,0), 4, HexColor('#003366')),
+        ('LEFTPADDING', (1,0), (1,0), 10),
+        ('RIGHTPADDING', (1,0), (1,0), 10),
+        ('TOPPADDING', (1,0), (1,0), 10),
+        ('BOTTOMPADDING', (1,0), (1,0), 10),
+    ]))
+    
+    story.append(t_tot_outer)
+    story.append(PageBreak())
+    
+    # --- 6. PAGE 2: TWO COLUMN LAYOUT ---
+    h_style = ParagraphStyle('HStyle', parent=bold_style, fontSize=12, textColor=HexColor('#003366'), spaceAfter=12)
+    
+    # Left Column: TERMS
+    left_col = []
+    left_col.append(Paragraph("TERMS & CONDITIONS", h_style))
+    terms_data = [
+        [Paragraph("<b>Currency</b>", normal_style), Paragraph("USD", normal_style)],
+        [Paragraph("<b>Offer validity</b>", normal_style), Paragraph(offer_validity, normal_style)],
+        [Paragraph("<b>Payment terms</b>", normal_style), Paragraph(payment_terms, normal_style)],
+        [Paragraph("<b>Delivery time</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
+        [Paragraph("<b>Place of delivery</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)]
+    ]
+    t_terms = Table(terms_data, colWidths=[3.2*cm, 5.3*cm])
+    t_terms.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 0.25, HexColor('#e2e8f0')),
+    ]))
+    left_col.append(t_terms)
+    
+    # Right Column: SCOPE & NOTES
+    right_col = []
+    right_col.append(Paragraph("SCOPE OF SUPPLY", h_style))
+    right_col.append(Paragraph("<b>Includes:</b>", bold_style))
+    right_col.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
+    right_col.append(Spacer(1, 0.4*cm))
+    right_col.append(Paragraph("<b>Excludes:</b>", bold_style))
+    right_col.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
+    right_col.append(Spacer(1, 0.8*cm))
+    
+    right_col.append(Paragraph("TECHNICAL NOTES", h_style))
+    notes_list = [
         "Prices subject to confirmation of stock and availability at the time of the purchase order.",
         "Quantities and specifications to be confirmed by the client before dispatch."
     ]
-    if notes and str(notes).strip() != "":
-        for nl in str(notes).strip().split('\n'):
-            if nl.strip():
-                notes_lines.append(nl.strip())
+    if notes and str(notes).strip():
+        notes_list.append(str(notes).strip())
+    
+    for nl in notes_list:
+        right_col.append(Paragraph(f"• {nl}", normal_style))
+        right_col.append(Spacer(1, 0.2*cm))
+        
+    # Put them in a 2-column table
+    page2_table = Table([
+        [left_col, "", right_col]
+    ], colWidths=[8.5*cm, 1*cm, 8.5*cm])
+    page2_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(page2_table)
+    
+    story.append(Spacer(1, 2*cm))
+    
+    # --- 7. SIGNATURE BLOCK ---
+    sig_table = Table([
+        [
+            Paragraph("Yours faithfully,", normal_style),
+            ""
+        ],
+        [
+            Paragraph("<b>Eva Proios</b><br/>Operations – Proios S.A.<br/><font color='#64748b'>eva@proios.com · +549 11 57265031</font>", normal_style),
+            ""
+        ]
+    ], colWidths=[8.5*cm, 9.5*cm])
+    sig_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (1,0), (1,0), 30),
+        ('LINEABOVE', (0,1), (0,1), 1, HexColor('#cbd5e1')),
+        ('TOPPADDING', (0,1), (0,1), 10),
+    ]))
+    
+    # Use KeepTogether to avoid signature splitting
+    story.append(KeepTogether(sig_table))
+    
+    # --- 8. SOLID CORPORATE FOOTER (CALLBACK) ---
+    def add_proios_corporate_footer(canvas, doc):
+        canvas.saveState()
+        # Draw a solid blue bar at the absolute bottom
+        canvas.setFillColor(HexColor('#003366'))
+        canvas.rect(0, 0, A4[0], 1.5*cm, fill=1, stroke=0)
+        
+        canvas.setFillColor(colors.white)
+        canvas.setFont(DEFAULT_FONT, 7.5)
+        footer_text = "Proios S.A. | Comodoro Pedro Zanni 351 floor 5th 503 LN. Buenos Aires (C1104AAH) Argentina | +549 11 57265031 | eva@proios.com | WWW.PROIOS.COM"
+        canvas.drawCentredString(A4[0]/2.0, 0.6*cm, footer_text)
+        
+        canvas.restoreState()
+        
+    doc.build(story, onFirstPage=add_proios_corporate_footer, onLaterPages=add_proios_corporate_footer)
+    return buffer.getvalue()
+
+
+def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21"):
+    import os
+    import io
+    from datetime import datetime
+    from django.conf import settings
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, KeepTogether, HRFlowable
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+    from reportlab.lib.units import cm
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    
+    # Translations
+    t = {
+        'en': {
+            'cat_quimicos': 'Chemicals', 'cat_productos': 'Products', 'cat_servicios': 'Services', 'cat_general': 'General',
+            'quotation': 'QUOTATION', 'from': 'FROM', 'to': 'TO',
+            'no': 'No.', 'date': 'Date', 'valid': 'Valid', 'vessel': 'Vessel', 'port': 'Port', 'location': 'Location', 'eta': 'ETA',
+            'intro': 'We are pleased to submit our quotation for the works detailed below:',
+            'intro_products': 'We are pleased to submit our quotation for the supply of products, as detailed below:',
+            'items': 'ITEMS', 'desc': 'Description', 'cat': 'Category', 'qty': 'Qty', 'unit': 'Unit', 'price': 'Unit price', 'amount': 'Amount',
+            'subtotal': 'Subtotal', 'vat': 'VAT', 'total': 'TOTAL', 'terms': 'TERMS',
+            'currency': 'Currency', 'offer_val': 'Offer validity', 'payment': 'Payment terms', 'delivery': 'Delivery time',
+            'place': 'Place of delivery', 'warranty': 'Warranty', 'taxes': 'Taxes',
+            'damage_desc': 'DAMAGE DESCRIPTION', 'loc_damage': 'Location and damage', 'frames': 'Frame(s)', 'area': 'Area L x H (mm)',
+            'scope': 'SCOPE', 'includes': 'Includes:', 'excludes': 'Excludes:', 'notes': 'NOTES',
+            'faithfully': 'Yours faithfully,', 'attn': 'Attn:'
+        },
+        'es': {
+            'cat_quimicos': 'Químicos', 'cat_productos': 'Productos', 'cat_servicios': 'Servicios', 'cat_general': 'General',
+            'quotation': 'COTIZACIÓN', 'from': 'DE', 'to': 'PARA',
+            'no': 'No.', 'date': 'Fecha', 'valid': 'Validez', 'vessel': 'Buque', 'port': 'Puerto', 'location': 'Ubicación', 'eta': 'ETA',
+            'intro': 'Nos complace presentar nuestra cotización por los trabajos detallados a continuación:',
+            'intro_products': 'Nos complace presentar nuestra cotización por el suministro de productos detallado a continuación:',
+            'items': 'ARTÍCULOS', 'desc': 'Descripción', 'cat': 'Categoría', 'qty': 'Cant.', 'unit': 'Unidad', 'price': 'Precio unit.', 'amount': 'Importe',
+            'subtotal': 'Subtotal', 'vat': 'IVA', 'total': 'TOTAL', 'terms': 'TÉRMINOS',
+            'currency': 'Moneda', 'offer_val': 'Validez de oferta', 'payment': 'Forma de pago', 'delivery': 'Tiempo de entrega',
+            'place': 'Lugar de entrega', 'warranty': 'Garantía', 'taxes': 'Impuestos',
+            'damage_desc': 'DESCRIPCIÓN DE DAÑOS', 'loc_damage': 'Ubicación y daño', 'frames': 'Cuaderna(s)', 'area': 'Área L x H (mm)',
+            'scope': 'ALCANCE', 'includes': 'Incluye:', 'excludes': 'Excluye:', 'notes': 'NOTAS',
+            'faithfully': 'Atentamente,', 'attn': 'Atención:'
+        }
+    }
+    
+    txt = t.get(lang, t['en'])
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=2*cm)
+    story = []
+    
+    styles = getSampleStyleSheet()
+    normal_style = styles['Normal']
+    normal_style.fontSize = 9
+    normal_style.leading = 12
+    normal_style.fontName = DEFAULT_FONT
+    normal_style.textColor = colors.black
+    
+    bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD)
+    
+    title_style = ParagraphStyle('TitleStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=24, leading=28, textColor=colors.black, alignment=TA_LEFT)
+    
+    # --- 1. HEADER (TITLE & LOGO) ---
+    logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
+    logo_img = ""
+    if os.path.exists(logo_path):
+        logo_img = Image(logo_path, width=4.5*cm, height=4.5*cm, kind='proportional')
+        
+    header_top = Table([
+        [Paragraph(txt['quotation'], title_style), logo_img]
+    ], colWidths=[13*cm, 5*cm])
+    header_top.setStyle(TableStyle([
+        ('VALIGN', (0,0), (0,0), 'BOTTOM'), # QUOTATION bottom aligned
+        ('VALIGN', (1,0), (1,0), 'MIDDLE'), # Logo middle aligned to avoid bottom transparent padding pushing text up
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(header_top)
+    story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#87CEEB'), spaceBefore=0, spaceAfter=10))
+    
+    # --- 2. 3-COLUMN INFO ---
+    buque = operacion.ship.name if operacion.ship else "[Vessel]"
+    puerto = operacion.port.name if operacion.port else "[Port]"
+    eta_str = operacion.eta.strftime("%d/%m/%Y") if operacion.eta else "[ETA]"
+    cliente_nombre = operacion.cliente.name if operacion.cliente else "[Client Name]"
+    current_date = datetime.now().strftime('%d %b %Y')
+    
+    from_html = f"<b>Proios S.A.</b><br/>Buenos Aires, Argentina<br/>Comodoro Pedro Zanni 351,<br/>5th Fl. – 503 LN (C1104AAH)<br/><i>info@proios.com</i>"
+    to_html = f"<b>{cliente_nombre}</b><br/>{txt['attn']} {attn}"
+    
+    loc_lbl = txt['location'] if operacion.tipo_operacion == 'servicios' else txt['port']
+    details_html = f"<b>{txt['no']}</b> {operacion.id:04d}<br/><b>{txt['date']}</b> {current_date}<br/><b>{txt['valid']}</b> {offer_validity}<br/><b>{txt['vessel']}</b> {buque}<br/><b>{loc_lbl}</b> {puerto}<br/><b>{txt['eta']}</b> {eta_str}"
+    
+    card_title_style = ParagraphStyle('CardTitle', parent=bold_style, fontSize=8, spaceAfter=4)
+    
+    card_from = [Paragraph(txt['from'], card_title_style), Paragraph(from_html, normal_style)]
+    card_to = [Paragraph(txt['to'], card_title_style), Paragraph(to_html, normal_style)]
+    card_details = [Paragraph(txt['quotation'], card_title_style), Paragraph(details_html, normal_style)]
+    
+    info_table = Table([
+        [card_from, card_to, card_details]
+    ], colWidths=[6.5*cm, 6.5*cm, 5*cm])
+    
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 15),
+    ]))
+    story.append(info_table)
+    
+    from apps.inventario.models import Articulo
+    import json
+    
+    grupos = {}
+    detalles = list(operacion.detalles.all())
+    for det in detalles:
+        try:
+            articulo = Articulo.objects.get(id=det.articulo_id)
+            cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
+            desc = articulo.nombre
+            unit = str(articulo.unidad) if articulo.unidad else "u"
+        except Articulo.DoesNotExist:
+            cat = "GENERAL"
+            desc = f"Item #{det.articulo_id}"
+            unit = "u"
+
+        cat = cat.upper()
+        if cat not in grupos:
+            grupos[cat] = []
+        grupos[cat].append({
+            'desc': desc,
+            'qty': float(det.cantidad),
+            'unit': unit,
+            'price': float(det.precio_unitario) if det.precio_unitario else 0.0
+        })
+
+    try:
+        if isinstance(custom_items, str):
+            custom_items_list = json.loads(custom_items)
+        else:
+            custom_items_list = custom_items
+            
+        print(f"DEBUG custom_items parsed: {custom_items_list}")
+            
+        if isinstance(custom_items_list, list):
+            if 'SERVICES' not in grupos:
+                grupos['SERVICES'] = []
+            for c_item in custom_items_list:
+                qty = c_item.get('cantidad', 1)
+                if not qty or str(qty).strip() == '': qty = 1
+                price = c_item.get('precio_unitario', 0)
+                if not price or str(price).strip() == '': price = 0
                 
-    for nl in notes_lines:
+                qty = float(qty)
+                price = float(price)
+                grupos['SERVICES'].append({
+                    'desc': c_item.get('nombre', ''),
+                    'qty': qty,
+                    'unit': 'UN',
+                    'price': price,
+                    'amount': qty * price
+                })
+        print(f"DEBUG grupos after custom items: {grupos}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"DEBUG ERROR custom_items: {e}")
+
+    has_items = sum(len(items) for items in grupos.values()) > 0
+    total_general = 0
+
+    # --- 3. ITEMS INTRO ---
+    if has_items:
+        intro_text = txt['intro'] if operacion.tipo_operacion == 'servicios' else txt['intro_products']
+        story.append(Paragraph(intro_text, normal_style))
+        story.append(Spacer(1, 0.4*cm))
+        story.append(Paragraph(f"<b>{txt['items']}</b>", card_title_style))
+        story.append(Spacer(1, 0.2*cm))
+    
+    # --- 4. ITEMS TABLE ---
+    if has_items:
+
+        th_style = ParagraphStyle('TH', parent=bold_style, fontSize=8)
+        th_right = ParagraphStyle('THR', parent=th_style, alignment=TA_RIGHT)
+        th_center = ParagraphStyle('THC', parent=th_style, alignment=TA_CENTER)
+
+        table_data = []
+        table_data.append([
+            Paragraph(txt['no'], th_center),
+            Paragraph(txt['desc'], th_style),
+            Paragraph(txt['qty'], th_center),
+            Paragraph(txt['unit'], th_center),
+            Paragraph(txt['price'], th_right),
+            Paragraph(txt['amount'], th_right)
+        ])
+
+
+
+        total_general = 0
+        idx = 1
+
+        tr_style = ParagraphStyle('TR', parent=normal_style)
+        tr_right = ParagraphStyle('TRR', parent=tr_style, alignment=TA_RIGHT)
+        tr_center = ParagraphStyle('TRC', parent=tr_style, alignment=TA_CENTER)
+
+        for cat_name, items in grupos.items():
+            trans_cat_title = txt.get(f"cat_{cat_name.lower().strip()}", cat_name).upper()
+            table_data.append([Paragraph(f"<b>{trans_cat_title}</b>", bold_style), "", "", "", "", ""])
+            subtotal_cat = 0
+            for item in items:
+                qty = item['qty']
+                price = item['price']
+                sub = qty * price
+                subtotal_cat += sub
+                total_general += sub
+
+                table_data.append([
+                    Paragraph(str(idx), tr_center),
+                    Paragraph(item['desc'], tr_style),
+                    Paragraph(str(int(qty) if qty.is_integer() else qty), tr_center),
+                    Paragraph(item['unit'], tr_center),
+                    Paragraph(f"{price:,.2f}", tr_right),
+                    Paragraph(f"{sub:,.2f}", tr_right)
+                ])
+                idx += 1
+
+            trans_cat_lower = txt.get(f"cat_{cat_name.lower().strip()}", cat_name).lower()
+            table_data.append([
+                Paragraph(f"{txt['subtotal']} {trans_cat_lower}", normal_style),
+                "", "", "", "",
+                Paragraph(f"<b>{subtotal_cat:,.2f}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
+            ])
+
+        col_widths = [1*cm, 8.5*cm, 1.5*cm, 1.5*cm, 2.5*cm, 3*cm]
+        t = Table(table_data, colWidths=col_widths)
+
+        ts = TableStyle([
+            ('LINEABOVE', (0,0), (-1,0), 1, HexColor('#87CEEB')), # Top blue line
+            ('LINEBELOW', (0,0), (-1,0), 1, HexColor('#87CEEB')), # Bottom blue line for header
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0,0), (-1,0), 4),
+            ('TOPPADDING', (0,0), (-1,0), 4),
+        ])
+
+        row_idx = 1
+        for cat_name, items in grupos.items():
+            ts.add('BACKGROUND', (0, row_idx), (-1, row_idx), HexColor('#e2e8f0')) # Darker grey category so it is visible!
+            ts.add('SPAN', (0, row_idx), (-1, row_idx))
+            row_idx += 1
+
+            for _ in items:
+                ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 4)
+                ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 4)
+                ts.add('LINEBELOW', (0, row_idx), (-1, row_idx), 0.25, colors.lightgrey)
+                row_idx += 1
+
+            ts.add('SPAN', (0, row_idx), (4, row_idx))
+            row_idx += 1
+
+        # Bottom blue line for whole table
+        ts.add('LINEBELOW', (0, row_idx-1), (-1, row_idx-1), 1, HexColor('#87CEEB'))
+
+        t.setStyle(ts)
+        story.append(t)
+        story.append(Spacer(1, 0.4*cm))
+
+        # --- 5. TOTALS ---
+        tot_label_style = ParagraphStyle('TotL', parent=normal_style, alignment=TA_LEFT)
+        tot_val_style = ParagraphStyle('TotV', parent=normal_style, alignment=TA_RIGHT)
+        tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_LEFT, fontSize=11)
+        tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=11)
+
+        if str(include_vat).lower() == 'true' or include_vat is True:
+            tot_data = [
+                [Paragraph(txt['subtotal'], tot_label_style), Paragraph(f"{total_general:,.2f}", tot_val_style)],
+                [Paragraph(txt['vat'], tot_label_style), Paragraph(f"{(float(total_general) * 0.21):,.2f}", tot_val_style)],
+                [Paragraph(f"<b>{txt['total']}</b>", tot_final_label), Paragraph(f"<b>USD<br/>{(float(total_general) * 1.21):,.2f}</b>", tot_final_val)]
+            ]
+        else:
+            tot_data = [
+                [Paragraph(f"<b>{txt['total']}</b>", tot_final_label), Paragraph(f"<b>USD<br/>{float(total_general):,.2f}</b>", tot_final_val)]
+            ]
+
+        t_tot = Table(tot_data, colWidths=[2.5*cm, 3*cm])
+        t_tot.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
+            ('BOTTOMPADDING', (0,0), (-1,-2), 2),
+            ('TOPPADDING', (0,0), (-1,-2), 2),
+            ('LINEABOVE', (0,-1), (-1,-1), 1, HexColor('#87CEEB')), # Blue line before total
+        ]))
+
+        # Wrap to align right
+        t_tot_wrap = Table([
+            ["", t_tot]
+        ], colWidths=[12.5*cm, 5.5*cm])
+        t_tot_wrap.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
+        story.append(t_tot_wrap)
+        story.append(Spacer(1, 0.6*cm))
+
+
+    # --- 6. TERMS ---
+
+    story.append(Paragraph(f"<b>{txt['terms']}</b>", card_title_style))
+    story.append(Spacer(1, 0.2*cm))
+    terms_data = [
+        [Paragraph(f"<b>{txt['currency']}</b>", normal_style), Paragraph("USD", normal_style)],
+        [Paragraph(f"<b>{txt['offer_val']}</b>", normal_style), Paragraph(offer_validity, normal_style)],
+        [Paragraph(f"<b>{txt['payment']}</b>", normal_style), Paragraph(payment_terms, normal_style)],
+        [Paragraph(f"<b>{txt['delivery']}</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
+        [Paragraph(f"<b>{txt['place']}</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)],
+        [Paragraph(f"<b>{txt['taxes']}</b>", normal_style), Paragraph(f"VAT {vat_percentage}%" if (str(include_vat).lower() == 'true' or include_vat is True) else "Not included", normal_style)]
+    ]
+    t_terms = Table(terms_data, colWidths=[3.5*cm, 14.5*cm])
+    t_terms.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+    story.append(KeepTogether(t_terms))
+    story.append(Spacer(1, 0.6*cm))
+    
+    # --- 7. DAMAGE DESCRIPTION (If apply) ---
+    if operacion.tipo_operacion == 'servicios':
+        story.append(Paragraph(f"<b>{damage_subject if damage_subject else txt['damage_desc']}</b>", card_title_style))
+        story.append(Spacer(1, 0.2*cm))
+        dmg_data = [
+            [Paragraph(f"<b>{damage_location_title if damage_location_title else txt['loc_damage']}</b>", normal_style), Paragraph(f"<b>{damage_frames_title if damage_frames_title else txt['frames']}</b>", normal_style), Paragraph(f"<b>{damage_area_title if damage_area_title else txt['area']}</b>", normal_style)],
+            [Paragraph(damage_location if damage_location else "-", normal_style), Paragraph(damage_frames if damage_frames else "-", normal_style), Paragraph(damage_area if damage_area else "-", normal_style)]
+        ]
+        t_dmg = Table(dmg_data, colWidths=[9*cm, 4.5*cm, 4.5*cm])
+        t_dmg.setStyle(TableStyle([
+            ('LINEABOVE', (0,0), (-1,0), 1, HexColor('#87CEEB')),
+            ('LINEBELOW', (0,0), (-1,0), 1, HexColor('#87CEEB')),
+            ('LINEBELOW', (0,-1), (-1,-1), 1, HexColor('#87CEEB')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+        ]))
+        story.append(KeepTogether(t_dmg))
+        
+    story.append(PageBreak())
+    
+    # --- 8. PAGE 2 (SCOPE & NOTES) ---
+    story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#87CEEB'), spaceBefore=2, spaceAfter=15))
+    story.append(Paragraph(f"<b>{txt['scope']}</b>", card_title_style))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph(f"<b>{txt['includes']}</b> {scope_includes}", normal_style))
+    story.append(Paragraph(f"<b>{txt['excludes']}</b> {scope_excludes}", normal_style))
+    story.append(Spacer(1, 0.6*cm))
+    
+    story.append(Paragraph(f"<b>{txt['notes']}</b>", card_title_style))
+    story.append(Spacer(1, 0.2*cm))
+    notes_list = []
+    if notes and str(notes).strip():
+        notes_list.append(str(notes).strip())
+    
+    for nl in notes_list:
         story.append(Paragraph(f"– {nl}", normal_style))
         
     story.append(Spacer(1, 1.5*cm))
     
-    # 9. SIGNATURE
-    story.append(Paragraph("Yours faithfully,", normal_style))
-    story.append(Spacer(1, 1*cm))
+    # --- 9. SIGNATURE ---
+    story.append(Paragraph(txt['faithfully'], normal_style))
+    story.append(Spacer(1, 0.8*cm))
     story.append(Paragraph("<b>Eva Proios</b>", normal_style))
     story.append(Paragraph("Operations – Proios S.A.", normal_style))
-    story.append(Paragraph("eva@proios.com · +549 11 57265031", normal_style))
+    story.append(Paragraph("eva@proios.com", normal_style))
     
-    # Helper to add footer
-    def add_footer(canvas, doc):
+    # Footer
+    def add_proios_footer(canvas, doc):
         canvas.saveState()
-        canvas.setFont(DEFAULT_FONT, 8)
         canvas.setFillColor(colors.gray)
-        canvas.drawCentredString(10.5*cm, 1*cm, "Proios S.A. · Buenos Aires, Argentina · eva@proios.com · +549 11 57265031")
-        canvas.drawCentredString(10.5*cm, 0.5*cm, f"Page {doc.page}")
+        canvas.setFont(DEFAULT_FONT, 7)
+        footer_text = "Proios S.A. · Comodoro Pedro Zanni 351, 5th Fl. – 503 LN, Buenos Aires (C1104AAH) · info@proios.com · www.proios.com"
+        canvas.drawString(1.5*cm, 1.5*cm, footer_text)
+        canvas.drawRightString(A4[0] - 1.5*cm, 1.5*cm, f"Page {doc.page}")
         canvas.restoreState()
-    
-    doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
-    
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
-    return pdf_bytes
+        
+    doc.build(story, onFirstPage=add_proios_footer, onLaterPages=add_proios_footer)
+    return buffer.getvalue()
+

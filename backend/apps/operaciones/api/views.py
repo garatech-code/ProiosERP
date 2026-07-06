@@ -1029,14 +1029,32 @@ class OperacionViewSet(viewsets.ModelViewSet):
         payment_terms = data.get('payment_terms', '30 days from invoice date')
         delivery_time = data.get('delivery_time', '5')
         include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
+        vat_percentage = data.get('vat_percentage', '21')
         scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
         scope_excludes = data.get('scope_excludes', '[freight, customs clearance, additional labour, parts not listed, etc.]')
         notes = data.get('notes', '[Other relevant note]')
         attn = data.get('attn', 'Operations / Technical Department')
+        template_type = data.get('template_type', 'proios')
+        lang = data.get('lang', 'en')
+        
+        # Nuevos campos de servicio
+        damage_location = data.get('damage_location', '')
+        damage_frames = data.get('damage_frames', '')
+        damage_area = data.get('damage_area', '')
+        custom_items = data.get('custom_items', '[]')
+        damage_subject = data.get('damage_subject', '')
+        damage_location_title = data.get('damage_location_title', '')
+        damage_frames_title = data.get('damage_frames_title', '')
+        damage_area_title = data.get('damage_area_title', '')
 
-        from apps.operaciones.services_docx import generar_cotizacion_pdf
         try:
-            pdf_content = generar_cotizacion_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn)
+            if template_type == 'eva':
+                from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
+                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage)
+            else:
+                from apps.operaciones.services_pdf import generar_cotizacion_pdf_nativa
+                pdf_content = generar_cotizacion_pdf_nativa(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage)
+
             response = HttpResponse(
                 pdf_content, 
                 content_type='application/pdf'

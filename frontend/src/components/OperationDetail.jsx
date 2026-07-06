@@ -91,24 +91,55 @@ export default function OperationDetail() {
   const [offerValidity, setOfferValidity] = useState('15 days');
   const [paymentTermsIsManual, setPaymentTermsIsManual] = useState(false);
   const [paymentTerms, setPaymentTerms] = useState('30 days from invoice date');
-  const [includeVat, setIncludeVat] = useState(true);
+  const [includeVat, setIncludeVat] = useState(false);
+  const [vatPercentage, setVatPercentage] = useState('21');
   const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
   const [deliveryTime, setDeliveryTime] = useState('5');
   const [cotizacionAttn, setCotizacionAttn] = useState('Operations / Technical Department');
   const [scopeIncludes, setScopeIncludes] = useState('[detail what the supply / service comprises]');
   const [scopeExcludes, setScopeExcludes] = useState('[freight, customs clearance, additional labour, parts not listed, etc.]');
+  
+  const defaultNotesSrvEn = `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`;
+  const defaultNotesSrvEs = `- Esta suma global cubre únicamente los trabajos designados enumerados en esta cotización. Cualquier acero, trabajo o daño adicional encontrado después del corte será recotizado y cobrado por separado.\n- Las reparaciones están sujetas a la aprobación y asistencia de la Sociedad de Clasificación.\n- Los andamios, la movilización/desmovilización, la pintura, las pruebas no destructivas (NDT), y los cargos de dique y puerto NO están incluidos en esta suma global y serán cobrados por separado.`;
+  const defaultNotesProdEn = `[Other relevant note]`;
+  const defaultNotesProdEs = `[Otra nota relevante]`;
+  
   const [cotizacionNotes, setCotizacionNotes] = useState('[Other relevant note]');
+  const [cotizacionTemplate, setCotizacionTemplate] = useState('eva');
+  const [cotizacionLang, setCotizacionLang] = useState('en');
 
-  // Parametros para generar PDF Servicios
-  const [servMobilization, setServMobilization] = useState('2-3 days after order confirmation.');
-  const [servExecution, setServExecution] = useState('1 day.');
-  const [servBankCharges, setServBankCharges] = useState('USD 50.00.');
-  const [servTaxes, setServTaxes] = useState('(ISS 3%): will be applied to the total invoice value accordingly.');
-  const [servPaymentTerms, setServPaymentTerms] = useState('To Be Negotiated.');
-  const [servTransport, setServTransport] = useState('Transportation of the rotor from the vessel to Barcarena/Belém and back (round trip) is to be arranged by and under the responsibility of the client/agents.');
-  const [servItems, setServItems] = useState([
-    { nombre: '', cantidad: 1, precio_unitario: '' }
-  ]);
+  useEffect(() => {
+    if (showCotizacionWordModal) {
+      const isSrv = operation?.tipo_operacion === 'servicios';
+      const isEs = cotizacionLang === 'es';
+      const defEn = isSrv ? defaultNotesSrvEn : defaultNotesProdEn;
+      const defEs = isSrv ? defaultNotesSrvEs : defaultNotesProdEs;
+      
+      if (
+        cotizacionNotes === defaultNotesSrvEn || 
+        cotizacionNotes === defaultNotesSrvEs ||
+        cotizacionNotes === defaultNotesProdEn ||
+        cotizacionNotes === defaultNotesProdEs ||
+        cotizacionNotes === '[Other relevant note]' ||
+        cotizacionNotes === '[Otra nota relevante]' ||
+        cotizacionNotes === `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.
+- Repairs are subject to Classification Society approval and attendance.
+- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`
+      ) {
+        setCotizacionNotes(isEs ? defEs : defEn);
+      }
+    }
+  }, [showCotizacionWordModal, operation, cotizacionLang]);
+
+  // Service specific arbitrary fields
+  const [damageLocation, setDamageLocation] = useState('');
+  const [damageFrames, setDamageFrames] = useState('');
+  const [damageArea, setDamageArea] = useState('');
+  const [damageSubject, setDamageSubject] = useState('DAMAGE DESCRIPTION');
+  const [damageLocationTitle, setDamageLocationTitle] = useState('Location and damage');
+  const [damageFramesTitle, setDamageFramesTitle] = useState('Frame(s)');
+  const [damageAreaTitle, setDamageAreaTitle] = useState('Area L x H (mm)');
+  const [customItems, setCustomItems] = useState([]);
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -375,66 +406,36 @@ export default function OperationDetail() {
     }
   };
 
-  const openCotizacionPdfModal = () => {
-    setDetalleServicio(operation?.detalle_servicio || '');
-    setCotizacionAdicional(operation?.texto_cotizacion_adicional || '');
-    setShowCotizacionPdfModal(true);
-  };
-
-  const handleDownloadCotizacionServicio = async () => {
-    try {
-      setActionLoading(true);
-      if (detalleServicio !== operation?.detalle_servicio || cotizacionAdicional !== operation?.texto_cotizacion_adicional) {
-        await axios.patch(`/operaciones/operations/${id}/`, {
-          detalle_servicio: detalleServicio,
-          texto_cotizacion_adicional: cotizacionAdicional
-        });
-        fetchOperation();
-      }
-      const params = new URLSearchParams({
-        mobilization: servMobilization,
-        execution: servExecution,
-        bank_charges: servBankCharges,
-        taxes: servTaxes,
-        payment_terms: servPaymentTerms,
-        transport: servTransport,
-        custom_items: JSON.stringify(servItems.filter(i => i.nombre.trim() !== ''))
-      }).toString();
-      
-      const response = await axios.get(`/operaciones/operations/${id}/generate_cotizacion_servicio/?${params}`, {
-        responseType: 'blob',
-      });
-      const fileUrl = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = fileUrl;
-      link.setAttribute('download', `Cotizacion_Servicio_OP${id}.docx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      
-      setShowCotizacionPdfModal(false);
-    } catch (err) {
-      console.error(err);
-      showToast('Error al descargar la cotización', 'error');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleDownloadCotizacionWord = async () => {
     try {
       setActionLoading(true);
 
-      const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, {
+      const payload = {
         offer_validity: offerValidity,
         payment_terms: paymentTerms,
         delivery_time: deliveryTime,
         include_vat: includeVat,
+        vat_percentage: vatPercentage,
         scope_includes: scopeIncludes,
         scope_excludes: scopeExcludes,
         notes: cotizacionNotes,
-        attn: cotizacionAttn
-      }, {
+        attn: cotizacionAttn,
+        template_type: cotizacionTemplate,
+        lang: cotizacionLang
+      };
+      
+      if (operation?.tipo_operacion === 'servicios') {
+        payload.damage_location = damageLocation;
+        payload.damage_frames = damageFrames;
+        payload.damage_area = damageArea;
+        payload.damage_subject = damageSubject;
+        payload.damage_location_title = damageLocationTitle;
+        payload.damage_frames_title = damageFramesTitle;
+        payload.damage_area_title = damageAreaTitle;
+        payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
+      }
+
+      const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
         responseType: 'blob',
       });
       const fileUrl = window.URL.createObjectURL(new Blob([response.data]));
@@ -1136,8 +1137,8 @@ export default function OperationDetail() {
 
             <div className="lg:col-span-2 space-y-6">
 
-              {/* Added Generate Word Button Here as Requested */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
+              {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -1178,118 +1179,6 @@ export default function OperationDetail() {
                 </div>
               )}
 
-              {/* PDF Settings for Services */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion === 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 mb-6">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-word-fill text-blue-500"></i> Generar Cotización de Servicio (Word)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Configura los parámetros específicos que se incluirán en el documento de cotización de servicio.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tiempo de Movilización</label>
-                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servMobilization} onChange={(e) => setServMobilization(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tiempo de Ejecución</label>
-                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servExecution} onChange={(e) => setServExecution(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Cargos Bancarios (Bank charges)</label>
-                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servBankCharges} onChange={(e) => setServBankCharges(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Impuestos (Taxes)</label>
-                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servTaxes} onChange={(e) => setServTaxes(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Condiciones de Pago (Payment terms)</label>
-                      <input type="text" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servPaymentTerms} onChange={(e) => setServPaymentTerms(e.target.value)} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Observaciones de Transporte</label>
-                      <textarea rows="2" className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" value={servTransport} onChange={(e) => setServTransport(e.target.value)} />
-                    </div>
-                    
-                    <div className="md:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ítems del Servicio (Aparecerán en la Sección "1. Items:")</label>
-                      {servItems.map((item, index) => (
-                        <div key={index} className="flex gap-2 mb-2 items-center">
-                          <input 
-                            type="text" 
-                            placeholder="Descripción (ej. Balancing...)" 
-                            className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 p-2 border sm:text-sm"
-                            value={item.nombre}
-                            onChange={(e) => {
-                              const newItems = [...servItems];
-                              newItems[index].nombre = e.target.value;
-                              setServItems(newItems);
-                            }}
-                          />
-                          <input 
-                            type="number" 
-                            placeholder="Cant." 
-                            className="w-20 rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 p-2 border sm:text-sm"
-                            value={item.cantidad}
-                            onChange={(e) => {
-                              const newItems = [...servItems];
-                              newItems[index].cantidad = e.target.value;
-                              setServItems(newItems);
-                            }}
-                          />
-                          <input 
-                            type="number" 
-                            placeholder="USD Unit." 
-                            className="w-28 rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 p-2 border sm:text-sm"
-                            value={item.precio_unitario}
-                            onChange={(e) => {
-                              const newItems = [...servItems];
-                              newItems[index].precio_unitario = e.target.value;
-                              setServItems(newItems);
-                            }}
-                          />
-                          <button 
-                            onClick={() => {
-                              const newItems = servItems.filter((_, i) => i !== index);
-                              setServItems(newItems);
-                            }}
-                            className="text-red-500 hover:text-red-700 p-2"
-                            title="Eliminar ítem"
-                          >
-                            <i className="bi bi-trash-fill"></i>
-                          </button>
-                        </div>
-                      ))}
-                      <button 
-                        onClick={() => setServItems([...servItems, { nombre: '', cantidad: 1, precio_unitario: '' }])}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1"
-                      >
-                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap justify-start gap-4 pt-2">
-                    <button
-                      onClick={openCotizacionPdfModal}
-                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2"
-                    >
-                      <i className="bi bi-pencil-square"></i> Revisar Notas y Generar
-                    </button>
-                    <button
-                      onClick={handleDownloadCotizacionServicio}
-                      disabled={actionLoading}
-                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2"
-                    >
-                      {actionLoading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <i className="bi bi-file-word-fill"></i>}
-                      Generar Directo (Word)
-                    </button>
-                  </div>
-                </div>
-              )}
 
               <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
                 <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
@@ -1925,7 +1814,7 @@ export default function OperationDetail() {
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button
-                              onClick={openCotizacionPdfModal}
+                              onClick={() => setShowCotizacionWordModal(true)}
                               disabled={actionLoading}
                               className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                               title="Vista previa del documento generado automáticamente"
@@ -2308,59 +2197,6 @@ Saludos cordiales.`}
         </div>
       )}
 
-      {/* Modal para Editar Cotización PDF/Word */}
-      {showCotizacionPdfModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] sm:max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700 animate-slideUp">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 shrink-0">
-              <h3 className="text-lg leading-6 font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <i className="bi bi-file-word-fill text-blue-500"></i> Generar Documento de Cotización
-              </h3>
-              <button onClick={() => setShowCotizacionPdfModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 shadow-sm">
-                <i className="bi bi-x-lg"></i>
-              </button>
-            </div>
-            <div className="p-4 sm:p-6 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 overflow-y-auto">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Detalle del Servicio</label>
-                  <textarea
-                    value={detalleServicio}
-                    onChange={(e) => setDetalleServicio(e.target.value)}
-                    placeholder="Descripción principal del servicio..."
-                    rows="4"
-                    className="w-full text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Notas / Condiciones Adicionales</label>
-                  <textarea
-                    value={cotizacionAdicional}
-                    onChange={(e) => setCotizacionAdicional(e.target.value)}
-                    placeholder="Escriba condiciones de pago, validez, o cualquier nota extra..."
-                    rows="4"
-                    className="w-full text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Este texto aparecerá en la parte inferior del PDF de cotización.</p>
-                </div>
-              </div>
-            </div>
-            <div className="px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 shrink-0">
-              <button
-                type="button"
-                className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                onClick={handleDownloadCotizacionServicio}
-                disabled={actionLoading}
-              >
-                {actionLoading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : 'Descargar Word'}
-              </button>
-              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowCotizacionPdfModal(false)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal para vista previa de Excel */}
       {showExcelModal && (
@@ -2539,7 +2375,7 @@ Saludos cordiales.`}
       {/* Modal para Generar Cotización (Productos) */}
       {showCotizacionWordModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 dark:border-slate-700 transform transition-all">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[95vh] overflow-hidden border border-slate-200 dark:border-slate-700 transform transition-all">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800">
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
@@ -2549,11 +2385,134 @@ Saludos cordiales.`}
               </button>
             </div>
             
-            <div className="p-6 bg-slate-50 dark:bg-slate-900/40 space-y-6">
+            <div className="p-6 bg-slate-50 dark:bg-slate-900/40 space-y-6 overflow-y-auto flex-1">
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Personaliza las condiciones comerciales que se incluirán en el documento.
               </p>
               
+              {operation?.tipo_operacion === 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">Campos Arbitrarios de Servicio</h4>
+                  
+                  <div className="mb-2">
+                      <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Título de la sección (Tema)</label>
+                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageSubject} onChange={(e) => setDamageSubject(e.target.value)} />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <input type="text" className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500" value={damageLocationTitle} onChange={(e) => setDamageLocationTitle(e.target.value)} />
+                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageLocation} onChange={(e) => setDamageLocation(e.target.value)} placeholder="Ej: Port Side..." />
+                    </div>
+                    <div>
+                      <input type="text" className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500" value={damageFramesTitle} onChange={(e) => setDamageFramesTitle(e.target.value)} />
+                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageFrames} onChange={(e) => setDamageFrames(e.target.value)} placeholder="Ej: 45-50" />
+                    </div>
+                    <div>
+                      <input type="text" className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500" value={damageAreaTitle} onChange={(e) => setDamageAreaTitle(e.target.value)} />
+                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageArea} onChange={(e) => setDamageArea(e.target.value)} placeholder="Ej: 2000 x 1500" />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Ítems Arbitrarios (Aparecen en la tabla principal)</label>
+                    {customItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 mb-2 items-center">
+                        <input 
+                          type="text" 
+                          placeholder="Descripción" 
+                          className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={item.nombre}
+                          onChange={(e) => {
+                            const newItems = [...customItems];
+                            newItems[index].nombre = e.target.value;
+                            setCustomItems(newItems);
+                          }}
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Cant." 
+                          className="w-20 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={item.cantidad}
+                          onChange={(e) => {
+                            const newItems = [...customItems];
+                            newItems[index].cantidad = e.target.value;
+                            setCustomItems(newItems);
+                          }}
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="USD Unit." 
+                          className="w-24 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={item.precio_unitario}
+                          onChange={(e) => {
+                            const newItems = [...customItems];
+                            newItems[index].precio_unitario = e.target.value;
+                            setCustomItems(newItems);
+                          }}
+                        />
+                        <button 
+                          onClick={() => {
+                            const newItems = customItems.filter((_, i) => i !== index);
+                            setCustomItems(newItems);
+                          }}
+                          className="text-red-500 hover:text-red-700 p-2 shrink-0"
+                          title="Eliminar ítem"
+                        >
+                          <i className="bi bi-trash-fill"></i>
+                        </button>
+                      </div>
+                    ))}
+                    <button 
+                      onClick={() => setCustomItems([...customItems, { nombre: '', cantidad: 1, precio_unitario: '' }])}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-2"
+                    >
+                      <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Language Selector */}
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
+                <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Idioma del Documento / Document Language</label>
+                <div className="flex gap-4">
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'en' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                    <input type="radio" name="cotizacionLang" value="en" checked={cotizacionLang === 'en'} onChange={(e) => setCotizacionLang(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
+                    <div>
+                      <span className={`block text-sm font-bold ${cotizacionLang === 'en' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Inglés (English)</span>
+                    </div>
+                  </label>
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'es' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                    <input type="radio" name="cotizacionLang" value="es" checked={cotizacionLang === 'es'} onChange={(e) => setCotizacionLang(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
+                    <div>
+                      <span className={`block text-sm font-bold ${cotizacionLang === 'es' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Español (Spanish)</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Template Selector */}
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
+                <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Diseño de Plantilla</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'eva' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                    <input type="radio" name="cotizacionTemplate" value="eva" checked={cotizacionTemplate === 'eva'} onChange={(e) => setCotizacionTemplate(e.target.value)} className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 mr-3" />
+                    <div>
+                      <span className={`block text-sm font-bold ${cotizacionTemplate === 'eva' ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-700 dark:text-slate-300'}`}>Diseño normal</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Diseño minimalista con tabla agrupada y líneas finas.</span>
+                    </div>
+                  </label>
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'proios' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                    <input type="radio" name="cotizacionTemplate" value="proios" checked={cotizacionTemplate === 'proios'} onChange={(e) => setCotizacionTemplate(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
+                    <div>
+                      <span className={`block text-sm font-bold ${cotizacionTemplate === 'proios' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Próximamente (pruebas)</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Diseño Premium B2B (Clásica).</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
                 {/* Columna Izquierda: Términos Comerciales */}
@@ -2654,18 +2613,34 @@ Saludos cordiales.`}
 
                       {/* VAT Toggle */}
                       <div className="pt-2 mt-auto">
-                        <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
-                          <div>
-                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Taxes (VAT)</p>
-                            <p className="text-xs text-slate-500">Incluir 21%</p>
+                        <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Taxes (VAT)</p>
+                              <p className="text-xs text-slate-500">Aplicar impuestos</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIncludeVat(!includeVat)}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeVat ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                            >
+                              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${includeVat ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setIncludeVat(!includeVat)}
-                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeVat ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                          >
-                            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${includeVat ? 'translate-x-5' : 'translate-x-0'}`} />
-                          </button>
+                          {includeVat && (
+                            <div className="flex items-center justify-between mt-1 pt-2 border-t border-slate-200 dark:border-slate-700">
+                              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Porcentaje VAT:</span>
+                              <div className="flex items-center relative w-24">
+                                <input
+                                  type="number"
+                                  className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1 px-2 pr-6 focus:ring-blue-500 focus:border-blue-500 text-right"
+                                  value={vatPercentage}
+                                  onChange={(e) => setVatPercentage(e.target.value)}
+                                />
+                                <span className="absolute right-2 text-slate-400 text-sm">%</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 

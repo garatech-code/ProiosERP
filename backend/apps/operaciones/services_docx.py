@@ -138,52 +138,92 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
     run.bold = True
     run.font.size = Pt(8)
 
-    headers = ["Description", "Category", "Qty", "Unit", "Unit price", "Amount"]
+    headers = ["No.", "Description", "Qty", "Unit", "Unit price", "Amount"]
     items_table = doc.add_table(rows=1, cols=len(headers))
     items_table.style = 'Table Grid'
     
-    # Llenar encabezados de la tabla
+    # Llenar encabezados
     hdr_cells = items_table.rows[0].cells
     for i, text in enumerate(headers):
         run = hdr_cells[i].paragraphs[0].add_run(text)
         run.bold = True
         
-    # Obtener detalles de la operacion
+    from docx.oxml.ns import nsdecls
+    from docx.oxml import parse_xml
+    
+    def set_cell_bg(cell, color):
+        shading_elm = parse_xml(r'<w:shd {} w:fill="{}"/>'.format(nsdecls('w'), color))
+        cell._tc.get_or_add_tcPr().append(shading_elm)
+        
+    # Obtener detalles
     total_usd = 0
-    detalles = operacion.detalles.all()
+    detalles = list(operacion.detalles.all())
     if detalles:
+        grupos = {}
         for det in detalles:
-            row_cells = items_table.add_row().cells
             try:
                 articulo = Articulo.objects.get(id=det.articulo_id)
+                cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
                 desc = articulo.nombre
-                cat = articulo.categoria if articulo.categoria else ''
-                unit = articulo.unidad if articulo.unidad else 'u'
+                unit = str(articulo.unidad) if articulo.unidad else "u"
             except Articulo.DoesNotExist:
+                cat = "GENERAL"
                 desc = f"Item #{det.articulo_id}"
-                cat = ''
-                unit = 'u'
+                unit = "u"
+            cat = cat.upper()
+            if cat not in grupos:
+                grupos[cat] = []
+            grupos[cat].append({
+                'desc': desc,
+                'qty': float(det.cantidad),
+                'unit': unit,
+                'price': float(det.precio_unitario) if det.precio_unitario else 0.0
+            })
             
-            qty = det.cantidad
-            price = det.precio_unitario
-            amount = qty * price
-            total_usd += amount
+        idx = 1
+        for cat_name, items in grupos.items():
+            # Category Row
+            cat_row = items_table.add_row()
+            a = cat_row.cells[0]
+            b = cat_row.cells[5]
+            a.merge(b)
+            p = a.paragraphs[0]
+            r = p.add_run(cat_name)
+            r.bold = True
+            set_cell_bg(a, "E2E8F0")
             
-            row_cells[0].text = str(desc)
-            row_cells[1].text = str(cat)
-            row_cells[2].text = str(qty)
-            row_cells[3].text = str(unit)
-            row_cells[4].text = f"{price:.2f}"
-            row_cells[5].text = f"{amount:.2f}"
+            subtotal_cat = 0
+            cant_cat = 0
+            for item in items:
+                qty = item['qty']
+                price = item['price']
+                amount = qty * price
+                subtotal_cat += amount
+                cant_cat += qty
+                total_usd += amount
+                
+                row = items_table.add_row().cells
+                row[0].text = str(idx)
+                row[1].text = str(item['desc'])
+                row[2].text = str(int(qty) if qty.is_integer() else qty)
+                row[3].text = str(item['unit'])
+                row[4].text = f"{price:.2f}"
+                row[5].text = f"{amount:.2f}"
+                idx += 1
+                
+            # Subtotal Row
+            sub_row = items_table.add_row()
+            a = sub_row.cells[0]
+            b = sub_row.cells[4]
+            a.merge(b)
+            a.paragraphs[0].add_run(f"Subtotal {cat_name.lower()} ({int(cant_cat)} {items[0]['unit'] if len(items)==1 else 'u.'})").bold = True
+            sub_row.cells[5].paragraphs[0].add_run(f"{subtotal_cat:.2f}").bold = True
     else:
-        # Fila de ejemplo si no hay detalles
         row_cells = items_table.add_row().cells
-        example_data = [operacion.detalle_servicio or "[Description of the product / spare part / service]", "[Chemicals]", "[0]", "[u/kg/lt]", "[0.00]", "[0.00]"]
+        example_data = ["1", operacion.detalle_servicio or "[Description]", "0", "u", "0.00", "0.00"]
         for i, text in enumerate(example_data):
             row_cells[i].text = text
 
-        for _ in range(3):
-            items_table.add_row()
 
     doc.add_paragraph() # Espaciado
 
