@@ -351,18 +351,18 @@ class OperacionViewSet(viewsets.ModelViewSet):
             logger.exception("Error generando PDF de solicitud particular")
             return Response({'error': str(e)}, status=400)
 
-    @action(detail=True, methods=['get'], url_path='generate_remito_docx')
-    def generate_remito_docx(self, request, pk=None):
+    @action(detail=True, methods=['get'], url_path='generate_remito_pdf')
+    def generate_remito_pdf(self, request, pk=None):
         op = self.get_object()
-        from apps.operaciones.services_docx import generar_remito_docx
+        from apps.operaciones.services_docx import generar_remito_pdf
         try:
-            docx_bytes = generar_remito_docx(op)
+            pdf_bytes = generar_remito_pdf(op)
             from django.http import HttpResponse
-            response = HttpResponse(docx_bytes, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-            response['Content-Disposition'] = f'attachment; filename="Remito_OP{op.id}.docx"'
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Remito_OP{op.id}.pdf"'
             return response
         except Exception as e:
-            logger.exception("Error generando Remito DOCX")
+            logger.exception("Error generando Remito PDF")
             return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['get'], url_path='packing_list_json')
@@ -1021,16 +1021,43 @@ class OperacionViewSet(viewsets.ModelViewSet):
             logger.exception("Error generando cotizacion de servicio")
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=True, methods=['post'], url_path='generate_cotizacion_pdf')
+    def generate_cotizacion_pdf(self, request, pk=None):
+        op = self.get_object()
+        data = request.data
+        offer_validity = data.get('offer_validity', '15 days')
+        payment_terms = data.get('payment_terms', '30 days from invoice date')
+        delivery_time = data.get('delivery_time', '5')
+        include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
+        scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
+        scope_excludes = data.get('scope_excludes', '[freight, customs clearance, additional labour, parts not listed, etc.]')
+        notes = data.get('notes', '[Other relevant note]')
+        attn = data.get('attn', 'Operations / Technical Department')
+
+        from apps.operaciones.services_docx import generar_cotizacion_pdf
+        try:
+            pdf_content = generar_cotizacion_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn)
+            response = HttpResponse(
+                pdf_content, 
+                content_type='application/pdf'
+            )
+            response['Content-Disposition'] = f'attachment; filename="cotizacion_OP{op.id}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("Error generando cotizacion pdf")
+            return Response({'error': str(e)}, status=500)
+
     @action(detail=True, methods=['get'])
     def generate_cotizacion_docx(self, request, pk=None):
         op = self.get_object()
         offer_validity = request.query_params.get('offer_validity', '15 days')
         payment_terms = request.query_params.get('payment_terms', '30 days from invoice date')
-        warranty = request.query_params.get('warranty', 'As per manufacturer')
+        delivery_time = request.query_params.get('delivery_time', '5')
+        include_vat = request.query_params.get('include_vat', 'true').lower() == 'true'
 
         from apps.operaciones.services_docx import generar_cotizacion_docx
         try:
-            docx_content = generar_cotizacion_docx(op, offer_validity, payment_terms, warranty)
+            docx_content = generar_cotizacion_docx(op, offer_validity, payment_terms, delivery_time, include_vat)
             response = HttpResponse(
                 docx_content, 
                 content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -1042,6 +1069,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=500)
 
     @action(detail=True, methods=['get'])
+
     def generate_permiso_pna(self, request, pk=None):
         op = self.get_object()
         tipo_trabajo = request.query_params.get('tipo', 'frio')

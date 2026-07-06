@@ -6,6 +6,27 @@ from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+try:
+    tahoma_path = os.path.join(settings.BASE_DIR, 'static_local', 'fonts', 'tahoma.ttf')
+    tahomabd_path = os.path.join(settings.BASE_DIR, 'static_local', 'fonts', 'tahomabd.ttf')
+    if os.path.exists(tahoma_path) and os.path.exists(tahomabd_path):
+        pdfmetrics.registerFont(TTFont('Tahoma', tahoma_path))
+        pdfmetrics.registerFont(TTFont('Tahoma-Bold', tahomabd_path))
+        pdfmetrics.registerFont(TTFont('Tahoma-Oblique', tahoma_path)) # Fallback to normal for oblique
+        DEFAULT_FONT = 'Tahoma'
+        DEFAULT_FONT_BOLD = 'Tahoma-Bold'
+        DEFAULT_FONT_OBLIQUE = 'Tahoma-Oblique'
+    else:
+        DEFAULT_FONT = 'Helvetica'
+        DEFAULT_FONT_BOLD = 'Helvetica-Bold'
+        DEFAULT_FONT_OBLIQUE = 'Helvetica-Oblique'
+except Exception:
+    DEFAULT_FONT = 'Helvetica'
+    DEFAULT_FONT_BOLD = 'Helvetica-Bold'
+    DEFAULT_FONT_OBLIQUE = 'Helvetica-Oblique'
 
 def get_logo():
     logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
@@ -55,9 +76,9 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
     normal_style = styles['Normal']
     normal_style.fontSize = 11
     normal_style.leading = 14
-    bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName='Helvetica-Bold')
-    italic_style = ParagraphStyle('ItalicStyle', parent=normal_style, fontName='Helvetica-Oblique')
-    heading_style = ParagraphStyle('Heading', parent=normal_style, fontName='Helvetica-Bold', fontSize=12, spaceAfter=6, spaceBefore=12)
+    bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD)
+    italic_style = ParagraphStyle('ItalicStyle', parent=normal_style, fontName=DEFAULT_FONT_OBLIQUE)
+    heading_style = ParagraphStyle('Heading', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=12, spaceAfter=6, spaceBefore=12)
     bullet_style = ParagraphStyle('Bullet', parent=normal_style, leftIndent=20, bulletIndent=10)
 
     # Header Logo
@@ -242,11 +263,12 @@ def generar_solicitud_particular_pdf(operacion):
         
     t = Table(data, colWidths=[1.5*cm, 9*cm, 1.5*cm, 4*cm])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#093641')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#002b5e')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), DEFAULT_FONT_BOLD),
+        ('FONTSIZE', (0,0), (-1,0), 10),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('GRID', (0,0), (-1,-1), 1, colors.black),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
         ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
@@ -288,3 +310,182 @@ def generar_reporte_servicio_pdf(operacion):
     pdf = buffer.getvalue()
     buffer.close()
     return pdf
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+import io
+from datetime import datetime
+
+def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]"):
+    buffer = io.BytesIO()
+    # Margins: Top, Bottom, Left, Right
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2.5*cm)
+    story = []
+    
+    styles = getSampleStyleSheet()
+    normal_style = styles['Normal']
+    normal_style.fontSize = 10
+    normal_style.leading = 14
+    normal_style.fontName = DEFAULT_FONT
+    
+    bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD)
+    title_style = ParagraphStyle('TitleStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=14, alignment=TA_CENTER, spaceAfter=20)
+    right_style = ParagraphStyle('RightStyle', parent=normal_style, alignment=TA_RIGHT)
+    total_style = ParagraphStyle('TotalStyle', parent=normal_style, alignment=TA_RIGHT, fontName=DEFAULT_FONT_BOLD, fontSize=12)
+    footer_style = ParagraphStyle('FooterStyle', parent=normal_style, alignment=TA_CENTER, fontSize=8, textColor=colors.gray)
+    
+    # 1. Header Information
+    buque = operacion.ship.name if operacion.ship else "[Vessel Name]"
+    puerto = operacion.port.name if operacion.port else "[Port]"
+    eta_str = operacion.eta.strftime("%d/%m/%Y") if operacion.eta else "[ETA]"
+    agencia = operacion.agency.name if operacion.agency else "[Agency]"
+    cliente_nombre = operacion.cliente.name if operacion.cliente else "[Client Name]"
+    
+    # Left Header
+    story.append(Paragraph(f"<b>To:</b> {cliente_nombre}", normal_style))
+    story.append(Paragraph(f"<b>Attn.:</b> Operations / Technical Department", normal_style))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph(f"<b>M/V:</b> {buque}", normal_style))
+    story.append(Paragraph(f"<b>Port:</b> {puerto}", normal_style))
+    story.append(Paragraph(f"<b>ETA:</b> {eta_str}", normal_style))
+    story.append(Paragraph(f"<b>Agency:</b> {agencia}", normal_style))
+    story.append(Spacer(1, 0.5*cm))
+    
+    # Right Header
+    story.append(Paragraph("<b>From:</b> Eva Proios", normal_style))
+    story.append(Paragraph("Operations Department", normal_style))
+    story.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%B %d, %Y')}", normal_style))
+    story.append(Spacer(1, 1*cm))
+    
+    # 2. Title
+    story.append(Paragraph("QUOTATION", title_style))
+    
+    # 3. Intro
+    tipo = operacion.tipo_operacion or ""
+    tipo_mapped = "products"
+    if tipo == 'quimicos': tipo_mapped = "chemicals"
+    elif tipo == 'servicios': tipo_mapped = "services"
+    elif tipo == 'otros': tipo_mapped = "spare parts"
+    
+    story.append(Paragraph(f"We are pleased to submit our quotation for the supply of <b>{tipo_mapped}</b>, as detailed below:", normal_style))
+    story.append(Spacer(1, 0.5*cm))
+    
+    # 4. Items Table
+    table_data = [["No.", "Description", "Category", "Qty.", "Unit", "Unit price", "Total amount"]]
+    total_usd = 0.0
+    detalles = operacion.detalles.all()
+    
+    from apps.inventario.models import Articulo
+    
+    if detalles:
+        for idx, det in enumerate(detalles, start=1):
+            qty = det.cantidad
+            price = float(det.precio_unitario)
+            amount = qty * price
+            total_usd += amount
+            try:
+                articulo = Articulo.objects.get(id=det.articulo_id)
+                desc = articulo.nombre
+                cat = str(articulo.categoria) if articulo.categoria else ""
+                unit = str(articulo.unidad) if articulo.unidad else "u"
+            except Articulo.DoesNotExist:
+                desc = f"Articulo #{det.articulo_id}"
+                cat = ""
+                unit = "u"
+            table_data.append([str(idx), desc, cat, str(qty), str(unit), f"{price:.2f}", f"{amount:.2f}"])
+    else:
+        table_data.append(["1", operacion.detalle_servicio or "[Description of product]", "[Chemicals]", "0", "u", "0.00", "0.00"])
+        table_data.append(["", "", "", "", "", "", ""])
+        table_data.append(["", "", "", "", "", "", ""])
+
+    t = Table(table_data, colWidths=[1*cm, 6*cm, 3*cm, 1.5*cm, 1.5*cm, 2*cm, 2*cm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('FONTNAME', (0,0), (-1,0), DEFAULT_FONT_BOLD),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
+        ('BOX', (0,0), (-1,-1), 0.25, colors.black),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 0.5*cm))
+    
+    # 5. Totals
+    if str(include_vat).lower() == 'true' or include_vat is True:
+        story.append(Paragraph(f"Subtotal:       {total_usd:.2f}", right_style))
+        story.append(Paragraph(f"VAT (21%):      {(float(total_usd) * 0.21):.2f}", right_style))
+        story.append(Paragraph(f"TOTAL USD:      {(float(total_usd) * 1.21):.2f}", total_style))
+    else:
+        story.append(Paragraph(f"TOTAL USD:      {float(total_usd):.2f}", total_style))
+    
+    story.append(PageBreak())
+    
+    # 6. TERMS
+    story.append(Paragraph("<b>TERMS</b>", bold_style))
+    terms_data = [
+        ["Currency", "USD / ARS"],
+        ["Offer validity", offer_validity],
+        ["Payment terms", payment_terms],
+        ["Delivery time", f"{delivery_time} days" if delivery_time else "[e.g. 5 business days from PO]"],
+        ["Place of delivery", f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse / on board M/V ____]"]
+    ]
+    
+    t_terms = Table(terms_data, colWidths=[4*cm, 13*cm])
+    t_terms.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (0,-1), DEFAULT_FONT_BOLD),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t_terms)
+    story.append(Spacer(1, 0.5*cm))
+    
+    # 7. SCOPE
+    story.append(Paragraph("<b>SCOPE</b>", bold_style))
+    story.append(Paragraph("<b>Includes:</b>", normal_style))
+    story.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("<b>Excludes:</b>", normal_style))
+    story.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
+    story.append(Spacer(1, 0.5*cm))
+    
+    # 8. NOTES
+    story.append(Paragraph("<b>NOTES</b>", bold_style))
+    notes_lines = [
+        "Prices subject to confirmation of stock and availability at the time of the purchase order.",
+        "Quantities and specifications to be confirmed by the client before dispatch."
+    ]
+    if notes and str(notes).strip() != "":
+        for nl in str(notes).strip().split('\n'):
+            if nl.strip():
+                notes_lines.append(nl.strip())
+                
+    for nl in notes_lines:
+        story.append(Paragraph(f"– {nl}", normal_style))
+        
+    story.append(Spacer(1, 1.5*cm))
+    
+    # 9. SIGNATURE
+    story.append(Paragraph("Yours faithfully,", normal_style))
+    story.append(Spacer(1, 1*cm))
+    story.append(Paragraph("<b>Eva Proios</b>", normal_style))
+    story.append(Paragraph("Operations – Proios S.A.", normal_style))
+    story.append(Paragraph("eva@proios.com · +549 11 57265031", normal_style))
+    
+    # Helper to add footer
+    def add_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont(DEFAULT_FONT, 8)
+        canvas.setFillColor(colors.gray)
+        canvas.drawCentredString(10.5*cm, 1*cm, "Proios S.A. · Buenos Aires, Argentina · eva@proios.com · +549 11 57265031")
+        canvas.drawCentredString(10.5*cm, 0.5*cm, f"Page {doc.page}")
+        canvas.restoreState()
+    
+    doc.build(story, onFirstPage=add_footer, onLaterPages=add_footer)
+    
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes

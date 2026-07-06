@@ -91,8 +91,13 @@ export default function OperationDetail() {
   const [offerValidity, setOfferValidity] = useState('15 days');
   const [paymentTermsIsManual, setPaymentTermsIsManual] = useState(false);
   const [paymentTerms, setPaymentTerms] = useState('30 days from invoice date');
-  const [warrantyIsManual, setWarrantyIsManual] = useState(false);
-  const [warranty, setWarranty] = useState('As per manufacturer');
+  const [includeVat, setIncludeVat] = useState(true);
+  const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
+  const [deliveryTime, setDeliveryTime] = useState('5');
+  const [cotizacionAttn, setCotizacionAttn] = useState('Operations / Technical Department');
+  const [scopeIncludes, setScopeIncludes] = useState('[detail what the supply / service comprises]');
+  const [scopeExcludes, setScopeExcludes] = useState('[freight, customs clearance, additional labour, parts not listed, etc.]');
+  const [cotizacionNotes, setCotizacionNotes] = useState('[Other relevant note]');
 
   // Parametros para generar PDF Servicios
   const [servMobilization, setServMobilization] = useState('2-3 days after order confirmation.');
@@ -419,26 +424,30 @@ export default function OperationDetail() {
   const handleDownloadCotizacionWord = async () => {
     try {
       setActionLoading(true);
-      const params = new URLSearchParams({
+
+      const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, {
         offer_validity: offerValidity,
         payment_terms: paymentTerms,
-        warranty: warranty
-      }).toString();
-
-      const response = await axios.get(`/operaciones/operations/${id}/generate_cotizacion_docx/?${params}`, {
+        delivery_time: deliveryTime,
+        include_vat: includeVat,
+        scope_includes: scopeIncludes,
+        scope_excludes: scopeExcludes,
+        notes: cotizacionNotes,
+        attn: cotizacionAttn
+      }, {
         responseType: 'blob',
       });
       const fileUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = fileUrl;
-      link.setAttribute('download', `Cotizacion_OP${id}.docx`);
+      link.setAttribute('download', `Cotizacion_OP${id}.pdf`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(fileUrl);
     } catch (error) {
-      console.error("Error descargando cotización Word:", error);
-      showToast('Error al descargar la cotización en Word', 'error');
+      console.error("Error descargando cotización PDF:", error);
+      showToast('Error al descargar la cotización en PDF', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -446,13 +455,13 @@ export default function OperationDetail() {
 
   const handleGenerateRemito = async () => {
     try {
-      const response = await axios.get(`/operaciones/operations/${id}/generate_remito_docx/`, {
+      const response = await axios.get(`/operaciones/operations/${id}/generate_remito_pdf/`, {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Remito_OP${id}.docx`);
+      link.setAttribute('download', `Remito_OP${id}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1054,12 +1063,7 @@ export default function OperationDetail() {
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <button
-                onClick={handleGenerateRemito}
-                className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
-              >
-                PROBAR DOCX
-              </button>
+
               <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 hidden sm:block">Hola, {formatUserName(user)}</span>
               <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors" title="Cerrar sesión">
                 <i className="bi bi-box-arrow-right text-lg"></i>
@@ -1134,130 +1138,43 @@ export default function OperationDetail() {
 
               {/* Added Generate Word Button Here as Requested */}
               {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 mb-6">
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white">Generar Cotización (Word)</h3>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
+                    </h3>
                     <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Personaliza las condiciones comerciales que se incluirán en el documento.
+                      Configura las condiciones comerciales y descarga la cotización en PDF.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Offer Validity</label>
-                      {!offerValidityIsManual ? (
-                        <select
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                          value={offerValidity}
-                          onChange={(e) => {
-                            if (e.target.value === 'manual') {
-                              setOfferValidityIsManual(true);
-                              setOfferValidity('');
-                            } else {
-                              setOfferValidity(e.target.value);
-                            }
-                          }}
-                        >
-                          <option value="15 days">15 days</option>
-                          <option value="30 days">30 days</option>
-                          <option value="manual">Otro (Manual)...</option>
-                        </select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${offerValidity.length > 35 ? 'border-orange-500' : ''}`}
-                            value={offerValidity}
-                            onChange={(e) => setOfferValidity(e.target.value)}
-                            placeholder="Escriba..."
-                            autoFocus
-                          />
-                          <button onClick={() => { setOfferValidityIsManual(false); setOfferValidity('15 days'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
-                        </div>
-                      )}
-                      {offerValidityIsManual && offerValidity.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
-                    </div>
+                  <button
+                    onClick={() => setShowCotizacionWordModal(true)}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                    title="Configurar y generar cotización en Word"
+                  >
+                    Generar Cotización
+                  </button>
+                </div>
+              )}
 
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Payment Terms</label>
-                      {!paymentTermsIsManual ? (
-                        <select
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                          value={paymentTerms}
-                          onChange={(e) => {
-                            if (e.target.value === 'manual') {
-                              setPaymentTermsIsManual(true);
-                              setPaymentTerms('');
-                            } else {
-                              setPaymentTerms(e.target.value);
-                            }
-                          }}
-                        >
-                          <option value="30 days from invoice date">30 days from invoice date</option>
-                          <option value="In advance">In advance</option>
-                          <option value="On delivery">On delivery</option>
-                          <option value="manual">Otro (Manual)...</option>
-                        </select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${paymentTerms.length > 35 ? 'border-orange-500' : ''}`}
-                            value={paymentTerms}
-                            onChange={(e) => setPaymentTerms(e.target.value)}
-                            placeholder="Escriba..."
-                            autoFocus
-                          />
-                          <button onClick={() => { setPaymentTermsIsManual(false); setPaymentTerms('30 days from invoice date'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
-                        </div>
-                      )}
-                      {paymentTermsIsManual && paymentTerms.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Warranty</label>
-                      {!warrantyIsManual ? (
-                        <select
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                          value={warranty}
-                          onChange={(e) => {
-                            if (e.target.value === 'manual') {
-                              setWarrantyIsManual(true);
-                              setWarranty('');
-                            } else {
-                              setWarranty(e.target.value);
-                            }
-                          }}
-                        >
-                          <option value="As per manufacturer">As per manufacturer</option>
-                          <option value="N/A for services">N/A for services</option>
-                          <option value="manual">Otro (Manual)...</option>
-                        </select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border ${warranty.length > 35 ? 'border-orange-500' : ''}`}
-                            value={warranty}
-                            onChange={(e) => setWarranty(e.target.value)}
-                            placeholder="Escriba..."
-                            autoFocus
-                          />
-                          <button onClick={() => { setWarrantyIsManual(false); setWarranty('As per manufacturer'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
-                        </div>
-                      )}
-                      {warrantyIsManual && warranty.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo, podría saltar de línea.</p>}
-                    </div>
+              {/* Generar Remito Box */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Descarga el remito autogenerado con los datos de esta operación.
+                    </p>
                   </div>
-                  <div className="flex justify-start pt-2">
-                    <button
-                      onClick={handleDownloadCotizacionWord}
-                      disabled={actionLoading}
-                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                      title="Descargar cotización generada en formato Word"
-                    >
-                      <i className="bi bi-file-word-fill"></i> Descargar Word
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleGenerateRemito}
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                    title="Descargar Remito"
+                  >
+                    <i className="bi bi-download"></i> Generar Remito
+                  </button>
                 </div>
               )}
 
@@ -2618,6 +2535,233 @@ Saludos cordiales.`}
         onSave={fetchOperation}
         onPreview={handlePreviewToolsPDF}
       />
+
+      {/* Modal para Generar Cotización (Productos) */}
+      {showCotizacionWordModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start sm:items-center p-2 sm:p-4 animate-fadeIn" role="dialog" aria-modal="true">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 dark:border-slate-700 transform transition-all">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800">
+              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
+              </h3>
+              <button onClick={() => setShowCotizacionWordModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors bg-white dark:bg-slate-700 shadow-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            
+            <div className="p-6 bg-slate-50 dark:bg-slate-900/40 space-y-6">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Personaliza las condiciones comerciales que se incluirán en el documento.
+              </p>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Columna Izquierda: Términos Comerciales */}
+                <div className="lg:col-span-4">
+                  <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm h-full flex flex-col">
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white mb-5 uppercase tracking-wider flex items-center gap-2">
+                      <i className="bi bi-card-checklist text-blue-500 text-base"></i> Términos Comerciales
+                    </h4>
+                    
+                    <div className="space-y-5 flex-1">
+                      {/* Offer Validity */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Offer Validity</label>
+                        {!offerValidityIsManual ? (
+                          <select
+                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                            value={offerValidity}
+                            onChange={(e) => {
+                              if (e.target.value === 'manual') {
+                                setOfferValidityIsManual(true);
+                                setOfferValidity('');
+                              } else {
+                                setOfferValidity(e.target.value);
+                              }
+                            }}
+                          >
+                            <option value="15 days">15 days</option>
+                            <option value="30 days">30 days</option>
+                            <option value="manual">Otro (Manual)...</option>
+                          </select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors ${offerValidity.length > 35 ? 'border-orange-500' : ''}`}
+                              value={offerValidity}
+                              onChange={(e) => setOfferValidity(e.target.value)}
+                              placeholder="Escriba..."
+                              autoFocus
+                            />
+                            <button onClick={() => { setOfferValidityIsManual(false); setOfferValidity('15 days'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                          </div>
+                        )}
+                        {offerValidityIsManual && offerValidity.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo.</p>}
+                      </div>
+
+                      {/* Payment Terms */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Payment Terms</label>
+                        {!paymentTermsIsManual ? (
+                          <select
+                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                            value={paymentTerms}
+                            onChange={(e) => {
+                              if (e.target.value === 'manual') {
+                                setPaymentTermsIsManual(true);
+                                setPaymentTerms('');
+                              } else {
+                                setPaymentTerms(e.target.value);
+                              }
+                            }}
+                          >
+                            <option value="30 days from invoice date">30 days from invoice date</option>
+                            <option value="In advance">In advance</option>
+                            <option value="On delivery">On delivery</option>
+                            <option value="manual">Otro (Manual)...</option>
+                          </select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors ${paymentTerms.length > 35 ? 'border-orange-500' : ''}`}
+                              value={paymentTerms}
+                              onChange={(e) => setPaymentTerms(e.target.value)}
+                              placeholder="Escriba..."
+                              autoFocus
+                            />
+                            <button onClick={() => { setPaymentTermsIsManual(false); setPaymentTerms('30 days from invoice date'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delivery Time */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Delivery Time</label>
+                        <div className="flex gap-2 items-center bg-slate-50 dark:bg-slate-700/50 p-1 rounded-lg border border-slate-200 dark:border-slate-600 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
+                          <input
+                            type="number"
+                            min="1"
+                            className="w-full bg-transparent border-none text-slate-900 dark:text-white focus:ring-0 text-sm p-1.5"
+                            value={deliveryTime}
+                            onChange={(e) => setDeliveryTime(e.target.value)}
+                            placeholder="5"
+                          />
+                          <span className="text-sm font-semibold text-slate-400 dark:text-slate-500 pr-3">business days</span>
+                        </div>
+                      </div>
+
+                      {/* VAT Toggle */}
+                      <div className="pt-2 mt-auto">
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+                          <div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Taxes (VAT)</p>
+                            <p className="text-xs text-slate-500">Incluir 21%</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIncludeVat(!includeVat)}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeVat ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                          >
+                            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${includeVat ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columna Derecha: Contenido del Documento */}
+                <div className="lg:col-span-8">
+                  <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm h-full flex flex-col">
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white mb-5 uppercase tracking-wider flex items-center gap-2">
+                      <i className="bi bi-text-paragraph text-purple-500 text-base"></i> Contenido del Documento
+                    </h4>
+                    
+                    <div className="space-y-5 flex-1">
+                      {/* Attention To */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Attention To (Attn:)</label>
+                        <input
+                          type="text"
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors"
+                          value={cotizacionAttn}
+                          onChange={(e) => setCotizacionAttn(e.target.value)}
+                          placeholder="e.g. Operations / Technical Department"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {/* Scope Includes */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Includes</label>
+                          <textarea
+                            rows={3}
+                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
+                            value={scopeIncludes}
+                            onChange={(e) => setScopeIncludes(e.target.value)}
+                            placeholder="[detail what the supply / service comprises]"
+                          />
+                        </div>
+
+                        {/* Scope Excludes */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Excludes</label>
+                          <textarea
+                            rows={3}
+                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
+                            value={scopeExcludes}
+                            onChange={(e) => setScopeExcludes(e.target.value)}
+                            placeholder="[freight, customs clearance, additional labour, parts not listed, etc.]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Notes <span className="normal-case font-normal">(Optional)</span></label>
+                        <textarea
+                          rows={2}
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
+                          value={cotizacionNotes}
+                          onChange={(e) => setCotizacionNotes(e.target.value)}
+                          placeholder="[Other relevant note]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowCotizacionWordModal(false)}
+                className="px-5 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  handleDownloadCotizacionWord();
+                  setShowCotizacionWordModal(false);
+                }}
+                disabled={actionLoading}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 transform active:scale-95"
+              >
+                {actionLoading ? (
+                  <><i className="bi bi-arrow-repeat animate-spin"></i> Generando...</>
+                ) : (
+                  <><i className="bi bi-file-earmark-pdf-fill"></i> Descargar Cotización</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

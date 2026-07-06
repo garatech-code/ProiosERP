@@ -55,8 +55,12 @@ def set_cell_border(cell, **kwargs):
             tcBorders.append(element)
     tcPr.append(tcBorders)
 
-def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", warranty="As per manufacturer"):
+def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department"):
     doc = Document()
+    
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Tahoma'
     
     # 1. Configurar márgenes de la página (Letter Size)
     section = doc.sections[0]
@@ -94,14 +98,15 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
     cell_1.width = Cm(6.0)
     p1 = cell_1.paragraphs[0]
     p1.add_run("FROM\n").bold = True
-    p1.add_run("Proios S.A.\nBuenos Aires, Argentina\n[address]\n[tel.] · [email]")
+    p1.add_run("Proios S.A.\nComodoro Pedro Zanni 351 floor 5th 503 LN.\nBuenos Aires (C1104AAH) Argentina\n\nTel: +549 11 57265031 · eva@proios.com")
+    p1.runs[0].font.size = Pt(10)
     
     # Columna 2: TO
     cell_2 = top_table.cell(0, 1)
     cell_2.width = Cm(6.0)
     p2 = cell_2.paragraphs[0]
     p2.add_run("TO\n").bold = True
-    p2.add_run(f"{cliente}\n\nAttn:\n[name and position]")
+    p2.add_run(f"{cliente}\n\nAttn:\n{attn}")
 
     # Columna 3: QUOTATION INFO
     cell_3 = top_table.cell(0, 2)
@@ -114,8 +119,17 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
 
     doc.add_paragraph() # Espacio
 
+    # Determinar tipo de operación en inglés
+    tipo_map = {
+        'productos': 'products',
+        'quimicos': 'chemicals',
+        'servicios': 'services',
+        'otros': 'spare parts'
+    }
+    tipo_en = tipo_map.get(operacion.tipo_operacion, 'products')
+
     # 5. PÁRRAFO INTRODUCTORIO
-    intro = doc.add_paragraph("We are pleased to submit our quotation for the supply of [products / spare parts / services], as detailed below:")
+    intro = doc.add_paragraph(f"We are pleased to submit our quotation for the supply of {tipo_en}, as detailed below:")
     intro.paragraph_format.space_after = Pt(15)
 
     # 6. SECCIÓN ITEMS
@@ -176,29 +190,45 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
     # Totales
     totals_p = doc.add_paragraph()
     totals_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    totals_p.add_run(f"Subtotal:       {total_usd:.2f}\n")
-    totals_p.add_run(f"VAT (21%):      {(float(total_usd) * 0.21):.2f}\n")
-    tot_run = totals_p.add_run(f"TOTAL USD:      {(float(total_usd) * 1.21):.2f}")
+    if str(include_vat).lower() == 'true' or include_vat is True:
+        totals_p.add_run(f"Subtotal:       {total_usd:.2f}\n")
+        totals_p.add_run(f"VAT (21%):      {(float(total_usd) * 0.21):.2f}\n")
+        tot_run = totals_p.add_run(f"TOTAL USD:      {(float(total_usd) * 1.21):.2f}")
+    else:
+        tot_run = totals_p.add_run(f"TOTAL USD:      {float(total_usd):.2f}")
     tot_run.bold = True
     tot_run.font.size = Pt(12)
 
     doc.add_paragraph()
 
-    # 7. TERMS
-    doc.add_page_break()
+    # 7. SCOPE
+    scope_title = doc.add_paragraph()
+    scope_title.paragraph_format.keep_with_next = True
+    run = scope_title.add_run("SCOPE")
+    run.bold = True
+    run.font.size = Pt(11)
+    
+    doc.add_paragraph().add_run("Includes:\n").bold = True
+    doc.paragraphs[-1].add_run(scope_includes)
+    
+    doc.add_paragraph().add_run("Excludes:\n").bold = True
+    doc.paragraphs[-1].add_run(scope_excludes)
+
+    doc.add_paragraph()
+
+    # 8. TERMS
     terms_title = doc.add_paragraph()
+    terms_title.paragraph_format.keep_with_next = True
     run = terms_title.add_run("TERMS")
     run.bold = True
-    run.font.size = Pt(8)
+    run.font.size = Pt(11)
 
     terms_data = [
-        ("Currency", "USD / ARS"),
+        ("Currency", "USD"),
         ("Offer validity", offer_validity),
         ("Payment terms", payment_terms),
-        ("Delivery time", "[e.g. 5 business days from PO]"),
+        ("Delivery time", f"{delivery_time} business days" if delivery_time else "[e.g. 5 business days from PO]"),
         ("Place of delivery", f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse / on board M/V ____]"),
-        ("Warranty", warranty),
-        ("Taxes", "VAT not included unless stated; other duties for the client’s account")
     ]
     
     terms_table = doc.add_table(rows=len(terms_data), cols=2)
@@ -213,32 +243,21 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
 
     doc.add_paragraph()
 
-    # 8. SCOPE
-    scope_title = doc.add_paragraph()
-    run = scope_title.add_run("SCOPE")
-    run.bold = True
-    run.font.size = Pt(8)
-    
-    doc.add_paragraph().add_run("Includes:\n").bold = True
-    doc.paragraphs[-1].add_run("[detail what the supply / service comprises]")
-    
-    doc.add_paragraph().add_run("Excludes:\n").bold = True
-    doc.paragraphs[-1].add_run("[freight, customs clearance, additional labour, parts not listed, etc.]")
-
-    doc.add_paragraph()
-
     # 9. NOTES
     notes_title = doc.add_paragraph()
+    notes_title.paragraph_format.keep_with_next = True
     run = notes_title.add_run("NOTES")
     run.bold = True
-    run.font.size = Pt(8)
+    run.font.size = Pt(11)
     
-    notes = [
+    notes_lines = [
         "Prices subject to confirmation of stock and availability at the time of the purchase order.",
-        "Quantities and specifications to be confirmed by the client before dispatch.",
-        "[Other relevant note]"
+        "Quantities and specifications to be confirmed by the client before dispatch."
     ]
-    for note in notes:
+    if notes and str(notes).strip() != "":
+        notes_lines.append(str(notes).strip())
+
+    for note in notes_lines:
         p = doc.add_paragraph(f"– {note}")
         p.paragraph_format.left_indent = Cm(0.5)
 
@@ -246,16 +265,15 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
     sig_p = doc.add_paragraph("Yours faithfully,\n\n")
     sig_name = sig_p.add_run("Eva Proios\n")
     sig_name.bold = True
-    sig_p.add_run("Operations – Proios S.A.\n[email] · [phone]")
+    sig_p.add_run("Operations – Proios S.A.\neva@proios.com · +549 11 57265031")
     sig_p.paragraph_format.space_after = Pt(20)
 
     # 11. FOOTER
     footer = section.footer
     footer_p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
     footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    f_run = footer_p.add_run("Proios S.A. · Buenos Aires, Argentina · [address] | [tel.] | [email] | [web]")
+    f_run = footer_p.add_run("Proios S.A. · Comodoro Pedro Zanni 351 floor 5th 503 LN. Buenos Aires (C1104AAH) Argentina | +549 11 57265031 | eva@proios.com | WWW.PROIOS.COM")
     f_run.font.size = Pt(8)
-    footer_p.add_run("\nPage X").font.size = Pt(8)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -263,6 +281,41 @@ def generar_cotizacion_docx(operacion, offer_validity="15 days", payment_terms="
     buffer.close()
     
     return docx_bytes
+
+def generar_cotizacion_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department"):
+    import tempfile
+    import os
+    import subprocess
+    
+    # 1. Generar DOCX con todo el estilo y estructura
+    docx_bytes = generar_cotizacion_docx(operacion, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn)
+    
+    # 2. Guardar a disco
+    fd_docx, temp_docx = tempfile.mkstemp(suffix=".docx")
+    os.close(fd_docx)
+    with open(temp_docx, 'wb') as f:
+        f.write(docx_bytes)
+        
+    temp_dir = os.path.dirname(temp_docx)
+    base_name = os.path.splitext(os.path.basename(temp_docx))[0]
+    temp_pdf = os.path.join(temp_dir, f"{base_name}.pdf")
+    
+    # 3. Convertir usando LibreOffice en background
+    try:
+        subprocess.run(
+            ['soffice', '--headless', '--convert-to', 'pdf', temp_docx, '--outdir', temp_dir],
+            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        
+        with open(temp_pdf, 'rb') as f:
+            pdf_bytes = f.read()
+    finally:
+        if os.path.exists(temp_docx): os.remove(temp_docx)
+        if os.path.exists(temp_pdf): os.remove(temp_pdf)
+        
+    return pdf_bytes
+
+
 
 def generar_cotizacion_servicio_docx(operacion, user, params):
     # Generar desde un docx en blanco
@@ -284,7 +337,7 @@ def generar_cotizacion_servicio_docx(operacion, user, params):
     footer = section.footer
     fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
     fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = fp.add_run("Proios S.A. · Buenos Aires, Argentina · [address] | [tel.] | [email] | [web]")
+    run = fp.add_run("Proios S.A. · Comodoro Pedro Zanni 351 floor 5th 503 LN. Buenos Aires (C1104AAH) Argentina | +549 11 57265031 | eva@proios.com | WWW.PROIOS.COM")
     run.font.color.rgb = RGBColor(0, 0, 255) # Azul
     run.font.size = Pt(8)
     run.font.name = 'Arial'
@@ -568,4 +621,50 @@ def generar_remito_docx(operacion):
     buffer.close()
     
     return docx_bytes
+
+def generar_remito_pdf(operacion):
+    """
+    Genera el remito en DOCX respetando la plantilla original y luego lo convierte
+    nativamente a PDF utilizando LibreOffice (headless), que corre en el contenedor Linux.
+    Esto garantiza 100% de fidelidad con el diseño de Microsoft Word sin usar COM/Windows.
+    """
+    import tempfile
+    import subprocess
+    
+    # 1. Obtenemos el DOCX con los datos inyectados en la plantilla
+    docx_bytes = generar_remito_docx(operacion)
+    
+    # 2. Guardamos en disco temporal
+    fd_docx, temp_docx = tempfile.mkstemp(suffix=".docx")
+    with os.fdopen(fd_docx, 'wb') as f:
+        f.write(docx_bytes)
+        
+    temp_dir = os.path.dirname(temp_docx)
+    
+    try:
+        # 3. Convertir a PDF usando libreoffice
+        subprocess.run([
+            "libreoffice",
+            "--headless",
+            "--convert-to", "pdf",
+            "--outdir", temp_dir,
+            temp_docx
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # 4. Leer el PDF generado
+        base_name = os.path.splitext(os.path.basename(temp_docx))[0]
+        pdf_path = os.path.join(temp_dir, f"{base_name}.pdf")
+        
+        with open(pdf_path, 'rb') as f:
+            pdf_bytes = f.read()
+            
+        # 5. Limpieza del PDF
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+            
+        return pdf_bytes
+    finally:
+        # 6. Limpieza del DOCX
+        if os.path.exists(temp_docx):
+            os.remove(temp_docx)
 
