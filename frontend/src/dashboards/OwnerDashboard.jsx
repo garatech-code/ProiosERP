@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { formatUserName, getUserInitials } from '../utils/formatters';
@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
 import StockMovements from '../components/StockMovements'; // NUEVO
 import UserManagement from '../components/UserManagement';
+import SeguimientoOperadores from '../components/SeguimientoOperadores';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -42,6 +43,7 @@ export default function OwnerDashboard() {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [activeTab, setActiveTab] = useState(() => localStorage.getItem('ownerDashboard_activeTab') || 'overview');
     const [operations, setOperations] = useState([]);
@@ -70,6 +72,12 @@ export default function OwnerDashboard() {
         }
         return { isOpen: false, type: null, id: null };
     });
+    const [emailSource, setEmailSource] = useState(null);
+
+    const handleCreateFromEmail = (email) => {
+        setEmailSource(email);
+        setOperationModalState({ isOpen: true, type: 'selector', id: null });
+    };
 
     // Eventos de Agenda
     const [agendaEvents, setAgendaEvents] = useState([]);
@@ -719,15 +727,17 @@ export default function OwnerDashboard() {
                         <i className="bi bi-people-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Plantel Operarios</span>}
                     </button>
-                    {/* NUEVO: Botón Movimientos Stock */}
                     <button title={!isSidebarOpen ? "Movimientos Stock" : ""} onClick={() => setActiveTab('stockMovements')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'stockMovements' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-boxes text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Movimientos Stock</span>}
                     </button>
-                    {/* NUEVO: Botón Gestión Usuarios */}
                     <button title={!isSidebarOpen ? "Gestión Usuarios" : ""} onClick={() => setActiveTab('users')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-person-gear text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Gestión Usuarios</span>}
+                    </button>
+                    <button title={!isSidebarOpen ? "Seguimiento Ops" : ""} onClick={() => setActiveTab('seguimiento_operadores')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'seguimiento_operadores' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-activity text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Seguimiento Ops</span>}
                     </button>
                 </div>
 
@@ -807,6 +817,7 @@ export default function OwnerDashboard() {
                     <i className="bi relative bi-envelope-open text-xl">
                         {unreadEmailsCount > 0 && activeTab !== 'inbox' && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>}
                     </i>
+                    <span className="text-[10px] mt-1 font-semibold">Correo</span>
                 </button>
                 <button onClick={() => setActiveTab('approvals')} className={`flex flex-col items-center p-2 ${activeTab === 'approvals' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi relative bi-bell text-xl">
@@ -814,19 +825,17 @@ export default function OwnerDashboard() {
                     </i>
                     <span className="text-[10px] mt-1 font-semibold">Notificaciones</span>
                 </button>
-                <button onClick={() => setActiveTab('staff')} className={`flex flex-col items-center p-2 ${activeTab === 'staff' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi bi-people-fill text-xl"></i>
-                    <span className="text-[10px] mt-1 font-semibold">Plantel</span>
-                </button>
-                {/* NUEVO: Botón móvil para Movimientos Stock */}
                 <button onClick={() => setActiveTab('stockMovements')} className={`flex flex-col items-center p-2 ${activeTab === 'stockMovements' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-boxes text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Stock</span>
                 </button>
-                {/* NUEVO: Botón móvil para Gestión Usuarios */}
                 <button onClick={() => setActiveTab('users')} className={`flex flex-col items-center p-2 ${activeTab === 'users' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-person-gear text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Usuarios</span>
+                </button>
+                <button onClick={() => setActiveTab('seguimiento_operadores')} className={`flex flex-col items-center p-2 ${activeTab === 'seguimiento_operadores' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-activity text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">KPIs</span>
                 </button>
             </div>
 
@@ -842,8 +851,9 @@ export default function OwnerDashboard() {
                             {activeTab === 'approvals' && 'Notificaciones Operativas'}
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
                             {activeTab === 'staff' && 'Personal de Plantel'}
-                            {activeTab === 'stockMovements' && 'Movimientos de Stock'} {/* NUEVO */}
+                            {activeTab === 'stockMovements' && 'Movimientos de Stock'}
                             {activeTab === 'users' && 'Gestión de Usuarios'}
+                            {activeTab === 'seguimiento_operadores' && 'Rendimiento y Seguimiento'}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
                             {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' :
@@ -851,11 +861,12 @@ export default function OwnerDashboard() {
                                     activeTab === 'staff' ? 'Administración del personal operativo disponible para la empresa.' :
                                         activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' :
                                             activeTab === 'users' ? 'Crea y administra las cuentas de acceso web para tus empleados.' :
+                                                activeTab === 'seguimiento_operadores' ? 'Métricas de rendimiento de operadores y tiempos de cierre.' :
                                                 'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && (
+                        {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && activeTab !== 'seguimiento_operadores' && (
                             <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                                 <i className="bi bi-plus-lg text-lg"></i>
                                 Nueva Operación
@@ -886,6 +897,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'staff' && <StaffManagement />}
                             {activeTab === 'stockMovements' && <StockMovements />} {/* NUEVO */}
                             {activeTab === 'users' && <UserManagement />}
+                            {activeTab === 'seguimiento_operadores' && <SeguimientoOperadores />}
                         </>
                     )}
                 </div>
@@ -901,29 +913,33 @@ export default function OwnerDashboard() {
             {operationModalState.isOpen && operationModalState.type === 'productos' && (
                 <OperationFormProductos
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
             {operationModalState.isOpen && operationModalState.type === 'quimicos' && (
                 <OperationFormQuimicos
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
             {operationModalState.isOpen && operationModalState.type === 'servicios' && (
                 <OperationFormServicios
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
             {operationModalState.isOpen && operationModalState.type === 'otros' && (
                 <OperationFormOtros
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
 

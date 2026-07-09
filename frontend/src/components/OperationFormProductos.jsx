@@ -107,7 +107,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 /* =========================
    MAIN COMPONENT
 ========================= */
-export default function OperationFormProductos({ id: propId, onClose, onSuccess }) {
+export default function OperationFormProductos({ id: propId, onClose, onSuccess, initialEmailData }) {
   const { user: currentUser } = useAuth();
   const { id: routeId } = useParams();
   const navigate = useNavigate();
@@ -157,8 +157,9 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
       }
     }
     return {
-      nombre: '',
+      nombre: initialEmailData?.subject?.slice(0, 50) || '',
       client: '',
+
       ship: '',
       port: '',
       agency: '',
@@ -166,7 +167,8 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
       tipo_operacion: 'productos',
       delivery_method: 'muelle',
       notes: '',
-      texto_pedido: '',
+      texto_pedido: initialEmailData ? (initialEmailData.body_text || '') : '',
+      source_email_id: initialEmailData ? initialEmailData.id : null,
       products: [],
       delivery_date: '',
       closed_date: '',
@@ -175,6 +177,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
       operadores_id: [],
       operarios_id: [],
       operarios_usuarios_id: [],
+      dificil_conseguir: false,
     };
   });
 
@@ -246,6 +249,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
             operadores_id: op.operadores_id || [],
             operarios_id: op.operarios_id || [],
             operarios_usuarios_id: op.operarios_usuarios_id || [],
+            dificil_conseguir: op.dificil_conseguir || false,
           });
 
           if (op.operarios_id && op.operarios_id.length > 0) {
@@ -276,6 +280,15 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
 
     loadData();
   }, [id, currentUser]);
+
+  useEffect(() => {
+    if (initialEmailData && initialEmailData.body_text) {
+      const imoMatch = initialEmailData.body_text.match(/\b(9\d{6})\b/);
+      if (imoMatch) {
+        setImoNumber(imoMatch[1]);
+      }
+    }
+  }, [initialEmailData]);
 
   useEffect(() => {
     if (!id) {
@@ -878,6 +891,20 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess 
                 className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                 placeholder="Información extra para logística o planta..."
               />
+            </div>
+
+            <div className="flex items-center gap-2 mt-4 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl">
+              <input
+                type="checkbox"
+                id="dificil_conseguir"
+                name="dificil_conseguir"
+                checked={formData.dificil_conseguir}
+                onChange={(e) => setFormData({ ...formData, dificil_conseguir: e.target.checked })}
+                className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 dark:focus:ring-amber-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="dificil_conseguir" className="text-sm font-medium text-amber-900 dark:text-amber-200 cursor-pointer">
+                El producto es difícil de conseguir (Exime de alerta de 48hs)
+              </label>
             </div>
 
             {id && (

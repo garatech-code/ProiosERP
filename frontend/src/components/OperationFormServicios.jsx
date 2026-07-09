@@ -108,8 +108,9 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 /* =========================
    MAIN COMPONENT
 ========================= */
-export default function OperationFormServicios({ id, onClose, onSuccess }) {
+export default function OperationFormServicios({ id: propId, onClose, onSuccess, initialEmailData }) {
   const navigate = useNavigate();
+  const id = propId;
   const { user: currentUser } = useAuth();
 
   const normalize = (str) => {
@@ -153,7 +154,7 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
       }
     }
     return {
-      nombre: '',
+      nombre: initialEmailData?.subject?.slice(0, 50) || '',
       client: '',
       ship: '',
       port: '',
@@ -164,7 +165,8 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
       detalle_servicio: '',
       forma_cotizacion_servicio: 'hora_hombre',
       notes: '',
-      texto_pedido: '',
+      texto_pedido: initialEmailData ? (initialEmailData.body_text || '') : '',
+      source_email_id: initialEmailData ? initialEmailData.id : null,
       products: [],
       delivery_date: '',
       closed_date: '',
@@ -261,6 +263,15 @@ export default function OperationFormServicios({ id, onClose, onSuccess }) {
 
     loadData();
   }, [id, currentUser]);
+
+  useEffect(() => {
+    if (initialEmailData && initialEmailData.body_text) {
+      const imoMatch = initialEmailData.body_text.match(/\b(9\d{6})\b/);
+      if (imoMatch) {
+        setImoNumber(imoMatch[1]);
+      }
+    }
+  }, [initialEmailData]);
 
   // Autosave silencioso (sólo en modo creación)
   useEffect(() => {

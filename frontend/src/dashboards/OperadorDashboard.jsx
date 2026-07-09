@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { formatUserName, getUserInitials } from '../utils/formatters';
@@ -40,6 +40,7 @@ export default function OperadorDashboard() {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // El Operador no tiene pestaña overview, así que el inicio es operations
     const [activeTab, setActiveTab] = useState(() => localStorage.getItem('operadorDashboard_activeTab') || 'operations'); // operations, calendar, inbox, inventory
@@ -63,6 +64,12 @@ export default function OperadorDashboard() {
         }
         return { isOpen: false, type: null, id: null };
     });
+    const [emailSource, setEmailSource] = useState(null);
+
+    const handleCreateFromEmail = (email) => {
+        setEmailSource(email);
+        setOperationModalState({ isOpen: true, type: 'selector', id: null });
+    };
 
     const [showDebugForm, setShowDebugForm] = useState(false);
 
@@ -594,7 +601,7 @@ export default function OperadorDashboard() {
                         <>
                             {activeTab === 'operations' && renderOperationsList()}
                             {activeTab === 'calendar' && renderCalendar()}
-                            {activeTab === 'inbox' && renderInbox()}
+                            {activeTab === 'inbox' && <InboxView onCreateFromEmail={handleCreateFromEmail} />}
                             {activeTab === 'inventory' && <InventoryManagement />}
                         </>
                     )}
@@ -611,29 +618,33 @@ export default function OperadorDashboard() {
             {operationModalState.isOpen && operationModalState.type === 'productos' && (
                 <OperationFormProductos
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
             {operationModalState.isOpen && operationModalState.type === 'quimicos' && (
                 <OperationFormQuimicos
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
             {operationModalState.isOpen && operationModalState.type === 'servicios' && (
                 <OperationFormServicios
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
             {operationModalState.isOpen && operationModalState.type === 'otros' && (
                 <OperationFormOtros
                     id={operationModalState.id}
-                    onClose={() => setOperationModalState({ isOpen: false, type: null, id: null })}
+                    onClose={() => { setOperationModalState({ isOpen: false, type: null, id: null }); setEmailSource(null); }}
                     onSuccess={handleFormSuccess}
+                    initialEmailData={emailSource}
                 />
             )}
 

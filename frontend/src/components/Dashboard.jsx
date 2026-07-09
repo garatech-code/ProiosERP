@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { formatUserName } from '../utils/formatters';
+import OperationTypeSelector from './OperationTypeSelector';
 import OperationFormProductos from './OperationFormProductos';
-import OperationFormWithIMO from './OperationFormWithIMO';
+import OperationFormServicios from './OperationFormServicios';
+import OperationFormQuimicos from './OperationFormQuimicos';
+import OperationFormOtros from './OperationFormOtros';
 
 export default function Dashboard() {
   const [operations, setOperations] = useState([]);
@@ -15,11 +18,22 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Estados de la NUEVA versión para los formularios modales y el menú móvil
-  const [showNormalForm, setShowNormalForm] = useState(false);
-  const [showIMOForm, setShowIMOForm] = useState(false);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [selectedFormType, setSelectedFormType] = useState(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [emailSource, setEmailSource] = useState(null);
+
+  useEffect(() => {
+    if (location.state?.createFromEmail) {
+      setEmailSource(location.state.createFromEmail);
+      setShowTypeSelector(true);
+      // Clean up the state so it doesn't reopen on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   // Mapeo amigable de roles (Versión vieja)
   const roleDisplay = {
@@ -110,9 +124,10 @@ export default function Dashboard() {
 
   // Lógica de Modales de la NUEVA versión
   const closeForms = () => {
-    setShowNormalForm(false);
-    setShowIMOForm(false);
+    setShowTypeSelector(false);
+    setSelectedFormType(null);
     setShowMobileMenu(false);
+    setEmailSource(null);
   };
 
   const handleSuccess = (id) => {
@@ -335,43 +350,38 @@ export default function Dashboard() {
 
       {/* FAB Mobile rediseñado con la lógica de menú de la NUEVA versión */}
       {!isOperario && (
-        <div className="sm:hidden fixed bottom-6 right-6 z-40 flex flex-col items-end">
-          {showMobileMenu && (
-            <div className="flex flex-col gap-2 mb-3">
-              <button
-                onClick={() => { setShowNormalForm(true); setShowMobileMenu(false); }}
-                className="px-5 py-2.5 bg-white text-gray-800 rounded-xl shadow-lg border border-gray-100 font-medium w-full text-right hover:bg-gray-50"
-              >
-                + Operación (Sin IMO)
-              </button>
-              <button
-                onClick={() => { setShowIMOForm(true); setShowMobileMenu(false); }}
-                className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl shadow-lg font-medium w-full text-right hover:bg-indigo-700"
-              >
-                + Operación (Con IMO)
-              </button>
-            </div>
-          )}
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
           <button
-            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            onClick={() => setShowTypeSelector(true)}
             className="w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-xl hover:bg-indigo-700 active:scale-95 transition-all focus:outline-none focus:ring-4 focus:ring-indigo-300"
           >
-            {showMobileMenu ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-            )}
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
           </button>
         </div>
       )}
 
       {/* Modales integrados al final del archivo */}
-      {showNormalForm && (
-        <OperationFormProductos onClose={closeForms} onSuccess={handleSuccess} />
+      {showTypeSelector && (
+        <OperationTypeSelector 
+          onSelect={(type) => {
+            setSelectedFormType(type);
+            setShowTypeSelector(false);
+          }} 
+          onClose={closeForms} 
+        />
       )}
 
-      {showIMOForm && (
-        <OperationFormWithIMO onClose={closeForms} onSuccess={handleSuccess} />
+      {selectedFormType === 'productos' && (
+        <OperationFormProductos onClose={closeForms} onSuccess={handleSuccess} initialEmailData={emailSource} />
+      )}
+      {selectedFormType === 'servicios' && (
+        <OperationFormServicios onClose={closeForms} onSuccess={handleSuccess} initialEmailData={emailSource} />
+      )}
+      {selectedFormType === 'quimicos' && (
+        <OperationFormQuimicos onClose={closeForms} onSuccess={handleSuccess} initialEmailData={emailSource} />
+      )}
+      {selectedFormType === 'otros' && (
+        <OperationFormOtros onClose={closeForms} onSuccess={handleSuccess} initialEmailData={emailSource} />
       )}
 
       {/* Estilos adicionales para utilidades visuales */}

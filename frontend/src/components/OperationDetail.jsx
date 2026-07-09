@@ -49,7 +49,7 @@ export default function OperationDetail() {
   // Estados del workflow de revisión Operador <-> Owner
   const [mensajeRevision, setMensajeRevision] = useState('');
   const [revisionActionLoading, setRevisionActionLoading] = useState(false);
-  const isOperador = user?.role === 'OPERADOR';
+  const isOperador = user?.role === 'OPERADOR' || user?.role === 'OPERADOR_JR';
 
   const [proveedor, setProveedor] = useState('PROIOS SA');
   const [paisDestino, setPaisDestino] = useState('argentina');
@@ -79,11 +79,10 @@ export default function OperationDetail() {
 
   const [showCotizacionEmailModal, setShowCotizacionEmailModal] = useState(false);
   const [cotizacionEmailAttachment, setCotizacionEmailAttachment] = useState(null);
-  const [fetchingCotizacionFile, setFetchingCotizacionFile] = useState(false);
 
-  const [showCotizacionPdfModal, setShowCotizacionPdfModal] = useState(false);
-  const [cotizacionAdicional, setCotizacionAdicional] = useState('');
-  const [detalleServicio, setDetalleServicio] = useState('');
+  const [showRechazoModal, setShowRechazoModal] = useState(false);
+  const [rechazoMotivo, setRechazoMotivo] = useState('');
+
   const [pnaText, setPnaText] = useState('');
 
   // Parametros para generar Word
@@ -454,6 +453,83 @@ export default function OperationDetail() {
     }
   };
 
+  const handleSendCotizacionEmail = async () => {
+    try {
+      setActionLoading(true);
+
+      const payload = {
+        offer_validity: offerValidity,
+        payment_terms: paymentTerms,
+        delivery_time: deliveryTime,
+        include_vat: includeVat,
+        vat_percentage: vatPercentage,
+        scope_includes: scopeIncludes,
+        scope_excludes: scopeExcludes,
+        notes: cotizacionNotes,
+        attn: cotizacionAttn,
+        template_type: cotizacionTemplate,
+        lang: cotizacionLang
+      };
+      
+      if (operation?.tipo_operacion === 'servicios') {
+        payload.damage_location = damageLocation;
+        payload.damage_frames = damageFrames;
+        payload.damage_area = damageArea;
+        payload.damage_subject = damageSubject;
+        payload.damage_location_title = damageLocationTitle;
+        payload.damage_frames_title = damageFramesTitle;
+        payload.damage_area_title = damageAreaTitle;
+        payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
+      }
+
+      // Descargamos el PDF generado temporalmente
+      const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
+        responseType: 'blob',
+      });
+      
+      const file = new File([response.data], `Cotizacion_OP${id}.pdf`, { type: 'application/pdf' });
+      setCotizacionEmailAttachment(file);
+      
+      // Ocultar modal de edición y mostrar modal de envío
+      setShowCotizacionWordModal(false);
+      setShowCotizacionEmailModal(true);
+      
+    } catch (error) {
+      console.error("Error generando cotización para email:", error);
+      showToast('Error al preparar la cotización para envío', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRechazarCotizacion = async (motivo) => {
+    try {
+      setActionLoading(true);
+      await axios.post(`/operaciones/operations/${id}/rechazar_cotizacion/`, { motivo_rechazo: motivo });
+      showToast('Operación pausada (rechazada)', 'success');
+      fetchOperation();
+    } catch (error) {
+      console.error("Error rechazando cotización:", error);
+      showToast('Error al pausar la operación', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReanudarOperacion = async () => {
+    try {
+      setActionLoading(true);
+      await axios.post(`/operaciones/operations/${id}/reanudar_operacion/`);
+      showToast('Operación reanudada', 'success');
+      fetchOperation();
+    } catch (error) {
+      console.error("Error reanudando operación:", error);
+      showToast('Error al reanudar la operación', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleGenerateRemito = async () => {
     try {
       const response = await axios.get(`/operaciones/operations/${id}/generate_remito_pdf/`, {
@@ -772,49 +848,27 @@ export default function OperationDetail() {
     }
   };
 
-  const handleCotizarClick = async () => {
-    setFetchingCotizacionFile(true);
-    try {
-      if (operation?.tipo === 'servicios') {
-        const paramsStr = new URLSearchParams({
-          mobilization: servMobilization,
-          execution: servExecution,
-          bank_charges: servBankCharges,
-          taxes: servTaxes,
-          payment_terms: servPaymentTerms,
-          transport: servTransport,
-        }).toString();
-        const url = `/operaciones/operations/${id}/generate_cotizacion_servicio/?${paramsStr}`;
-        const response = await axios.get(url, { responseType: 'blob' });
-        const file = new File([response.data], `Cotizacion_Servicio_OP${id}.docx`, {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        });
-        setCotizacionEmailAttachment(file);
-      } else {
-        const url = `/operaciones/operations/${id}/generate_cotizacion_docx/`;
-        const response = await axios.get(url, { responseType: 'blob' });
-        const file = new File([response.data], `Cotizacion_OP${id}.docx`, {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        });
-        setCotizacionEmailAttachment(file);
-      }
-      setShowCotizacionEmailModal(true);
-    } catch (error) {
-      console.error(error);
-      showToast('Error al generar la cotización para adjuntar', 'error');
-    } finally {
-      setFetchingCotizacionFile(false);
-    }
-  };
-
   const handleCotizacionEmailSuccess = async () => {
     setShowCotizacionEmailModal(false);
     showToast('Correo de Cotización encolado. Transicionando operación...', 'success');
 
     setActionLoading(true);
     try {
-      await axios.post(`/operaciones/operations/${id}/cotizar_servicio/`);
-      showToast('Operación marcada como Cotizada.', 'success');
+      const formData = new FormData();
+      if (cotizacionEmailAttachment) {
+        formData.append('file', cotizacionEmailAttachment);
+      }
+
+      if (operation?.tipo_operacion === 'servicios') {
+        await axios.post(`/operaciones/operations/${id}/cotizar_servicio/`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        await axios.post(`/operaciones/operations/${id}/cotizar_producto/`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+      showToast('Operación marcada como Cotizada (Cotización Enviada).', 'success');
       fetchOperation();
     } catch (err) {
       console.error(err);
@@ -822,6 +876,16 @@ export default function OperationDetail() {
       showToast(errMsg, 'error');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleVerCotizacion = () => {
+    const cotizaciones = operation.documentos_adjuntos?.filter(d => d.tipo === 'cotizacion') || [];
+    if (cotizaciones.length > 0) {
+      const ultimaCotizacion = cotizaciones[cotizaciones.length - 1];
+      window.open(ultimaCotizacion.archivo, '_blank');
+    } else {
+      showToast('No se encontró el archivo de la cotización. Revise la pestaña Documentación.', 'warning');
     }
   };
 
@@ -1012,7 +1076,10 @@ export default function OperationDetail() {
 
   const isOperario = user?.role === 'OPERARIO';
   const isOwner = user?.role === 'OWNER';
-  const canEdit = isOwner || (isOperador && operation?.creado_por === user?.id);
+  const canEdit = isOwner || (isOperador && (
+    operation?.creado_por === user?.id || 
+    (operation?.operadores_id && operation.operadores_id.includes(user?.id))
+  ));
 
   if (loading) return <div className="flex justify-center mt-20"><LogoSpinner size="w-16 h-16" /></div>;
   if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
@@ -1074,7 +1141,46 @@ export default function OperationDetail() {
         </div>
       </nav>
 
-      <div className="py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {operation.estado === 'pausada' && (
+          <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded-r-xl mb-6 shadow-sm">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <i className="bi bi-exclamation-octagon-fill text-red-500 text-xl"></i>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">
+                  Operación Pausada (Rechazada)
+                </h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-200">
+                  <p>
+                    <strong>Motivo del rechazo: </strong>
+                    {operation.motivo_rechazo || 'No se especificó un motivo.'}
+                  </p>
+                </div>
+                {isOwner && (
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={handleReanudarOperacion}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded shadow transition-colors inline-flex flex-row items-center gap-2"
+                    >
+                      <i className="bi bi-arrow-repeat"></i> Reanudar Operación
+                    </button>
+                    <button
+                      onClick={() => handleAction('recotizar_operacion', '¿Solicitar una recotización? La operación volverá al estado Recibida.')}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded shadow transition-colors inline-flex flex-row items-center gap-2"
+                    >
+                      <i className="bi bi-arrow-counterclockwise"></i> Solicitar Recotización
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {toastMessage && (
           <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' :
             toastMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
@@ -1739,10 +1845,64 @@ export default function OperationDetail() {
                         <i className="bi bi-x-octagon-fill"></i> Anular
                       </button>
                     )}
-                    {canEdit && (
-                      <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
-                        <i className="bi bi-pencil-fill"></i> Editar Info
-                      </button>
+                    {isOwner && operation.estado === 'pausada' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleReanudarOperacion}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-4 py-2 border-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <i className="bi bi-play-fill"></i> Reanudar Operación
+                        </button>
+                        <button
+                          onClick={() => handleAction('recotizar_operacion', '¿Solicitar una recotización? La operación volverá al estado Recibida.')}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-4 py-2 border-2 border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <i className="bi bi-arrow-counterclockwise"></i> Solicitar Recotización
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Botones Especiales de Seguimiento de Cotización */}
+                    {(operation.estado === 'cotizacion_enviada' || operation.estado === 'cotizado') ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            // Abrir modal de correo para seguimiento (sin adjunto forzado, usa plantilla)
+                            setCotizacionEmailAttachment(null);
+                            setShowCotizacionEmailModal(true);
+                          }}
+                          className="w-full sm:w-auto px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+                        >
+                          <i className="bi bi-send-check-fill"></i> Seguimiento
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (operation.tipo_operacion === 'servicios') {
+                              handleAction('tramitar_permisos_pna', '¿El cliente ha confirmado la cotización? La operación pasará a gestión de PNA.');
+                            } else {
+                              handleAction('cliente_confirma_producto', '¿El cliente ha confirmado la cotización? La operación pasará a preparación.');
+                            }
+                          }}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                        >
+                          <i className="bi bi-check-circle-fill"></i> Confirmada
+                        </button>
+                        <button
+                          onClick={() => setShowRechazoModal(true)}
+                          className="w-full sm:w-auto px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                        >
+                          <i className="bi bi-x-circle-fill"></i> Rechazada
+                        </button>
+                      </>
+                    ) : (
+                      canEdit && operation.estado !== 'pausada' && (
+                        <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                          <i className="bi bi-pencil-fill"></i> Editar Info
+                        </button>
+                      )
                     )}
 
                     {isOwner && operation.estado_revision === 'pending' && (
@@ -1803,7 +1963,7 @@ export default function OperationDetail() {
                             {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
                           </button>
                         )}
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && isOwner && (
                           <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
                             {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
                           </button>
@@ -1811,31 +1971,46 @@ export default function OperationDetail() {
                       </>
                     ) : (
                       <>
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'recibida' || operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <button
-                              onClick={() => setShowCotizacionWordModal(true)}
-                              disabled={actionLoading}
-                              className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                              title="Vista previa del documento generado automáticamente"
-                            >
-                              <i className="bi bi-eye-fill"></i> Vista Previa
-                            </button>
                             <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
                               <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
                               <input type="file" className="hidden" onChange={handleUploadCotizacionCustom} disabled={uploading} />
                             </label>
                             <button
-                              onClick={handleCotizarClick}
-                              disabled={actionLoading || fetchingCotizacionFile}
+                              onClick={() => setShowCotizacionWordModal(true)}
+                              disabled={actionLoading}
                               className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                             >
-                              {actionLoading || fetchingCotizacionFile ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
+                            </button>
+                          </div>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizacion_enviada' && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={handleVerCotizacion}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              <i className="bi bi-file-earmark-pdf"></i> Ver Cotización
+                            </button>
+                            <button
+                              onClick={() => handleAction('cliente_confirma_producto', '¿El cliente ha confirmado la cotización?')}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-check-circle"></i> Cliente Confirma</>}
                             </button>
                           </div>
                         )}
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={handleVerCotizacion}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              <i className="bi bi-file-earmark-pdf"></i> Ver Cotización
+                            </button>
                             <button
                               onClick={openPnaModal}
                               disabled={actionLoading}
@@ -1881,8 +2056,8 @@ export default function OperationDetail() {
                             </button>
                           </div>
                         )}
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && (
-                          <button onClick={() => handleAction('close_servicio', '¿Cerrar Operación por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && isOwner && (
+                          <button onClick={() => handleAction('close_servicio', '¿Finalizar la operación de servicio por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
                             {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
                           </button>
                         )}
@@ -1957,18 +2132,14 @@ export default function OperationDetail() {
           user={user}
           defaultOperacionId={id}
           defaultRecipient={operation.agency_email || operation.client_email || ''}
-          initialSubject={`Cotización de Servicio - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
-          initialBody={`Estimados,
-
-Adjuntamos la cotización correspondiente al servicio solicitado para el buque ${operation.ship_name}.
-
-• Cliente: ${operation.client_name}
-• Buque: ${operation.ship_name}
-• Puerto: ${operation.port_name}
-
-Quedamos a su disposición por cualquier consulta y a la espera de su confirmación.
-
-Saludos cordiales.`}
+          initialSubject={cotizacionEmailAttachment 
+            ? `Cotización - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`
+            : `Seguimiento: Cotización - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`
+          }
+          initialBody={cotizacionEmailAttachment 
+            ? `Estimados,\n\nAdjuntamos la cotización correspondiente a lo solicitado para el buque ${operation.ship_name}.\n\n• Cliente: ${operation.client_name}\n• Buque: ${operation.ship_name}\n• Puerto: ${operation.port_name}\n\nQuedamos a su disposición por cualquier consulta y a la espera de su confirmación.\n\nSaludos cordiales.`
+            : `Estimados,\n\nLes escribimos para consultar si han tenido oportunidad de revisar la cotización enviada anteriormente para el buque ${operation.ship_name}.\n\nQuedamos a su disposición para aclarar cualquier duda que pueda surgir o ajustar nuestra propuesta según lo requieran.\n\nAguardamos sus comentarios.\n\nSaludos cordiales.`
+          }
           initialAttachments={cotizacionEmailAttachment ? [cotizacionEmailAttachment] : []}
         />
       )}
@@ -2730,9 +2901,82 @@ Saludos cordiales.`}
                 {actionLoading ? (
                   <><i className="bi bi-arrow-repeat animate-spin"></i> Generando...</>
                 ) : (
-                  <><i className="bi bi-file-earmark-pdf-fill"></i> Descargar Cotización</>
+                  <><i className="bi bi-file-earmark-pdf-fill"></i> Descargar PDF</>
                 )}
               </button>
+              <button
+                onClick={() => {
+                  handleSendCotizacionEmail();
+                  setShowCotizacionWordModal(false);
+                }}
+                disabled={actionLoading}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 transform active:scale-95"
+              >
+                {actionLoading ? (
+                  <><i className="bi bi-arrow-repeat animate-spin"></i> Enviando...</>
+                ) : (
+                  <><i className="bi bi-envelope-check-fill"></i> Enviar por Correo</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Rechazo Cotización */}
+      {showRechazoModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onClick={() => setShowRechazoModal(false)}></div>
+
+            <div className="relative transform overflow-hidden rounded-2xl bg-white dark:bg-slate-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200 dark:border-slate-700">
+              <div className="bg-red-500 px-6 py-4 flex items-center justify-between">
+                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                  <i className="bi bi-x-circle-fill"></i> Rechazar Cotización
+                </h3>
+                <button onClick={() => setShowRechazoModal(false)} className="text-white hover:text-red-200 transition-colors">
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+
+              <div className="px-6 py-6 bg-white dark:bg-slate-800 space-y-4">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Por favor ingresa el motivo por el cual la cotización fue rechazada. La operación pasará al estado de Pausada para que el Owner pueda revisarla.
+                </p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Motivo del rechazo</label>
+                  <textarea
+                    rows={4}
+                    value={rechazoMotivo}
+                    onChange={(e) => setRechazoMotivo(e.target.value)}
+                    className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-red-500 focus:border-red-500 dark:text-white"
+                    placeholder="Ej: El cliente consideró que el precio es muy alto..."
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
+                <button
+                  onClick={() => setShowRechazoModal(false)}
+                  className="px-5 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    if (!rechazoMotivo.trim()) {
+                      showToast('Debes ingresar un motivo', 'error');
+                      return;
+                    }
+                    handleRechazarCotizacion(rechazoMotivo);
+                    setShowRechazoModal(false);
+                  }}
+                  disabled={actionLoading}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2"
+                >
+                  {actionLoading ? 'Procesando...' : <><i className="bi bi-exclamation-triangle-fill"></i> Confirmar Rechazo</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>

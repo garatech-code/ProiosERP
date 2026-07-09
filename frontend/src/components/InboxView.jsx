@@ -16,7 +16,7 @@ const getEmailPreview = (htmlOrText) => {
     return text.length > 50 ? text.slice(0, 50) + '...' : text;
 };
 
-export default function InboxView() {
+export default function InboxView({ onCreateFromEmail }) {
   const { user } = useAuth();
   const [emails, setEmails] = useState([]);
   const [selectedEmail, setSelectedEmail] = useState(null);
@@ -200,6 +200,16 @@ export default function InboxView() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
                 </button>
                 <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{selectedEmail.subject || '(Sin Asunto)'}</h2>
+                {!selectedEmail.operacion && (
+                  <button onClick={() => {
+                      if (onCreateFromEmail) {
+                          onCreateFromEmail(selectedEmail);
+                      }
+                  }} className="px-3 md:px-4 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-400 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0 border border-emerald-200 dark:border-emerald-800">
+                    <i className="bi bi-play-fill"></i>
+                    <span className="hidden sm:inline">Iniciar Operación</span>
+                  </button>
+                )}
                 <button onClick={handleReply} className="px-3 md:px-4 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0">
                   <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                   Responder

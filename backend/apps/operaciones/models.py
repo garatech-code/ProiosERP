@@ -50,6 +50,8 @@ class Agency(models.Model):
 
 class Operacion(models.Model):
     # Estados FSM (Productos / Químicos)
+    ESTADO_RECIBIDA = 'recibida'
+    ESTADO_COTIZACION_ENVIADA = 'cotizacion_enviada'
     ESTADO_SOLICITADA = 'solicitada'
     ESTADO_ARMADO_PACKING = 'armado_packing'
     ESTADO_EN_ADUANA = 'en_aduana'
@@ -66,8 +68,11 @@ class Operacion(models.Model):
     # Estados Comunes
     ESTADO_ENTREGADA = 'entregada'
     ESTADO_CANCELADA = 'cancelada'
+    ESTADO_PAUSADA = 'pausada'
 
     ESTADOS_CHOICES = (
+        (ESTADO_RECIBIDA, 'Recibida'),
+        (ESTADO_COTIZACION_ENVIADA, 'Cotización Enviada'),
         (ESTADO_SOLICITADA, 'Preparación'),
         (ESTADO_ARMADO_PACKING, 'En Gestión (Armado del Packing List)'),
         (ESTADO_EN_ADUANA, 'En Aduana (Esperando Rancho)'),
@@ -82,6 +87,7 @@ class Operacion(models.Model):
 
         (ESTADO_ENTREGADA, 'Completada / Cerrada'),
         (ESTADO_CANCELADA, 'Cancelada'),
+        (ESTADO_PAUSADA, 'Pausada (Rechazada / En Revisión)'),
     )
 
     cliente = models.ForeignKey(Client, on_delete=models.PROTECT, related_name="operaciones")
@@ -97,9 +103,14 @@ class Operacion(models.Model):
     nombre = models.CharField(max_length=200, blank=True, null=True, help_text="Nombre identificatorio de la operación")
 
     order_received_date = models.DateTimeField(null=True, blank=True)
+    quotation_sent_date = models.DateTimeField(null=True, blank=True)
+    quoted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='quoted_operations')
     client_confirmed_date = models.DateTimeField(null=True, blank=True)
     delivery_date = models.DateTimeField(null=True, blank=True)
     closed_date = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='closed_operations')
+    dificil_conseguir = models.BooleanField(default=False, help_text="Excluye a esta operación de las alertas de tiempo de cotización")
+    motivo_rechazo = models.TextField(blank=True, null=True, help_text="Razón por la que se rechazó la cotización o se pausó la operación")
 
     TIPO_PRODUCTOS = 'productos'
     TIPO_QUIMICOS = 'quimicos'
@@ -150,7 +161,7 @@ class Operacion(models.Model):
     estado_revision = models.CharField(max_length=20, choices=REVISION_CHOICES, default=ESTADO_REVISION_NONE)
     mensaje_revision = models.TextField(blank=True, null=True, help_text="Comentarios del operador (al solicitar) o del owner (al aprobar/rechazar).")
 
-    estado = FSMField(default=ESTADO_SOLICITADA, choices=ESTADOS_CHOICES, protected=True)
+    estado = FSMField(default=ESTADO_RECIBIDA, choices=ESTADOS_CHOICES, protected=True)
 
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='operaciones_creadas')
 
@@ -167,6 +178,14 @@ class Operacion(models.Model):
 
     def __str__(self):
         return f"OP-{self.pk:05d} : {self.cliente} ({self.get_estado_display()})"
+
+    @transition(field=estado, source=[ESTADO_RECIBIDA, ESTADO_COTIZACION_ENVIADA, ESTADO_PAUSADA], target=ESTADO_COTIZACION_ENVIADA)
+    def cotizar_producto(self):
+        self.quotation_sent_date = timezone.now()
+
+    @transition(field=estado, source=ESTADO_COTIZACION_ENVIADA, target=ESTADO_SOLICITADA)
+    def cliente_confirma_producto(self):
+        self.client_confirmed_date = timezone.now()
 
     @transition(field=estado, source=ESTADO_SOLICITADA, target=ESTADO_ARMADO_PACKING)
     def start_packing(self):
@@ -195,7 +214,7 @@ class Operacion(models.Model):
         pass
 
     # Transiciones para Servicios
-    @transition(field=estado, source=[ESTADO_SOLICITUD_SERVICIO, ESTADO_SOLICITADA], target=ESTADO_COTIZADO)
+    @transition(field=estado, source=[ESTADO_RECIBIDA, ESTADO_SOLICITUD_SERVICIO, ESTADO_SOLICITADA, ESTADO_COTIZADO, ESTADO_PAUSADA], target=ESTADO_COTIZADO)
     def cotizar_servicio(self):
         self.client_confirmed_date = timezone.now()
 
@@ -214,6 +233,20 @@ class Operacion(models.Model):
     @transition(field=estado, source=ESTADO_REPORTE_FIRMADO, target=ESTADO_ENTREGADA)
     def close_servicio(self):
         self.closed_date = timezone.now()
+
+    @transition(field=estado, source=[ESTADO_COTIZACION_ENVIADA, ESTADO_COTIZADO], target=ESTADO_PAUSADA)
+    def rechazar_cotizacion(self):
+        pass
+
+    @transition(field=estado, source=ESTADO_PAUSADA, target=ESTADO_RECIBIDA)
+    def reanudar_operacion(self):
+        pass
+
+    @transition(field=estado, source=ESTADO_PAUSADA, target=ESTADO_RECIBIDA)
+    def recotizar(self):
+        self.quotation_sent_date = None
+        self.client_confirmed_date = None
+        pass
 
     @transition(field=estado, source='*', target=ESTADO_CANCELADA)
     def cancel(self):

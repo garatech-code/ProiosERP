@@ -59,8 +59,8 @@ class IsOwnerOrCreatorSenior(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # descargar_zip es un POST de solo lectura de archivos
-        if view.action == 'descargar_zip':
+        # descargar_zip y generar reportes son POST pero de solo lectura/generación
+        if view.action in ['descargar_zip', 'generate_cotizacion_pdf', 'generate_solicitud_particular_pdf']:
             return True
 
         user = request.user
@@ -68,12 +68,12 @@ class IsOwnerOrCreatorSenior(permissions.BasePermission):
             return False
 
         # OWNER puede hacer cualquier modificación
-        if user.role == 'OWNER':
+        if user.role in ['OWNER', 'CONTABLE']:
             return True
 
-        # OPERADOR puede modificar solo sus propias creaciones
-        if user.role == 'OPERADOR':
-            return obj.creado_por == user
+        # OPERADOR y OPERADOR_JR pueden modificar si son creadores o están asignados
+        if user.role in ['OPERADOR', 'OPERADOR_JR']:
+            return obj.creado_por == user or obj.operadores_asignados.filter(id=user.id).exists()
 
         return False
 

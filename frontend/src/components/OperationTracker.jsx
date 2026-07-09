@@ -10,6 +10,7 @@ export default function OperationTracker({ currentState, operationType }) {
         
         if (isService) {
             switch (state) {
+                case 'recibida':
                 case 'solicitud_servicio':
                 case 'solicitada': // Fallback si quedó con el estado viejo
                     return 1;
@@ -28,18 +29,22 @@ export default function OperationTracker({ currentState, operationType }) {
             }
         } else {
             switch (state) {
-                case 'solicitada':
+                case 'recibida':
                     return 1;
-                case 'armado_packing':
+                case 'cotizacion_enviada':
                     return 2;
-                case 'en_aduana':
+                case 'solicitada':
                     return 3;
+                case 'armado_packing':
+                    return 4;
+                case 'en_aduana':
+                    return 5;
                 case 'lista_para_envio':
                 case 'remitada':
-                    return 4;
+                    return 6;
                 case 'entregada':
                 case 'closed':
-                    return 5;
+                    return 7;
                 default:
                     return 1;
             }
@@ -50,11 +55,13 @@ export default function OperationTracker({ currentState, operationType }) {
     const isCancelled = activeStep === -1;
 
     const stepsProduct = [
-        { num: 1, label: 'Preparación', icon: 'bi-file-earmark-text', desc: 'Orden ingresada' },
-        { num: 2, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
-        { num: 3, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
-        { num: 4, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
-        { num: 5, label: 'Finalizada', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
+        { num: 1, label: 'Recibida', icon: 'bi-inbox', desc: 'Solicitud ingresada' },
+        { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
+        { num: 3, label: 'Preparación', icon: 'bi-file-earmark-text', desc: 'Aprobada por cliente' },
+        { num: 4, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
+        { num: 5, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
+        { num: 6, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
+        { num: 7, label: 'Finalizada', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
     ];
 
     const stepsService = [

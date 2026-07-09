@@ -79,7 +79,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     }
 
     // Plantilla Institucional Proios Manager
-    const logoUrl = "cid:header_institucional";
+    const logoUrl = "https://drive.google.com/uc?export=view&id=1XZPPHdHgJ-9n4PvO1cUTm_Vhb8skmFKh";
     return `
       <!DOCTYPE html>
       <html>

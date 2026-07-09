@@ -97,8 +97,20 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 operation.operarios_usuarios_asignados.add(user)
                 
             operation.estado_revision = Operacion.ESTADO_REVISION_PENDING
-            operation.mensaje_revision = f"Operación iniciada por {user.username} ({user.role}) el {timezone.now().strftime('%d/%m/%Y a las %H:%M')}"
+            display_name = f"{user.first_name} {user.last_name}".strip() if user.first_name else user.username
+            operation.mensaje_revision = f"Operación iniciada por {display_name} ({user.role}) el {timezone.now().strftime('%d/%m/%Y a las %H:%M')}"
             operation.save()
+
+        # Vincular correo fuente si se provee
+        source_email_id = self.request.data.get('source_email_id')
+        if source_email_id:
+            try:
+                from apps.correos.models import EmailMessage
+                email = EmailMessage.objects.get(id=source_email_id)
+                email.operacion = operation
+                email.save()
+            except Exception as e:
+                logger.error(f"No se pudo vincular el correo {source_email_id} a la operacion {operation.id}: {e}")
 
     @action(detail=False, methods=['get'])
     def dashboard_metrics(self, request):
@@ -292,9 +304,13 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def close_operation(self, request, pk=None):
+        from apps.usuarios.models import User
+        if request.user.role != User.Role.OWNER:
+            return Response({'error': 'Solo el Owner puede cerrar operaciones.'}, status=403)
         op = self.get_object()
         try:
             op.close()
+            op.closed_by = request.user
             op.save()
             self.notificar_senior(op, "cerrado")
             return Response({'status': 'closed'})
@@ -945,8 +961,57 @@ class OperacionViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 op.cotizar_servicio()
+                op.quoted_by = request.user
+                
+                # Check for uploaded file
+                if 'file' in request.FILES:
+                    DocumentoAdjunto.objects.create(
+                        operacion=op,
+                        archivo=request.FILES['file'],
+                        nombre_personalizado=f"Cotizacion_Servicio_{op.id}.pdf",
+                        tipo='cotizacion'
+                    )
+                
                 op.save()
             return Response({'status': 'cotizado'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+        except Exception as e:
+            return Response({'error': f"Error al transicionar la operación: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def cotizar_producto(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.cotizar_producto()
+                op.quoted_by = request.user
+
+                # Check for uploaded file
+                if 'file' in request.FILES:
+                    DocumentoAdjunto.objects.create(
+                        operacion=op,
+                        archivo=request.FILES['file'],
+                        nombre_personalizado=f"Cotizacion_OP_{op.id}.pdf",
+                        tipo='cotizacion'
+                    )
+
+                op.save()
+            return Response({'status': 'cotizado'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+        except Exception as e:
+            # Handle TransitionNotAllowed and other exceptions gracefully
+            return Response({'error': f"Error al transicionar la operación: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def cliente_confirma_producto(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.cliente_confirma_producto()
+                op.save()
+            return Response({'status': 'confirmado_cliente'})
         except ValidationError as e:
             return Response({'error': str(e)}, status=400)
 
@@ -985,10 +1050,14 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def close_servicio(self, request, pk=None):
+        from apps.usuarios.models import User
+        if request.user.role != User.Role.OWNER:
+            return Response({'error': 'Solo el Owner puede cerrar operaciones.'}, status=403)
         op = self.get_object()
         try:
             with transaction.atomic():
                 op.close_servicio()
+                op.closed_by = request.user
                 op.save()
             return Response({'status': 'closed_servicio'})
         except ValidationError as e:
@@ -1064,6 +1133,138 @@ class OperacionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.exception("Error generando cotizacion pdf")
             return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['post'], url_path='send_cotizacion_email')
+    def send_cotizacion_email(self, request, pk=None):
+        op = self.get_object()
+        data = request.data
+        
+        offer_validity = data.get('offer_validity', '15 days')
+        payment_terms = data.get('payment_terms', '30 days from invoice date')
+        delivery_time = data.get('delivery_time', '5')
+        include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
+        vat_percentage = data.get('vat_percentage', '21')
+        scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
+        scope_excludes = data.get('scope_excludes', '[freight, customs clearance, additional labour, parts not listed, etc.]')
+        notes = data.get('notes', '[Other relevant note]')
+        attn = data.get('attn', 'Operations / Technical Department')
+        template_type = data.get('template_type', 'proios')
+        lang = data.get('lang', 'en')
+        
+        damage_location = data.get('damage_location', '')
+        damage_frames = data.get('damage_frames', '')
+        damage_area = data.get('damage_area', '')
+        custom_items = data.get('custom_items', '[]')
+        damage_subject = data.get('damage_subject', '')
+        damage_location_title = data.get('damage_location_title', '')
+        damage_frames_title = data.get('damage_frames_title', '')
+        damage_area_title = data.get('damage_area_title', '')
+        
+        recipient = data.get('recipient')
+        subject = data.get('subject')
+        body = data.get('body')
+        
+        if not recipient:
+            return Response({'error': 'Falta el destinatario'}, status=400)
+            
+        try:
+            if template_type == 'eva':
+                from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
+                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage)
+            else:
+                from apps.operaciones.services_pdf import generar_cotizacion_pdf_nativa
+                pdf_content = generar_cotizacion_pdf_nativa(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage)
+
+            import uuid
+            from django.utils import timezone
+            from django.db import transaction
+            from django.core.files.base import ContentFile
+            from apps.correos.models import EmailMessage, EmailAttachment
+            from apps.correos.tasks import send_outlook_email
+            
+            full_subject = subject if subject else f"[OP-{op.id}] Quotation"
+            if not full_subject.startswith(f"[OP-{op.id}]"):
+                full_subject = f"[OP-{op.id}] {full_subject}"
+
+            with transaction.atomic():
+                email_msg = EmailMessage.objects.create(
+                    message_id=f"OUT-{uuid.uuid4()}",
+                    subject=full_subject,
+                    sender_address='demomailproios@gmail.com',
+                    recipient_address=recipient,
+                    date_received=timezone.now(),
+                    body_text=body if body else "Please find attached the quotation.",
+                    is_read=True,
+                    is_sent=False,
+                    operacion=op
+                )
+                
+                attachment = EmailAttachment(
+                    email=email_msg,
+                    filename=f"cotizacion_OP{op.id}.pdf",
+                    content_type='application/pdf',
+                    size=len(pdf_content)
+                )
+                attachment.file.save(f"cotizacion_OP{op.id}.pdf", ContentFile(pdf_content), save=True)
+
+                if op.estado in [Operacion.ESTADO_RECIBIDA, Operacion.ESTADO_SOLICITUD_SERVICIO, Operacion.ESTADO_SOLICITADA]:
+                    if op.tipo_operacion == Operacion.TIPO_SERVICIOS:
+                        op.cotizar_servicio()
+                    else:
+                        op.cotizar_producto()
+                    op.quoted_by = request.user
+                    op.save()
+
+            send_outlook_email.delay(email_msg.id)
+
+            return Response({'status': 'ok'})
+        except Exception as e:
+            logger.exception("Error enviando cotizacion pdf por email")
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['post'], url_path='rechazar_cotizacion')
+    def rechazar_cotizacion(self, request, pk=None):
+        op = self.get_object()
+        motivo = request.data.get('motivo_rechazo')
+        if not motivo:
+            return Response({'error': 'Debe proveer un motivo de rechazo'}, status=400)
+            
+        try:
+            with transaction.atomic():
+                op.rechazar_cotizacion()
+                op.motivo_rechazo = motivo
+                op.save()
+            return Response({'status': 'pausada'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'], url_path='recotizar_operacion')
+    def recotizar_operacion(self, request, pk=None):
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.recotizar()
+                op.motivo_rechazo = ''
+                op.save()
+            return Response({'status': 'recibida'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'], url_path='reanudar_operacion')
+    def reanudar_operacion(self, request, pk=None):
+        from apps.usuarios.models import User
+        if request.user.role != User.Role.OWNER:
+            return Response({'error': 'Solo el Owner puede reanudar operaciones pausadas.'}, status=403)
+            
+        op = self.get_object()
+        try:
+            with transaction.atomic():
+                op.reanudar_operacion()
+                op.motivo_rechazo = None
+                op.save()
+            return Response({'status': 'reanudada'})
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['get'])
     def generate_cotizacion_docx(self, request, pk=None):
