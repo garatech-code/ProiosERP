@@ -339,7 +339,7 @@ export default function OwnerDashboard() {
 
             {/* Operaciones */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 transition-all">
-                <div 
+                <div
                     className="flex justify-between items-center cursor-pointer select-none mb-4"
                     onClick={() => setOpsExpanded(!opsExpanded)}
                 >
@@ -354,62 +354,62 @@ export default function OwnerDashboard() {
                 {opsExpanded && (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
-                        <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Total</span>
-                        <span className="text-3xl sm:text-4xl font-black text-indigo-600">{metrics.operaciones?.total || metrics.total || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
-                        <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">En Proceso</span>
-                        <span className="text-3xl sm:text-4xl font-black text-amber-500">{metrics.operaciones?.en_proceso || metrics.en_proceso || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
-                        <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Finalizadas</span>
-                        <span className="text-3xl sm:text-4xl font-black text-emerald-500">{metrics.operaciones?.finalizadas || metrics.finalizadas || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
-                        <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Canceladas</span>
-                        <span className="text-3xl sm:text-4xl font-black text-red-500">{metrics.operaciones?.canceladas || 0}</span>
-                    </div>
-                </div>
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
+                                <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Total</span>
+                                <span className="text-3xl sm:text-4xl font-black text-indigo-600">{metrics.operaciones?.total || metrics.total || 0}</span>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
+                                <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">En Proceso</span>
+                                <span className="text-3xl sm:text-4xl font-black text-amber-500">{metrics.operaciones?.en_proceso || metrics.en_proceso || 0}</span>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
+                                <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Finalizadas</span>
+                                <span className="text-3xl sm:text-4xl font-black text-emerald-500">{metrics.operaciones?.finalizadas || metrics.finalizadas || 0}</span>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
+                                <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Canceladas</span>
+                                <span className="text-3xl sm:text-4xl font-black text-red-500">{metrics.operaciones?.canceladas || 0}</span>
+                            </div>
+                        </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-                    <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600">
-                            <i className="bi bi-box-seam"></i>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600">
+                                    <i className="bi bi-box-seam"></i>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Productos</p>
+                                    <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.productos || 0}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
+                                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600">
+                                    <i className="bi bi-droplet-half"></i>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Químicos</p>
+                                    <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.quimicos || 0}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
+                                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600">
+                                    <i className="bi bi-tools"></i>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Servicios</p>
+                                    <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.servicios || 0}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
+                                <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400">
+                                    <i className="bi bi-folder"></i>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Otros</p>
+                                    <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.otros || 0}</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Productos</p>
-                            <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.productos || 0}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600">
-                            <i className="bi bi-droplet-half"></i>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Químicos</p>
-                            <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.quimicos || 0}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600">
-                            <i className="bi bi-tools"></i>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Servicios</p>
-                            <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.servicios || 0}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400">
-                            <i className="bi bi-folder"></i>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Otros</p>
-                            <p className="text-lg font-black text-gray-800 dark:text-gray-100">{metrics.operaciones?.por_tipo?.otros || 0}</p>
-                        </div>
-                    </div>
-                </div>
                     </>
                 )}
             </div>
@@ -417,7 +417,7 @@ export default function OwnerDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Inventario */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 transition-all">
-                    <div 
+                    <div
                         className="flex justify-between items-center cursor-pointer select-none mb-4"
                         onClick={() => setInvExpanded(!invExpanded)}
                     >
@@ -431,21 +431,21 @@ export default function OwnerDashboard() {
                     </div>
                     {invExpanded && (
                         <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl">
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1">Total Artículos</span>
-                            <span className="text-3xl font-black text-emerald-600">{metrics.inventario?.total_articulos || 0}</span>
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl">
+                                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1">Total Artículos</span>
+                                <span className="text-3xl font-black text-emerald-600">{metrics.inventario?.total_articulos || 0}</span>
+                            </div>
+                            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl">
+                                <span className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest block mb-1">Bajo Stock</span>
+                                <span className="text-3xl font-black text-red-600">{metrics.inventario?.bajo_stock || 0}</span>
+                            </div>
                         </div>
-                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl">
-                            <span className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest block mb-1">Bajo Stock</span>
-                            <span className="text-3xl font-black text-red-600">{metrics.inventario?.bajo_stock || 0}</span>
-                        </div>
-                    </div>
                     )}
                 </div>
 
                 {/* Usuarios */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 transition-all">
-                    <div 
+                    <div
                         className="flex justify-between items-center cursor-pointer select-none mb-4"
                         onClick={() => setUsrExpanded(!usrExpanded)}
                     >
@@ -459,25 +459,25 @@ export default function OwnerDashboard() {
                     </div>
                     {usrExpanded && (
                         <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center">
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1">Usuarios Activos</span>
-                            <span className="text-3xl font-black text-blue-600">{metrics.usuarios?.activos || metrics.usuarios_activos || 0}</span>
+                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center">
+                                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest block mb-1">Usuarios Activos</span>
+                                <span className="text-3xl font-black text-blue-600">{metrics.usuarios?.activos || metrics.usuarios_activos || 0}</span>
+                            </div>
+                            <div className="flex flex-col gap-2 justify-center">
+                                <div className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-700/30 px-3 py-1.5 rounded-lg">
+                                    <span className="font-semibold text-gray-600 dark:text-slate-300">Owners</span>
+                                    <span className="font-black text-gray-800 dark:text-gray-100">{metrics.usuarios?.owner || 0}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-700/30 px-3 py-1.5 rounded-lg">
+                                    <span className="font-semibold text-gray-600 dark:text-slate-300">Operadores</span>
+                                    <span className="font-black text-gray-800 dark:text-gray-100">{metrics.usuarios?.operadores || 0}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-700/30 px-3 py-1.5 rounded-lg">
+                                    <span className="font-semibold text-gray-600 dark:text-slate-300">Operarios</span>
+                                    <span className="font-black text-gray-800 dark:text-gray-100">{metrics.usuarios?.operarios || 0}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex flex-col gap-2 justify-center">
-                            <div className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-700/30 px-3 py-1.5 rounded-lg">
-                                <span className="font-semibold text-gray-600 dark:text-slate-300">Owners</span>
-                                <span className="font-black text-gray-800 dark:text-gray-100">{metrics.usuarios?.owner || 0}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-700/30 px-3 py-1.5 rounded-lg">
-                                <span className="font-semibold text-gray-600 dark:text-slate-300">Operadores</span>
-                                <span className="font-black text-gray-800 dark:text-gray-100">{metrics.usuarios?.operadores || 0}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-700/30 px-3 py-1.5 rounded-lg">
-                                <span className="font-semibold text-gray-600 dark:text-slate-300">Operarios</span>
-                                <span className="font-black text-gray-800 dark:text-gray-100">{metrics.usuarios?.operarios || 0}</span>
-                            </div>
-                        </div>
-                    </div>
                     )}
                 </div>
             </div>
@@ -651,7 +651,7 @@ export default function OwnerDashboard() {
     );
 
     const renderInbox = () => (
-        <InboxView />
+        <InboxView onCreateFromEmail={handleCreateFromEmail} />
     );
 
     return (
@@ -862,7 +862,7 @@ export default function OwnerDashboard() {
                                         activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' :
                                             activeTab === 'users' ? 'Crea y administra las cuentas de acceso web para tus empleados.' :
                                                 activeTab === 'seguimiento_operadores' ? 'Métricas de rendimiento de operadores y tiempos de cierre.' :
-                                                'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                                                    'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
