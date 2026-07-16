@@ -27,6 +27,15 @@ export default function InboxView({ onCreateFromEmail }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [isManageTemplatesOpen, setIsManageTemplatesOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const processEmails = (data) => {
     return data.map(e => ({
@@ -38,7 +47,8 @@ export default function InboxView({ onCreateFromEmail }) {
   const fetchEmails = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/correos/inbox/');
+      const url = debouncedSearch ? `/correos/inbox/?search=${encodeURIComponent(debouncedSearch)}` : '/correos/inbox/';
+      const res = await axios.get(url);
       const data = res.data.results ? res.data.results : res.data;
       setEmails(processEmails(data));
     } catch (err) {
@@ -52,13 +62,14 @@ export default function InboxView({ onCreateFromEmail }) {
     fetchEmails();
     // Pooling cada silencioso 60 segundos por si entran nuevos
     const interval = setInterval(() => {
-      axios.get('/correos/inbox/').then((res) => {
+      const url = debouncedSearch ? `/correos/inbox/?search=${encodeURIComponent(debouncedSearch)}` : '/correos/inbox/';
+      axios.get(url).then((res) => {
         const data = res.data.results ? res.data.results : res.data;
         setEmails(processEmails(data));
       }).catch(console.error);
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [debouncedSearch]);
 
   const handleSelectEmail = async (email) => {
     setSelectedEmail(email);
@@ -109,45 +120,60 @@ export default function InboxView({ onCreateFromEmail }) {
       
       {/* Left Sidebar - Email List */}
       <div className={`w-full md:w-1/3 flex-col border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-between items-center">
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setFilter('inbound')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'inbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
-            >
-              Recibidos
-            </button>
-            <button 
-              onClick={() => setFilter('outbound')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'outbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
-            >
-              Enviados
-            </button>
-            {user?.role === 'OWNER' && (
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <div className="flex flex-wrap gap-2">
               <button 
-                onClick={() => setIsManageTemplatesOpen(true)}
-                className="px-2 py-1 text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1"
-                title="Gestionar Plantillas"
+                onClick={() => setFilter('inbound')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'inbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span className="text-[10px] font-bold hidden sm:block">Plantillas</span>
+                Recibidos
               </button>
-            )}
-            <button 
-              onClick={handleSyncNow} 
-              disabled={isSyncing}
-              className="px-2 py-1 text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1"
-              title="Sincronizar ahora"
-            >
-              <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} style={isSyncing ? { animationDirection: 'reverse' } : {}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              {syncMessage && <span className="text-[10px] font-bold text-indigo-600 animate-fadeIn">{syncMessage}</span>}
+              <button 
+                onClick={() => setFilter('outbound')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'outbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`}
+              >
+                Enviados
+              </button>
+              {user?.role === 'OWNER' && (
+                <button 
+                  onClick={() => setIsManageTemplatesOpen(true)}
+                  className="px-2 py-1 text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1 bg-gray-50 hover:bg-gray-100 rounded-lg"
+                  title="Gestionar Plantillas"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                  <span className="text-[10px] font-bold hidden xl:block">Plantillas</span>
+                </button>
+              )}
+              <button 
+                onClick={handleSyncNow} 
+                disabled={isSyncing}
+                className="px-2 py-1 text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1 bg-gray-50 hover:bg-gray-100 rounded-lg"
+                title="Sincronizar ahora"
+              >
+                <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} style={isSyncing ? { animationDirection: 'reverse' } : {}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                {syncMessage && <span className="text-[10px] font-bold text-indigo-600 animate-fadeIn">{syncMessage}</span>}
+              </button>
+            </div>
+            
+            <button onClick={handleCompose} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 transition-colors flex items-center gap-2 shadow-sm shrink-0" title="Redactar">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+              <span className="text-xs font-bold hidden lg:block">Redactar</span>
             </button>
           </div>
-          <button onClick={handleCompose} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-2 transition-colors" title="Redactar">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-          </button>
+
+          <div className="relative w-full">
+            <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            <input 
+              type="search" 
+              placeholder="Buscar por asunto, email o contenido..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-sm pl-9 pr-4 py-2.5 transition-all outline-none text-gray-800 dark:text-gray-200 placeholder-gray-500"
+            />
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto">

@@ -105,7 +105,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 /* =========================
    MAIN COMPONENT
 ========================= */
-export default function OperationFormOtros({ id: propId, onClose, onSuccess }) {
+export default function OperationFormOtros({ id: propId, onClose, onSuccess, initialEmailData }) {
   const { user: currentUser } = useAuth();
   const { id: routeId } = useParams();
   const navigate = useNavigate();
@@ -153,7 +153,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess }) {
       }
     }
     return {
-      nombre: '',
+      nombre: initialEmailData?.subject?.slice(0, 50) || '',
       client: '',
       ship: '',
       port: '',
@@ -162,7 +162,8 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess }) {
       tipo_operacion: 'otros',
       delivery_method: 'muelle',
       notes: '',
-      texto_pedido: '',
+      texto_pedido: initialEmailData ? (initialEmailData.body_text || '') : '',
+      source_email_id: initialEmailData ? initialEmailData.id : null,
       products: [],
       delivery_date: '',
       closed_date: '',
@@ -265,6 +266,15 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess }) {
 
     loadData();
   }, [id, currentUser]);
+
+  useEffect(() => {
+    if (initialEmailData && initialEmailData.body_text) {
+      const imoMatch = initialEmailData.body_text.match(/\b(9\d{6})\b/);
+      if (imoMatch) {
+        setImoNumber(imoMatch[1]);
+      }
+    }
+  }, [initialEmailData]);
 
   useEffect(() => {
     if (!id) {
@@ -421,6 +431,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess }) {
         order_received_date: safeFormatDate(formData.order_received_date),
         client_confirmed_date: safeFormatDate(formData.client_confirmed_date),
         texto_pedido: formData.texto_pedido,
+        source_email_id: formData.source_email_id,
       };
 
       let res;

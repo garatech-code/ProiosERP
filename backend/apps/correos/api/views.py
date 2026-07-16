@@ -43,11 +43,12 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
             
         search = self.request.query_params.get('search')
         if search:
-            qs = qs.filter(
-                Q(subject__icontains=search) |  # type: ignore
-                Q(sender_address__icontains=search) |  # type: ignore
-                Q(body_text__icontains=search)
-            )
+            from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+            vector = SearchVector('subject', weight='A') + \
+                     SearchVector('sender_address', weight='B') + \
+                     SearchVector('body_text', weight='C')
+            query = SearchQuery(search)
+            qs = qs.annotate(rank=SearchRank(vector, query)).filter(rank__gt=0.0).order_by('-rank', '-date_received')
             
         return qs
 
