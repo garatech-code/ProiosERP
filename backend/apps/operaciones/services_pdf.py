@@ -681,7 +681,15 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         "Quantities and specifications to be confirmed by the client before dispatch."
     ]
     if notes and str(notes).strip():
-        notes_list.append(str(notes).strip())
+        for line in str(notes).split('\n'):
+            line = line.strip()
+            if line:
+                # Remove leading dashes/bullets to avoid duplication
+                if line.startswith('- ') or line.startswith('– ') or line.startswith('• '):
+                    line = line[2:].strip()
+                elif line.startswith('-') or line.startswith('–') or line.startswith('•'):
+                    line = line[1:].strip()
+                notes_list.append(line)
     
     for nl in notes_list:
         right_col.append(Paragraph(f"• {nl}", normal_style))
@@ -1091,7 +1099,15 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     story.append(Spacer(1, 0.2*cm))
     notes_list = []
     if notes and str(notes).strip():
-        notes_list.append(str(notes).strip())
+        for line in str(notes).split('\n'):
+            line = line.strip()
+            if line:
+                # Remove leading dashes/bullets to avoid duplication
+                if line.startswith('- ') or line.startswith('– ') or line.startswith('• '):
+                    line = line[2:].strip()
+                elif line.startswith('-') or line.startswith('–') or line.startswith('•'):
+                    line = line[1:].strip()
+                notes_list.append(line)
     
     for nl in notes_list:
         story.append(Paragraph(f"– {nl}", normal_style))

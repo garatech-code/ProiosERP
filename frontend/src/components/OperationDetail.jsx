@@ -127,6 +127,10 @@ export default function OperationDetail() {
       ) {
         setCotizacionNotes(isEs ? defEs : defEn);
       }
+      
+      setDamageLocationTitle(isEs ? 'Ubicación y daños' : 'Location and damage');
+      setDamageFramesTitle(isEs ? 'Cuaderna(s)' : 'Frame(s)');
+      setDamageAreaTitle(isEs ? 'Área L x H (mm)' : 'Area L x H (mm)');
     }
   }, [showCotizacionWordModal, operation, cotizacionLang]);
 
@@ -2572,15 +2576,15 @@ export default function OperationDetail() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
-                      <input type="text" className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500" value={damageLocationTitle} onChange={(e) => setDamageLocationTitle(e.target.value)} />
+                      <div className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{damageLocationTitle}</div>
                       <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageLocation} onChange={(e) => setDamageLocation(e.target.value)} placeholder="Ej: Port Side..." />
                     </div>
                     <div>
-                      <input type="text" className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500" value={damageFramesTitle} onChange={(e) => setDamageFramesTitle(e.target.value)} />
+                      <div className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{damageFramesTitle}</div>
                       <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageFrames} onChange={(e) => setDamageFrames(e.target.value)} placeholder="Ej: 45-50" />
                     </div>
                     <div>
-                      <input type="text" className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-600 focus:outline-none focus:border-blue-500" value={damageAreaTitle} onChange={(e) => setDamageAreaTitle(e.target.value)} />
+                      <div className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{damageAreaTitle}</div>
                       <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageArea} onChange={(e) => setDamageArea(e.target.value)} placeholder="Ej: 2000 x 1500" />
                     </div>
                   </div>
