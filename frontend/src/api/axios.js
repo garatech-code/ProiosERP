@@ -37,6 +37,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Check for maintenance mode
+    if (error.response?.status === 503 && error.response?.data?.detail === 'maintenance') {
+      window.dispatchEvent(new Event('app:maintenance'));
+      return Promise.reject(error);
+    }
+
     // The access token is expired or unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

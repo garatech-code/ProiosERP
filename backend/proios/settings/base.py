@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "apps.usuarios.middleware.MaintenanceModeMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware", # Servir estáticos de forma eficiente
@@ -135,6 +136,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
         "apps.usuarios.permissions.RestrictedPasswordPermission",
     ),
+    "UPLOADED_FILES_USE_URL": False,
 }
 
 # JWT configuration

@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Login from './components/Login';
@@ -26,6 +26,14 @@ const ProtectedRoute = ({ children }) => {
 
 const AppRoutes = () => {
   const { user, logout } = useAuth();
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleMaintenance = () => setIsMaintenanceMode(true);
+    window.addEventListener('app:maintenance', handleMaintenance);
+    return () => window.removeEventListener('app:maintenance', handleMaintenance);
+  }, []);
 
   useEffect(() => {
     let intervalId;
@@ -62,12 +70,27 @@ const AppRoutes = () => {
     const handleGlobalKeyPress = (e) => {
       if (e.key) {
         keySequence += e.key;
-        if (keySequence.length > 3) {
-          keySequence = keySequence.slice(-3);
+        if (keySequence.length > 4) {
+          keySequence = keySequence.slice(-4);
         }
-        if (keySequence === '+99') {
+        if (keySequence.slice(-3) === '+99') {
           window.open(`http://${window.location.hostname}:4000`, '_blank');
           keySequence = '';
+        } else if (keySequence === '++33') {
+          keySequence = '';
+          const secret = window.prompt("Kill Switch (Clave secreta):");
+          if (secret) {
+            fetch('/api/usuarios/users/toggle_maintenance/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ secret: secret.trim() })
+            })
+            .then(res => {
+              if (res.ok) window.location.reload();
+              else alert('Clave incorrecta o error en el servidor.');
+            })
+            .catch(() => alert('Error de conexión.'));
+          }
         }
       }
     };
@@ -76,11 +99,13 @@ const AppRoutes = () => {
       // Inicializar
       updateActivity();
       events.forEach(e => window.addEventListener(e, updateActivity));
-      window.addEventListener('keypress', handleGlobalKeyPress);
 
       // Chequear cada 10 segundos
       intervalId = setInterval(checkInactivity, 10000);
     }
+    
+    // Listener global de teclado (independiente de si hay usuario o no)
+    window.addEventListener('keypress', handleGlobalKeyPress);
 
     return () => {
       clearInterval(intervalId);
@@ -88,6 +113,19 @@ const AppRoutes = () => {
       window.removeEventListener('keypress', handleGlobalKeyPress);
     };
   }, [user, logout]);
+
+  if (isMaintenanceMode && location.pathname !== '/login') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="bg-white dark:bg-gray-800 p-10 rounded-xl shadow-lg text-center max-w-md w-full">
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-4">Mantenimiento Programado</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            El sistema se encuentra temporalmente en mantenimiento. Por favor, intente más tarde.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes>

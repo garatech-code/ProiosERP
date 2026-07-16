@@ -24,9 +24,7 @@ services:
       - redis_data:/data
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: garatecharg/stock-backend:v1.3
     container_name: proios_backend
     restart: always
     command: gunicorn proios.wsgi:application --bind 0.0.0.0:8000
@@ -48,9 +46,7 @@ services:
       - redis
 
   celery_worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: garatecharg/stock-backend:v1.3
     container_name: proios_celery_worker
     restart: always
     command: celery -A proios worker -l info
@@ -68,9 +64,7 @@ services:
       - redis
 
   celery_beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: garatecharg/stock-backend:v1.3
     container_name: proios_celery_beat
     restart: always
     command: celery -A proios beat -l info
@@ -88,10 +82,7 @@ services:
       - redis
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: build-stage
+    image: garatecharg/stock-frontend:v1.3
     container_name: proios_frontend
     restart: always
     command: npm run dev -- --host 0.0.0.0 --port 3000
