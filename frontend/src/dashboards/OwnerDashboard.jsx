@@ -56,6 +56,7 @@ export default function OwnerDashboard() {
     const [metrics, setMetrics] = useState({ total: 0, en_proceso: 0, finalizadas: 0, usuarios_activos: 0 });
     const [holidays, setHolidays] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // Collapsible states for KPIs
     const [opsExpanded, setOpsExpanded] = useState(true);
@@ -799,45 +800,101 @@ export default function OwnerDashboard() {
 
             {/* Mobile Bottom Tabs */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 z-30 flex justify-around p-2 pb-safe">
-                <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center p-2 ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center p-2 ${activeTab === 'overview' && !isMobileMenuOpen ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-pie-chart-fill text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Resumen</span>
                 </button>
-                <button onClick={() => setActiveTab('calendar')} className={`flex flex-col items-center p-2 ${activeTab === 'calendar' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi relative bi-calendar-event text-xl">
-                        {hasNewAgendaEvent && activeTab !== 'calendar' && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 border-2 border-white rounded-full"></span>}
-                    </i>
-                    <span className="text-[10px] mt-1 font-semibold">Agenda</span>
-                </button>
-                <button onClick={() => setActiveTab('operations')} className={`flex flex-col items-center p-2 ${activeTab === 'operations' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button onClick={() => { setActiveTab('operations'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center p-2 ${activeTab === 'operations' && !isMobileMenuOpen ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-list-check text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Operaciones</span>
                 </button>
-                <button onClick={() => setActiveTab('inbox')} className={`flex flex-col items-center p-2 ${activeTab === 'inbox' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button onClick={() => { setActiveTab('inbox'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center p-2 ${activeTab === 'inbox' && !isMobileMenuOpen ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi relative bi-envelope-open text-xl">
                         {unreadEmailsCount > 0 && activeTab !== 'inbox' && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>}
                     </i>
                     <span className="text-[10px] mt-1 font-semibold">Correo</span>
                 </button>
-                <button onClick={() => setActiveTab('approvals')} className={`flex flex-col items-center p-2 ${activeTab === 'approvals' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi relative bi-bell text-xl">
-                        {(operations || []).some(op => op.estado_revision === 'pending') && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-full"></span>}
+                <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`flex flex-col items-center p-2 ${isMobileMenuOpen ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi relative bi-list text-xl">
+                        {(hasNewAgendaEvent || (operations || []).some(op => op.estado_revision === 'pending')) && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-amber-500 border-2 border-white rounded-full"></span>}
                     </i>
-                    <span className="text-[10px] mt-1 font-semibold">Notificaciones</span>
-                </button>
-                <button onClick={() => setActiveTab('stockMovements')} className={`flex flex-col items-center p-2 ${activeTab === 'stockMovements' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi bi-boxes text-xl"></i>
-                    <span className="text-[10px] mt-1 font-semibold">Stock</span>
-                </button>
-                <button onClick={() => setActiveTab('users')} className={`flex flex-col items-center p-2 ${activeTab === 'users' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi bi-person-gear text-xl"></i>
-                    <span className="text-[10px] mt-1 font-semibold">Usuarios</span>
-                </button>
-                <button onClick={() => setActiveTab('seguimiento_operadores')} className={`flex flex-col items-center p-2 ${activeTab === 'seguimiento_operadores' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    <i className="bi bi-activity text-xl"></i>
-                    <span className="text-[10px] mt-1 font-semibold">KPIs</span>
+                    <span className="text-[10px] mt-1 font-semibold">Menú</span>
                 </button>
             </div>
+
+            {/* Mobile Menu Overlay */}
+            {isMobileMenuOpen && (
+                <div className="md:hidden fixed inset-0 z-20 flex flex-col bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
+                    <div className="mt-auto bg-white dark:bg-slate-900 rounded-t-3xl shadow-2xl p-6 pb-24 overflow-y-auto max-h-[80vh] border-t border-gray-100 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-12 h-1.5 bg-gray-300 dark:bg-slate-700 rounded-full mx-auto mb-6"></div>
+                        
+                        <h3 className="text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-4">Gestión y Herramientas</h3>
+                        <div className="grid grid-cols-4 gap-4 mb-8">
+                            <button onClick={() => { setActiveTab('calendar'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'calendar' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center relative shadow-sm border ${activeTab === 'calendar' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-calendar-event text-xl"></i>
+                                    {hasNewAgendaEvent && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full"></span>}
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Agenda</span>
+                            </button>
+                            <button onClick={() => { setActiveTab('approvals'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'approvals' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center relative shadow-sm border ${activeTab === 'approvals' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-bell text-xl"></i>
+                                    {(operations || []).some(op => op.estado_revision === 'pending') && <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 border-2 border-white dark:border-slate-800 rounded-full"></span>}
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Alertas</span>
+                            </button>
+                            <button onClick={() => { setActiveTab('stockMovements'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'stockMovements' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${activeTab === 'stockMovements' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-boxes text-xl"></i>
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Stock</span>
+                            </button>
+                            <button onClick={() => { setActiveTab('inventory'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'inventory' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${activeTab === 'inventory' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-box-seam text-xl"></i>
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Inventario</span>
+                            </button>
+                            <button onClick={() => { setActiveTab('staff'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'staff' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${activeTab === 'staff' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-people text-xl"></i>
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Plantel</span>
+                            </button>
+                            <button onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'users' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${activeTab === 'users' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-person-gear text-xl"></i>
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Usuarios</span>
+                            </button>
+                            <button onClick={() => { setActiveTab('seguimiento_operadores'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'seguimiento_operadores' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${activeTab === 'seguimiento_operadores' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-activity text-xl"></i>
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">KPIs</span>
+                            </button>
+                        </div>
+                        
+                        <h3 className="text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-4">Ajustes</h3>
+                        <div className="space-y-3">
+                            <button onClick={() => { toggleTheme(); setIsMobileMenuOpen(false); }} className="w-full flex items-center gap-3 p-3.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 border border-slate-100 dark:border-slate-700 rounded-xl font-bold text-sm text-gray-700 dark:text-slate-300 transition-colors">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'} text-base`}></i>
+                                </div>
+                                {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
+                            </button>
+                            <button onClick={() => { logout(); setIsMobileMenuOpen(false); }} className="w-full flex items-center gap-3 p-3.5 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 rounded-xl font-bold text-sm text-red-600 dark:text-red-400 transition-colors">
+                                <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center text-red-600 dark:text-red-400">
+                                    <i className="bi bi-box-arrow-right text-base"></i>
+                                </div>
+                                Cerrar Sesión
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative pb-16 md:pb-0 transition-colors duration-200">
