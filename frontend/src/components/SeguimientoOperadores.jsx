@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import LogoSpinner from './LogoSpinner';
+import * as XLSX from 'xlsx';
 
 export default function SeguimientoOperadores() {
   const [loading, setLoading] = useState(true);
@@ -158,8 +159,63 @@ export default function SeguimientoOperadores() {
 
   const globalKPIs = calculateGlobalKPIs();
 
+  const handleExportExcel = () => {
+    // 1. Prepare Global Data
+    const globalData = [{
+      "Total Proyectado (Mes Actual)": globalKPIs.currentMonthTotal, // RAW value for Excel to format if needed, but since formatCurrency has symbol, we output string
+      "Total Proyectado (String)": formatCurrency(globalKPIs.currentMonthTotal),
+      "Tasa de Conversión Global": globalKPIs.conversionRate.toFixed(1) + "%",
+      "Proyectado Mes Anterior": formatCurrency(globalKPIs.previousMonthTotal),
+      "Crecimiento Intermensual": globalKPIs.monthOverMonthChange.toFixed(1) + "%"
+    }];
+
+    // 2. Prepare Operator Data
+    const operatorData = operators.map(op => {
+      const m = calculateMetrics(op.id);
+      return {
+        "Operador": `${op.first_name || ''} ${op.last_name || ''}`.trim() || op.username,
+        "Email": op.email,
+        "Aporte Proyectado": formatCurrency(m.projectedValue),
+        "Tasa Conversión": m.conversionRate.toFixed(1) + "%",
+        "Cotizadas": m.quotedCount,
+        "Confirmadas": m.confirmedCount,
+        "Cerradas": m.closedCount,
+        "Tiempo Prom. Cotización": formatDuration(m.avgQuoteTimeMs),
+        "Tiempo Prom. Cierre": formatDuration(m.avgCloseTimeMs)
+      };
+    });
+
+    // 3. Create Workbook
+    const wb = XLSX.utils.book_new();
+    const wsGlobal = XLSX.utils.json_to_sheet(globalData);
+    const wsOperators = XLSX.utils.json_to_sheet(operatorData);
+    
+    // Auto-size columns (basic)
+    wsOperators['!cols'] = [
+      { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, 
+      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 22 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, wsGlobal, "KPIs Globales");
+    XLSX.utils.book_append_sheet(wb, wsOperators, "Rendimiento Operadores");
+
+    // 4. Download
+    XLSX.writeFile(wb, "Seguimiento_Operadores.xlsx");
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-black text-gray-900 dark:text-white">Seguimiento Comercial</h2>
+        <button 
+          onClick={handleExportExcel}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-colors text-sm"
+        >
+          <i className="bi bi-file-earmark-excel"></i>
+          Exportar a Excel
+        </button>
+      </div>
+
       {/* Panel de KPIs Globales */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Total Proyectado */}

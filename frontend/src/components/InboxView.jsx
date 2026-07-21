@@ -16,6 +16,20 @@ const getEmailPreview = (htmlOrText) => {
     return text.length > 50 ? text.slice(0, 50) + '...' : text;
 };
 
+const getMediaUrl = (url) => {
+    if (!url) return '';
+    try {
+        const parsed = new URL(url);
+        return parsed.pathname;
+    } catch (e) {
+        if (!url.startsWith('/')) {
+            if (url.startsWith('media/')) return '/' + url;
+            return '/media/' + url;
+        }
+        return url;
+    }
+};
+
 export default function InboxView({ onCreateFromEmail }) {
   const { user } = useAuth();
   const [emails, setEmails] = useState([]);
@@ -29,6 +43,11 @@ export default function InboxView({ onCreateFromEmail }) {
   const [isManageTemplatesOpen, setIsManageTemplatesOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [operationsForLink, setOperationsForLink] = useState([]);
+  const [selectedOpIdToLink, setSelectedOpIdToLink] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -108,6 +127,37 @@ export default function InboxView({ onCreateFromEmail }) {
   const handleCompose = () => {
     setReplyTo(null);
     setIsComposeOpen(true);
+  };
+
+  const fetchOperationsForLink = async () => {
+    try {
+      const res = await axios.get('/operaciones/operations/?page_size=50');
+      const data = res.data.results ? res.data.results : res.data;
+      setOperationsForLink(data);
+    } catch (err) {
+      console.error("Error fetching ops for link", err);
+    }
+  };
+
+  const openLinkModal = () => {
+    fetchOperationsForLink();
+    setIsLinkModalOpen(true);
+  };
+
+  const handleLinkToOperation = async () => {
+    if (!selectedOpIdToLink) return;
+    setIsLinking(true);
+    try {
+      await axios.patch(`/correos/inbox/${selectedEmail.id}/`, { operacion: selectedOpIdToLink });
+      setEmails(prev => prev.map(e => e.id === selectedEmail.id ? { ...e, operacion: selectedOpIdToLink } : e));
+      setSelectedEmail(prev => ({ ...prev, operacion: selectedOpIdToLink }));
+      setIsLinkModalOpen(false);
+      setSelectedOpIdToLink('');
+    } catch (err) {
+      console.error("Error linking", err);
+    } finally {
+      setIsLinking(false);
+    }
   };
 
   const filteredEmails = emails.filter((e) => {
@@ -227,14 +277,20 @@ export default function InboxView({ onCreateFromEmail }) {
                 </button>
                 <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{selectedEmail.subject || '(Sin Asunto)'}</h2>
                 {!selectedEmail.operacion && (
-                  <button onClick={() => {
-                      if (onCreateFromEmail) {
-                          onCreateFromEmail(selectedEmail);
-                      }
-                  }} className="px-3 md:px-4 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-400 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0 border border-emerald-200 dark:border-emerald-800">
-                    <i className="bi bi-play-fill"></i>
-                    <span className="hidden sm:inline">Iniciar Operación</span>
-                  </button>
+                  <>
+                    <button onClick={() => {
+                        if (onCreateFromEmail) {
+                            onCreateFromEmail(selectedEmail);
+                        }
+                    }} className="px-3 md:px-4 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-400 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0 border border-emerald-200 dark:border-emerald-800">
+                      <i className="bi bi-play-fill"></i>
+                      <span className="hidden sm:inline">Iniciar Operación</span>
+                    </button>
+                    <button onClick={openLinkModal} className="px-3 md:px-4 py-1.5 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-400 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0 border border-blue-200 dark:border-blue-800">
+                      <i className="bi bi-link-45deg"></i>
+                      <span className="hidden sm:inline">Vincular a Operación</span>
+                    </button>
+                  </>
                 )}
                 <button onClick={handleReply} className="px-3 md:px-4 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0">
                   <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
@@ -265,9 +321,9 @@ export default function InboxView({ onCreateFromEmail }) {
                   Adjuntos:
                 </span>
                 {selectedEmail.adjuntos.map(adj => (
-                  <span key={adj.id} className="px-2 py-1 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-xs text-indigo-600 dark:text-indigo-400 font-medium whitespace-nowrap">
-                    {adj.filename}
-                  </span>
+                  <a key={adj.id} href={getMediaUrl(adj.file)} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-xs text-indigo-600 dark:text-indigo-400 font-medium whitespace-nowrap hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1">
+                    <i className="bi bi-download"></i> {adj.filename}
+                  </a>
                 ))}
               </div>
             )}
@@ -299,6 +355,43 @@ export default function InboxView({ onCreateFromEmail }) {
             defaultEditMode={true}
             onCancel={() => setIsManageTemplatesOpen(false)}
           />
+        </div>
+      )}
+
+      {isLinkModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/50">
+              <h3 className="font-black text-gray-900 dark:text-white">Vincular a Operación</h3>
+              <button onClick={() => setIsLinkModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Seleccionar Operación</label>
+              <select 
+                value={selectedOpIdToLink} 
+                onChange={(e) => setSelectedOpIdToLink(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="">-- Seleccione --</option>
+                {operationsForLink.map(op => (
+                  <option key={op.id} value={op.id}>OP-{op.id} - {op.client_name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-2">Solo se muestran las últimas operaciones activas.</p>
+            </div>
+            <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex justify-end gap-3">
+              <button onClick={() => setIsLinkModalOpen(false)} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancelar</button>
+              <button 
+                onClick={handleLinkToOperation} 
+                disabled={!selectedOpIdToLink || isLinking}
+                className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {isLinking ? 'Vinculando...' : 'Confirmar Vinculación'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

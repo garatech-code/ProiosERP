@@ -14,6 +14,20 @@ import AutocompleteCreate from './AutocompleteCreate';
 import ToolsModal from './ToolsModal';
 import * as XLSX from 'xlsx';
 
+const getMediaUrl = (url) => {
+    if (!url) return '';
+    try {
+        const parsed = new URL(url);
+        return parsed.pathname;
+    } catch (e) {
+        if (!url.startsWith('/')) {
+            if (url.startsWith('media/')) return '/' + url;
+            return '/media/' + url;
+        }
+        return url;
+    }
+};
+
 export default function OperationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -1806,13 +1820,13 @@ export default function OperationDetail() {
 
                           <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
                             <button
-                              onClick={() => openPreview(adj.file, adj.filename)}
+                              onClick={() => openPreview(getMediaUrl(adj.file), adj.filename)}
                               className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
                             >
                               <i className="bi bi-eye-fill"></i> Ver
                             </button>
                             <a
-                              href={adj.file}
+                              href={getMediaUrl(adj.file)}
                               download
                               target="_blank"
                               rel="noopener noreferrer"

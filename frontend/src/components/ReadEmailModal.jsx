@@ -1,6 +1,20 @@
 import React from 'react';
 import DOMPurify from 'dompurify';
 
+const getMediaUrl = (url) => {
+    if (!url) return '';
+    try {
+        const parsed = new URL(url);
+        return parsed.pathname;
+    } catch (e) {
+        if (!url.startsWith('/')) {
+            if (url.startsWith('media/')) return '/' + url;
+            return '/media/' + url;
+        }
+        return url;
+    }
+};
+
 export default function ReadEmailModal({ email, onClose, onReply, openPreview }) {
   if (!email) return null;
 
@@ -78,7 +92,7 @@ export default function ReadEmailModal({ email, onClose, onReply, openPreview })
                       {openPreview && (
                         <button
                           type="button"
-                          onClick={() => openPreview(adj.file)}
+                          onClick={() => openPreview(getMediaUrl(adj.file))}
                           className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-400 p-0.5"
                           title="Previsualizar"
                         >
@@ -86,7 +100,7 @@ export default function ReadEmailModal({ email, onClose, onReply, openPreview })
                         </button>
                       )}
                       <a 
-                        href={adj.file} 
+                        href={getMediaUrl(adj.file)} 
                         download
                         target="_blank" 
                         rel="noopener noreferrer"

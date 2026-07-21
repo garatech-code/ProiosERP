@@ -2,6 +2,20 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
+const getMediaUrl = (url) => {
+    if (!url) return '';
+    try {
+        const parsed = new URL(url);
+        return parsed.pathname;
+    } catch (e) {
+        if (!url.startsWith('/')) {
+            if (url.startsWith('media/')) return '/' + url;
+            return '/media/' + url;
+        }
+        return url;
+    }
+};
+
 export default function OperationDocuments({ operacionId, documentos, onDocumentChange, openPreview, selectedDocs = [], toggleSelectDoc, canEdit = true }) {
     const { user } = useAuth();
     const [uploading, setUploading] = useState(false);
@@ -170,14 +184,14 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
                                     {openPreview && (
                                         <button
                                             type="button"
-                                            onClick={() => openPreview(doc.archivo)}
+                                            onClick={() => openPreview(getMediaUrl(doc.archivo))}
                                             className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
                                         >
                                             <i className="bi bi-eye-fill"></i> Ver
                                         </button>
                                     )}
                                     <a
-                                        href={doc.archivo}
+                                        href={getMediaUrl(doc.archivo)}
                                         download
                                         target="_blank"
                                         rel="noopener noreferrer"
