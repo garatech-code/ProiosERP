@@ -16,10 +16,12 @@ export default function SeguimientoOperadores() {
     setLoading(true);
     try {
       const [usersRes, opsRes] = await Promise.all([
-        axios.get('/usuarios/users/?role=OPERADOR'),
+        axios.get('/usuarios/users/'),
         axios.get('/operaciones/operations/?page_size=500') // fetch recent ops
       ]);
-      setOperators(usersRes.data?.results || usersRes.data || []);
+      const allUsers = usersRes.data?.results || usersRes.data || [];
+      const opUsers = allUsers.filter(u => u.role === 'OPERADOR' || u.role === 'OPERADOR_JR');
+      setOperators(opUsers);
       setOperations(opsRes.data?.results || opsRes.data || []);
     } catch (err) {
       console.error(err);

@@ -33,7 +33,7 @@ class IsOperarioReadOnly(BasePermission):
             return False
         if request.user.is_superuser or request.user.is_staff:
             return True
-        if request.user.groups.filter(name='OPERARIO').exists():
+        if getattr(request.user, 'role', None) == 'OPERARIO':
             if request.method in ('GET', 'HEAD', 'OPTIONS'):
                 return True
             if view.action == 'movimiento':

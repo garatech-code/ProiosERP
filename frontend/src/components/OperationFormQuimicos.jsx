@@ -171,7 +171,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
   useEffect(() => {
     const loadData = async () => {
       try {
-        if (currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR') {
+        if (currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR' || currentUser?.role === 'OPERADOR_JR') {
           const [usersRes, staffRes] = await Promise.all([
             axios.get('/usuarios/users/'),
             axios.get('/usuarios/plantel/?activo=true')
@@ -606,7 +606,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
               />
             </div>
 
-            {(currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR') && (
+            {(currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR' || currentUser?.role === 'OPERADOR_JR') && (
               <div>
                 <div className="flex justify-between items-center border-b dark:border-slate-600 pb-2 mb-4">
                   <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Equipo Asignado</h3>

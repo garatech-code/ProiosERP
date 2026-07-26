@@ -193,7 +193,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
   useEffect(() => {
     const loadData = async () => {
       try {
-        if (currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR') {
+        if (currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR' || currentUser?.role === 'OPERADOR_JR') {
           const [usersRes, staffRes] = await Promise.all([
             axios.get('/usuarios/users/'),
             axios.get('/usuarios/plantel/?activo=true')
@@ -210,7 +210,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
           const res = await axios.get(`/operaciones/operations/${id}/`);
           const op = res.data;
 
-          if (currentUser.role !== 'OWNER' && !(currentUser.role === 'OPERADOR' && op.creado_por === currentUser.id)) {
+          if (currentUser.role !== 'OWNER' && !((currentUser.role === 'OPERADOR' || currentUser.role === 'OPERADOR_JR') && op.creado_por === currentUser.id)) {
             setError('No tiene permisos para editar esta operación. Solo el creador y el Owner pueden modificarla.');
             setHasPermission(false);
             setFetchingData(false);
@@ -697,7 +697,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
               />
             </div>
 
-            {(currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR') && (
+            {(currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR' || currentUser?.role === 'OPERADOR_JR') && (
               <div>
                 <div className="flex justify-between items-center border-b dark:border-slate-600 pb-2 mb-4">
                   <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Equipo Asignado</h3>
