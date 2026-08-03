@@ -1047,47 +1047,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         story.append(Spacer(1, 0.6*cm))
 
 
-    # --- 6. TERMS ---
-
-    story.append(Paragraph(f"<b>{txt['terms']}</b>", card_title_style))
-    story.append(Spacer(1, 0.2*cm))
-    terms_data = [
-        [Paragraph(f"<b>{txt['currency']}</b>", normal_style), Paragraph("USD", normal_style)],
-        [Paragraph(f"<b>{txt['offer_val']}</b>", normal_style), Paragraph(offer_validity, normal_style)],
-        [Paragraph(f"<b>{txt['payment']}</b>", normal_style), Paragraph(payment_terms, normal_style)],
-        [Paragraph(f"<b>{txt['delivery']}</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
-        [Paragraph(f"<b>{txt['place']}</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)],
-        [Paragraph(f"<b>{txt['taxes']}</b>", normal_style), Paragraph(f"VAT {vat_percentage}%" if (str(include_vat).lower() == 'true' or include_vat is True) else "Not included", normal_style)]
-    ]
-    t_terms = Table(terms_data, colWidths=[3.5*cm, 14.5*cm])
-    t_terms.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-    ]))
-    story.append(KeepTogether(t_terms))
-    story.append(Spacer(1, 0.6*cm))
-    
-    # --- 7. DAMAGE DESCRIPTION (If apply) ---
-    if operacion.tipo_operacion == 'servicios':
-        story.append(Paragraph(f"<b>{damage_subject if damage_subject else txt['damage_desc']}</b>", card_title_style))
-        story.append(Spacer(1, 0.2*cm))
-        dmg_data = [
-            [Paragraph(f"<b>{damage_location_title if damage_location_title else txt['loc_damage']}</b>", normal_style), Paragraph(f"<b>{damage_frames_title if damage_frames_title else txt['frames']}</b>", normal_style), Paragraph(f"<b>{damage_area_title if damage_area_title else txt['area']}</b>", normal_style)],
-            [Paragraph(damage_location if damage_location else "-", normal_style), Paragraph(damage_frames if damage_frames else "-", normal_style), Paragraph(damage_area if damage_area else "-", normal_style)]
-        ]
-        t_dmg = Table(dmg_data, colWidths=[9*cm, 4.5*cm, 4.5*cm])
-        t_dmg.setStyle(TableStyle([
-            ('LINEABOVE', (0,0), (-1,0), 1, HexColor('#87CEEB')),
-            ('LINEBELOW', (0,0), (-1,0), 1, HexColor('#87CEEB')),
-            ('LINEBELOW', (0,-1), (-1,-1), 1, HexColor('#87CEEB')),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-        ]))
-        story.append(KeepTogether(t_dmg))
-        
-    story.append(PageBreak())
-    
-    # --- 8. PAGE 2 (SCOPE & NOTES) ---
+    # --- 6. PAGE 2 (SCOPE & NOTES) ---
     story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#87CEEB'), spaceBefore=2, spaceAfter=15))
     story.append(Paragraph(f"<b>{txt['scope']}</b>", card_title_style))
     story.append(Spacer(1, 0.2*cm))
@@ -1113,6 +1073,46 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         story.append(Paragraph(f"– {nl}", normal_style))
         
     story.append(Spacer(1, 1.5*cm))
+    
+    # --- 7. DAMAGE DESCRIPTION (If apply) ---
+    if operacion.tipo_operacion == 'servicios':
+        story.append(Paragraph(f"<b>{damage_subject if damage_subject else txt['damage_desc']}</b>", card_title_style))
+        story.append(Spacer(1, 0.2*cm))
+        dmg_data = [
+            [Paragraph(f"<b>{damage_location_title if damage_location_title else txt['loc_damage']}</b>", normal_style), Paragraph(f"<b>{damage_frames_title if damage_frames_title else txt['frames']}</b>", normal_style), Paragraph(f"<b>{damage_area_title if damage_area_title else txt['area']}</b>", normal_style)],
+            [Paragraph(damage_location if damage_location else "-", normal_style), Paragraph(damage_frames if damage_frames else "-", normal_style), Paragraph(damage_area if damage_area else "-", normal_style)]
+        ]
+        t_dmg = Table(dmg_data, colWidths=[9*cm, 4.5*cm, 4.5*cm])
+        t_dmg.setStyle(TableStyle([
+            ('LINEABOVE', (0,0), (-1,0), 1, HexColor('#87CEEB')),
+            ('LINEBELOW', (0,0), (-1,0), 1, HexColor('#87CEEB')),
+            ('LINEBELOW', (0,-1), (-1,-1), 1, HexColor('#87CEEB')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+        ]))
+        story.append(KeepTogether(t_dmg))
+        
+    story.append(PageBreak())
+
+    # --- 8. TERMS ---
+
+    story.append(Paragraph(f"<b>{txt['terms']}</b>", card_title_style))
+    story.append(Spacer(1, 0.2*cm))
+    terms_data = [
+        [Paragraph(f"<b>{txt['currency']}</b>", normal_style), Paragraph("USD", normal_style)],
+        [Paragraph(f"<b>{txt['offer_val']}</b>", normal_style), Paragraph(offer_validity, normal_style)],
+        [Paragraph(f"<b>{txt['payment']}</b>", normal_style), Paragraph(payment_terms, normal_style)],
+        [Paragraph(f"<b>{txt['delivery']}</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
+        [Paragraph(f"<b>{txt['place']}</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)],
+        [Paragraph(f"<b>{txt['taxes']}</b>", normal_style), Paragraph(f"VAT {vat_percentage}%" if (str(include_vat).lower() == 'true' or include_vat is True) else "Not included", normal_style)]
+    ]
+    t_terms = Table(terms_data, colWidths=[3.5*cm, 14.5*cm])
+    t_terms.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+    story.append(KeepTogether(t_terms))
+    story.append(Spacer(1, 0.6*cm))
     
     # --- 9. SIGNATURE ---
     story.append(Paragraph(txt['faithfully'], normal_style))
