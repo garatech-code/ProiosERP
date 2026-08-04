@@ -175,7 +175,7 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
     story.append(Spacer(1, 0.5*cm))
     
     user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
-    user_email = user.email if user and user.email else ""
+    user_email = "operations@proios.com"
     
     firma_data = [
         [Paragraph(f"<b>{user_name}</b><br/>Comercial / Operations<br/>{user_email}", normal_style)]
@@ -325,7 +325,7 @@ from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
 import io
 from datetime import datetime
 
-def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21"):
+def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None):
     import os
     import io
     from datetime import datetime
@@ -647,35 +647,17 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     # --- 6. PAGE 2: TWO COLUMN LAYOUT ---
     h_style = ParagraphStyle('HStyle', parent=bold_style, fontSize=12, textColor=HexColor('#003366'), spaceAfter=12)
     
-    # Left Column: TERMS
+    # Left Column: SCOPE & NOTES
     left_col = []
-    left_col.append(Paragraph("TERMS & CONDITIONS", h_style))
-    terms_data = [
-        [Paragraph("<b>Currency</b>", normal_style), Paragraph("USD", normal_style)],
-        [Paragraph("<b>Offer validity</b>", normal_style), Paragraph(offer_validity, normal_style)],
-        [Paragraph("<b>Payment terms</b>", normal_style), Paragraph(payment_terms, normal_style)],
-        [Paragraph("<b>Delivery time</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
-        [Paragraph("<b>Place of delivery</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)]
-    ]
-    t_terms = Table(terms_data, colWidths=[3.2*cm, 5.3*cm])
-    t_terms.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('LINEBELOW', (0,0), (-1,-1), 0.25, HexColor('#e2e8f0')),
-    ]))
-    left_col.append(t_terms)
+    left_col.append(Paragraph("SCOPE OF SUPPLY", h_style))
+    left_col.append(Paragraph("<b>Includes:</b>", bold_style))
+    left_col.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
+    left_col.append(Spacer(1, 0.4*cm))
+    left_col.append(Paragraph("<b>Excludes:</b>", bold_style))
+    left_col.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
+    left_col.append(Spacer(1, 0.8*cm))
     
-    # Right Column: SCOPE & NOTES
-    right_col = []
-    right_col.append(Paragraph("SCOPE OF SUPPLY", h_style))
-    right_col.append(Paragraph("<b>Includes:</b>", bold_style))
-    right_col.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
-    right_col.append(Spacer(1, 0.4*cm))
-    right_col.append(Paragraph("<b>Excludes:</b>", bold_style))
-    right_col.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
-    right_col.append(Spacer(1, 0.8*cm))
-    
-    right_col.append(Paragraph("TECHNICAL NOTES", h_style))
+    left_col.append(Paragraph("TECHNICAL NOTES", h_style))
     notes_list = [
         "Prices subject to confirmation of stock and availability at the time of the purchase order.",
         "Quantities and specifications to be confirmed by the client before dispatch."
@@ -692,9 +674,27 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
                 notes_list.append(line)
     
     for nl in notes_list:
-        right_col.append(Paragraph(f"• {nl}", normal_style))
-        right_col.append(Spacer(1, 0.2*cm))
-        
+        left_col.append(Paragraph(f"• {nl}", normal_style))
+        left_col.append(Spacer(1, 0.2*cm))
+
+    # Right Column: TERMS
+    right_col = []
+    right_col.append(Paragraph("TERMS & CONDITIONS", h_style))
+    terms_data = [
+        [Paragraph("<b>Currency</b>", normal_style), Paragraph("USD", normal_style)],
+        [Paragraph("<b>Offer validity</b>", normal_style), Paragraph(offer_validity, normal_style)],
+        [Paragraph("<b>Payment terms</b>", normal_style), Paragraph(payment_terms, normal_style)],
+        [Paragraph("<b>Delivery time</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
+        [Paragraph("<b>Place of delivery</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)]
+    ]
+    t_terms = Table(terms_data, colWidths=[3.2*cm, 5.3*cm])
+    t_terms.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 0.25, HexColor('#e2e8f0')),
+    ]))
+    right_col.append(t_terms)
+    
     # Put them in a 2-column table
     page2_table = Table([
         [left_col, "", right_col]
@@ -709,13 +709,17 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     story.append(Spacer(1, 2*cm))
     
     # --- 7. SIGNATURE BLOCK ---
+    user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
+    user_role = user.rol if (user and hasattr(user, 'rol')) else "Operations"
+    user_email = "operations@proios.com"
+    
     sig_table = Table([
         [
             Paragraph("Yours faithfully,", normal_style),
             ""
         ],
         [
-            Paragraph("<b>Eva Proios</b><br/>Operations – Proios S.A.<br/><font color='#64748b'>eva@proios.com · +549 11 57265031</font>", normal_style),
+            Paragraph(f"<b>{user_name}</b><br/>{user_role} – Proios S.A.<br/><font color='#64748b'>{user_email}</font>", normal_style),
             ""
         ]
     ], colWidths=[8.5*cm, 9.5*cm])
@@ -747,7 +751,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     return buffer.getvalue()
 
 
-def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21"):
+def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None):
     import os
     import io
     from datetime import datetime
@@ -1117,9 +1121,14 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     # --- 9. SIGNATURE ---
     story.append(Paragraph(txt['faithfully'], normal_style))
     story.append(Spacer(1, 0.8*cm))
-    story.append(Paragraph("<b>Eva Proios</b>", normal_style))
-    story.append(Paragraph("Operations – Proios S.A.", normal_style))
-    story.append(Paragraph("eva@proios.com", normal_style))
+    
+    user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
+    user_role = user.rol if (user and hasattr(user, 'rol')) else "Operations"
+    user_email = "operations@proios.com"
+    
+    story.append(Paragraph(f"<b>{user_name}</b>", normal_style))
+    story.append(Paragraph(f"{user_role} – Proios S.A.", normal_style))
+    story.append(Paragraph(f"{user_email}", normal_style))
     
     # Footer
     def add_proios_footer(canvas, doc):

@@ -53,3 +53,10 @@ remitos/
 ranchos/
 packing_list/
 packing_lists/
+# Archivos generados
+*.pdf
+*.xlsx
+
+# Documentos de propuesta de backups
+*[Bb]ackup*.md
+*[Bb]ackup*.html

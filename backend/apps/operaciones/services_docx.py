@@ -576,7 +576,7 @@ def generar_cotizacion_servicio_docx(operacion, user, params):
     add_run_arial(p_data, "Tel.: +55 13 3226-4686\n") # Teléfono fijo de la empresa
     add_run_arial(p_data, "Cel.: +55 13 99697-3059\n") # Celular (podría venir de user en el futuro)
     
-    user_email = user.email if user and user.email else ""
+    user_email = "operations@proios.com"
     if user_email:
         run_email = add_run_arial(p_data, f"{user_email}")
         run_email.font.color.rgb = RGBColor(0, 0, 255)

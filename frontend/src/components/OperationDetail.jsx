@@ -680,7 +680,7 @@ export default function OperationDetail() {
   const openPreview = (url, filename = 'documento') => {
     if (!url) return;
     const friendlyName = filename || url.split('/').pop();
-    const ext = url.split('.').pop().toLowerCase();
+    const ext = (friendlyName.includes('.') ? friendlyName : url).split('.').pop().toLowerCase();
 
     if (ext === 'xlsx' || ext === 'xls') {
       previewExcelFile(url);
@@ -748,6 +748,46 @@ export default function OperationDetail() {
     }
   };
 
+  const handleCotizacionExcelUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        const newItems = [];
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (row.length === 0 || !row[0]) continue;
+          
+          newItems.push({
+            nombre: String(row[0] || ''),
+            cantidad: row[1] !== undefined && row[1] !== null ? Number(row[1]) : 1,
+            precio_unitario: row[2] !== undefined && row[2] !== null ? Number(row[2]) : ''
+          });
+        }
+        
+        if (newItems.length > 0) {
+          setCustomItems(prev => [...prev, ...newItems]);
+          showToast(`Se agregaron ${newItems.length} ítems masivamente`, 'success');
+        } else {
+          showToast('El Excel no contenía datos válidos en las primeras 3 columnas', 'error');
+        }
+      } catch (err) {
+        console.error("Error al parsear Excel", err);
+        showToast('Error al leer el archivo Excel', 'error');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null;
+  };
+
   const downloadPackingListExcel = async () => {
     try {
       let url = `/operaciones/operations/${id}/packing_list_excel/`;
@@ -812,7 +852,7 @@ export default function OperationDetail() {
         window.URL.revokeObjectURL(url);
         showToast('Descargando Solicitud Particular...', 'success');
       } else {
-        openPreview(url, 'Generador de Solicitud Particular');
+        openPreview(url, 'Generador de Solicitud Particular.pdf');
       }
     } catch (error) {
       console.error('Error generando PDF:', error);
@@ -2149,11 +2189,8 @@ export default function OperationDetail() {
           onSuccess={handleCotizacionEmailSuccess}
           user={user}
           defaultOperacionId={id}
-          defaultRecipient={operation.agency_email || operation.client_email || ''}
-          initialSubject={cotizacionEmailAttachment 
-            ? `Cotización - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`
-            : `Seguimiento: Cotización - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`
-          }
+          defaultRecipient={operation.client_email || operation.agency_email || ''}
+          initialSubject={`[OP-${id}] Seguimiento y Cotizaciones - Buque: ${operation.ship_name}`}
           initialBody={cotizacionEmailAttachment 
             ? `Estimados,\n\nAdjuntamos la cotización correspondiente a lo solicitado para el buque ${operation.ship_name}.\n\n• Cliente: ${operation.client_name}\n• Buque: ${operation.ship_name}\n• Puerto: ${operation.port_name}\n\nQuedamos a su disposición por cualquier consulta y a la espera de su confirmación.\n\nSaludos cordiales.`
             : `Estimados,\n\nLes escribimos para consultar si han tenido oportunidad de revisar la cotización enviada anteriormente para el buque ${operation.ship_name}.\n\nQuedamos a su disposición para aclarar cualquier duda que pueda surgir o ajustar nuestra propuesta según lo requieran.\n\nAguardamos sus comentarios.\n\nSaludos cordiales.`
@@ -2652,12 +2689,23 @@ export default function OperationDetail() {
                         </button>
                       </div>
                     ))}
-                    <button 
-                      onClick={() => setCustomItems([...customItems, { nombre: '', cantidad: 1, precio_unitario: '' }])}
-                      className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-2"
-                    >
-                      <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
-                    </button>
+                    <div className="flex items-center gap-4 mt-2">
+                      <button 
+                        onClick={() => setCustomItems([...customItems, { nombre: '', cantidad: 1, precio_unitario: '' }])}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                      >
+                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
+                      </button>
+                      <label className="text-sm text-emerald-600 hover:text-emerald-800 font-semibold flex items-center gap-1 cursor-pointer">
+                        <i className="bi bi-file-earmark-excel-fill"></i> Carga Masiva (.xlsx)
+                        <input 
+                          type="file" 
+                          accept=".xlsx, .xls" 
+                          className="hidden" 
+                          onChange={handleCotizacionExcelUpload} 
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               )}
