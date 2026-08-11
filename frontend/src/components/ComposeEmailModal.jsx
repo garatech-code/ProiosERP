@@ -42,15 +42,28 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
         return match ? match[1].trim() : address.trim();
       };
 
+      const targetRecipient = replyTo.direction === 'outbound' ? replyTo.recipient_address : replyTo.sender_address;
+
+      const htmlToText = (html) => {
+        if (!html) return '';
+        const temp = document.createElement('div');
+        let formattedHtml = html.replace(/<br\s*[\/]?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<\/div>/gi, '\n');
+        temp.innerHTML = formattedHtml;
+        // Eliminar múltiples saltos de línea seguidos
+        return (temp.textContent || temp.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+      };
+
+      const fullReplyText = htmlToText(replyTo.body_html) || replyTo.body_text || '(Mensaje original sin contenido)';
+
       setFormData({
-        recipient: extractEmail(replyTo.sender_address),
+        recipient: extractEmail(targetRecipient),
         subject: replyTo.subject.startsWith('Re:') ? replyTo.subject : `Re: ${replyTo.subject}`,
-        body: `\n\n--- En respuesta a ---\nFecha: ${new Date(replyTo.date_received).toLocaleString()}\nDe: ${replyTo.sender_address}\n\n${replyTo.body_text || '(Mensaje HTML original)'}`,
+        body: (initialBody ? initialBody + '\n' : '') + `\n--- En respuesta a ---\nFecha: ${new Date(replyTo.date_received).toLocaleString()}\nDe: ${replyTo.sender_address}\n\n${fullReplyText}`,
         operacion_id: replyTo.operacion || '',
         useTemplate: true,
       });
     }
-  }, [replyTo]);
+  }, [replyTo, initialBody]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -78,6 +91,17 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
       return formData.body.replace(/\n/g, '<br>') + signature;
     }
 
+    const replyMarker = '\n\n--- En respuesta a ---\n';
+    const splitIndex = formData.body.indexOf(replyMarker);
+    
+    let mainContent = formData.body;
+    let quotedContent = '';
+
+    if (splitIndex !== -1) {
+      mainContent = formData.body.substring(0, splitIndex);
+      quotedContent = formData.body.substring(splitIndex).replace(/\n/g, '<br>');
+    }
+
     // Plantilla Institucional Proios Manager
     const logoUrl = "https://drive.google.com/uc?export=view&id=1XZPPHdHgJ-9n4PvO1cUTm_Vhb8skmFKh";
     return `
@@ -92,7 +116,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
           </tr>
           <tr>
             <td style="padding: 30px 25px; color: #334155; font-size: 14px; line-height: 1.6;">
-              ${formData.body.replace(/\n/g, '<br>')}
+              ${mainContent.replace(/\n/g, '<br>')}
             </td>
           </tr>
           <tr>
@@ -107,6 +131,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
             </td>
           </tr>
         </table>
+        ${quotedContent ? `<div style="max-width: 600px; margin: 20px auto; padding: 15px; color: #64748b; font-size: 12px; border-left: 3px solid #cbd5e1; background-color: #f1f5f9; border-radius: 4px;">${quotedContent}</div>` : ''}
       </body>
       </html>
     `;
@@ -131,6 +156,9 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
       formDataToSend.append('body', buildHtmlBody());
       if (formData.operacion_id) {
         formDataToSend.append('operacion_id', formData.operacion_id);
+      }
+      if (replyTo && replyTo.message_id) {
+        formDataToSend.append('reply_to_msg_id', replyTo.message_id);
       }
       attachments.forEach((file) => {
         formDataToSend.append('attachments', file);

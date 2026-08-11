@@ -99,7 +99,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   );
 }
 
-export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }) {
+export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, initialEmailData }) {
   const navigate = useNavigate();
   const { id: routeId } = useParams();
   const { user: currentUser } = useAuth();
@@ -147,7 +147,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
       }
     }
     return {
-      nombre: '',
+      nombre: initialEmailData?.subject?.slice(0, 50) || '',
       client: '',
       ship: '',
       port: '',
@@ -156,7 +156,8 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess }
       tipo_operacion: 'quimicos',
       delivery_method: 'muelle',
       notes: '',
-      texto_pedido: '',
+      texto_pedido: initialEmailData ? (initialEmailData.body_text || '') : '',
+      source_email_id: initialEmailData ? initialEmailData.id : null,
       products: [],
       delivery_date: '',
       closed_date: '',

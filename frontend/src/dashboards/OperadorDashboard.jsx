@@ -15,6 +15,7 @@ import AgendaEventModal from '../components/AgendaEventModal';
 import NotificationMenu from '../components/NotificationMenu';
 import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
+import AppVersionInfo from '../components/AppVersionInfo';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -515,6 +516,7 @@ export default function OperadorDashboard() {
                         <i className="bi bi-box-arrow-right text-lg"></i>
                         {isSidebarOpen && <span>Salir</span>}
                     </button>
+                    <AppVersionInfo isSidebarOpen={isSidebarOpen} />
                 </div>
             </aside>
 

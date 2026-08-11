@@ -2,8 +2,14 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.usuarios.api.views import CustomTokenObtainPairView
+from django.http import JsonResponse
+from django.conf import settings
+
+def version_view(request):
+    return JsonResponse({"backend_version": getattr(settings, 'APP_VERSION', 'local')})
 
 urlpatterns = [
+    path('api/version/', version_view, name='api_version'),
     # Panel de Administración de Django
     path('admin/', admin.site.urls),
 

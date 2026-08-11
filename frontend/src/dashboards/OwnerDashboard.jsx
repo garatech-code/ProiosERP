@@ -18,6 +18,7 @@ import LogoSpinner from '../components/LogoSpinner';
 import StockMovements from '../components/StockMovements'; // NUEVO
 import UserManagement from '../components/UserManagement';
 import SeguimientoOperadores from '../components/SeguimientoOperadores';
+import AppVersionInfo from '../components/AppVersionInfo';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -774,6 +775,7 @@ export default function OwnerDashboard() {
                         <i className="bi bi-box-arrow-right text-lg"></i>
                         {isSidebarOpen && <span>Salir</span>}
                     </button>
+                    <AppVersionInfo isSidebarOpen={isSidebarOpen} />
                 </div>
             </aside>
 

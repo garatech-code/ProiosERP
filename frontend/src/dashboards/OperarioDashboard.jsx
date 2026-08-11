@@ -6,6 +6,7 @@ import LogoSpinner from '../components/LogoSpinner';
 import { format } from 'date-fns';
 import es from 'date-fns/locale/es';
 import { formatUserName, getUserInitials } from '../utils/formatters';
+import AppVersionInfo from '../components/AppVersionInfo';
 
 export default function OperarioDashboard() {
   const { user, logout } = useAuth();
@@ -158,6 +159,7 @@ export default function OperarioDashboard() {
             <i className="bi bi-box-arrow-right text-lg"></i>
             {isSidebarOpen && <span>Salir</span>}
           </button>
+          <AppVersionInfo isSidebarOpen={isSidebarOpen} />
         </div>
       </aside>
 

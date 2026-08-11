@@ -72,6 +72,7 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
         body = request.data.get('body')
         recipient = request.data.get('recipient')
         operacion_id = request.data.get('operacion_id')
+        reply_to_msg_id = request.data.get('reply_to_msg_id')
         
         if operacion_id == '':
             operacion_id = None
@@ -89,8 +90,10 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
         from apps.correos.tasks import send_outlook_email
         
         full_subject = subject
-        if operacion_id and not full_subject.startswith(f"[OP-{operacion_id}]"):
-            full_subject = f"[OP-{operacion_id}] {full_subject}"
+        if operacion_id:
+            op_tag = f"[OP-{operacion_id}]"
+            if op_tag not in full_subject:
+                full_subject = f"{op_tag} {full_subject}"
 
         with transaction.atomic():
             email_msg = EmailMessage.objects.create(
@@ -114,6 +117,6 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
                     file=f
                 )
                 
-        send_outlook_email.delay(email_msg.id)
+        send_outlook_email.delay(email_msg.id, reply_to_msg_id)
         
         return Response({'status': 'Correo encolado exitosamente para envío...'}, status=status.HTTP_202_ACCEPTED)

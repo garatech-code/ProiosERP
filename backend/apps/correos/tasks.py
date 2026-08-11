@@ -144,7 +144,7 @@ def sync_outlook_inbox():
         cache.delete(lock_id)
 
 @shared_task
-def send_outlook_email(email_message_id):
+def send_outlook_email(email_message_id, reply_to_msg_id=None):
     if not getattr(settings, 'MS_GRAPH_CLIENT_ID', None):
         return "Credentials missing. Skipping email send."
         
@@ -156,10 +156,12 @@ def send_outlook_email(email_message_id):
     try:
         # Asunto con Tracking
         subject = email_msg.subject
-        if email_msg.operacion_id and not subject.startswith(f"[OP-{email_msg.operacion_id}]"):
-            subject = f"[OP-{email_msg.operacion_id}] {subject}"
-            email_msg.subject = subject
-            email_msg.save(update_fields=['subject'])
+        if email_msg.operacion_id:
+            op_tag = f"[OP-{email_msg.operacion_id}]"
+            if op_tag not in subject:
+                subject = f"{op_tag} {subject}"
+                email_msg.subject = subject
+                email_msg.save(update_fields=['subject'])
 
         text_body = email_msg.body_text or "Este es un correo institucional de Proios Manager."
         html_body = email_msg.body_html or text_body
@@ -222,35 +224,83 @@ def send_outlook_email(email_message_id):
             
         user_email = getattr(settings, 'MS_GRAPH_USER_EMAIL', 'operations@proios.com')
         
-        message_payload = {
-            "message": {
-                "subject": subject,
-                "body": {
-                    "contentType": "HTML",
-                    "content": html_body
-                },
-                "from": {
-                    "emailAddress": {
-                        "name": sender_name,
-                        "address": user_email
-                    }
-                },
-                "toRecipients": to_recipients,
-                "ccRecipients": cc_recipients,
-                "attachments": attachments
-            },
-            "saveToSentItems": "true"
-        }
-
         token = get_msgraph_token()
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
         }
         
-        url = f"https://graph.microsoft.com/v1.0/users/{user_email}/sendMail"
-        response = requests.post(url, headers=headers, json=message_payload)
-        response.raise_for_status()
+        graph_msg_id = None
+        if reply_to_msg_id:
+            try:
+                search_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/messages"
+                search_params = {"$filter": f"internetMessageId eq '{reply_to_msg_id}'"}
+                search_res = requests.get(search_url, headers=headers, params=search_params)
+                if search_res.status_code == 200:
+                    search_data = search_res.json().get('value', [])
+                    if search_data:
+                        graph_msg_id = search_data[0]['id']
+            except Exception as e:
+                logger.error(f"Error looking up message for reply: {e}")
+                
+        if graph_msg_id:
+            # 1. Create Draft Reply
+            reply_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/messages/{graph_msg_id}/createReply"
+            draft_res = requests.post(reply_url, headers=headers)
+            draft_res.raise_for_status()
+            draft_id = draft_res.json()['id']
+            
+            # 2. Update Draft with our body, subject, and recipients
+            update_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/messages/{draft_id}"
+            patch_payload = {
+                "subject": subject,
+                "body": {
+                    "contentType": "HTML",
+                    "content": html_body
+                },
+                "toRecipients": to_recipients,
+                "ccRecipients": cc_recipients,
+            }
+            patch_res = requests.patch(update_url, headers=headers, json=patch_payload)
+            patch_res.raise_for_status()
+            
+            # 3. Add attachments to draft
+            if attachments:
+                for att in attachments:
+                    att_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/messages/{draft_id}/attachments"
+                    att_res = requests.post(att_url, headers=headers, json=att)
+                    att_res.raise_for_status()
+                    
+            # 4. Send Draft
+            send_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/messages/{draft_id}/send"
+            send_res = requests.post(send_url, headers={'Authorization': f'Bearer {token}'})
+            send_res.raise_for_status()
+            
+        else:
+            # Send as new message
+            message_payload = {
+                "message": {
+                    "subject": subject,
+                    "body": {
+                        "contentType": "HTML",
+                        "content": html_body
+                    },
+                    "from": {
+                        "emailAddress": {
+                            "name": sender_name,
+                            "address": user_email
+                        }
+                    },
+                    "toRecipients": to_recipients,
+                    "ccRecipients": cc_recipients,
+                    "attachments": attachments
+                },
+                "saveToSentItems": "true"
+            }
+            
+            url = f"https://graph.microsoft.com/v1.0/users/{user_email}/sendMail"
+            response = requests.post(url, headers=headers, json=message_payload)
+            response.raise_for_status()
         
         return "Email sent successfully."
         

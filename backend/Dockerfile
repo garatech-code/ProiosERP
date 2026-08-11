@@ -35,3 +35,5 @@ RUN chmod +x /app/entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 CMD gunicorn proios.wsgi:application --bind 0.0.0.0:${PORT:-10000}
+
+

@@ -2173,6 +2173,7 @@ export default function OperationDetail() {
         <ComposeEmailModal
           onClose={() => setShowAduanasEmailModal(false)}
           onSuccess={handleAduanasEmailSuccess}
+          replyTo={emails.find(e => e.message_id && !e.message_id.startsWith('OUT-')) || null}
           user={user}
           defaultOperacionId={id}
           defaultRecipient={operation.agency_email || operation.client_email || ''}
@@ -2187,6 +2188,7 @@ export default function OperationDetail() {
         <ComposeEmailModal
           onClose={() => setShowCotizacionEmailModal(false)}
           onSuccess={handleCotizacionEmailSuccess}
+          replyTo={emails.find(e => e.message_id && !e.message_id.startsWith('OUT-')) || null}
           user={user}
           defaultOperacionId={id}
           defaultRecipient={operation.client_email || operation.agency_email || ''}
