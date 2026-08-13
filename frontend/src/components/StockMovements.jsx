@@ -104,12 +104,12 @@ export default function StockMovements() {
 
   const getTipoBadge = (tipoMov) => {
     const styles = {
-      INGRESO: 'bg-green-100 text-green-800',
-      SALIDA: 'bg-red-100 text-red-800',
-      AJUSTE: 'bg-yellow-100 text-yellow-800',
+      INGRESO: 'bg-green-100 dark:bg-green-900/30 text-green-800',
+      SALIDA: 'bg-red-100 dark:bg-red-900/30 text-red-800',
+      AJUSTE: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${styles[tipoMov] || 'bg-gray-100'}`}>
+      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${styles[tipoMov] || 'bg-gray-100 dark:bg-slate-800/50'}`}>
         {tipoMov}
       </span>
     );
@@ -141,7 +141,7 @@ export default function StockMovements() {
                 {productos.map((prod) => (
                   <div
                     key={prod.id}
-                    className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-slate-700 cursor-pointer text-sm"
+                    className="px-3 py-2 hover:bg-indigo-50 dark:bg-indigo-900/20 dark:hover:bg-slate-700 cursor-pointer text-sm"
                     onClick={() => {
                       setSelectedProducto(prod.id);
                       setProductoSearch(prod.nombre);
@@ -260,7 +260,7 @@ export default function StockMovements() {
                 </tr>
               ) : (
                 movements.map((mov) => (
-                  <tr key={mov.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                  <tr key={mov.id} className="hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 text-sm">{new Date(mov.fecha).toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm font-medium">{mov.articulo_nombre}</td>
                     <td className="px-4 py-3 text-sm">{mov.usuario_nombre}</td>

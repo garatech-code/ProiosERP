@@ -1098,13 +1098,13 @@ export default function OperationDetail() {
 
   const statusBadge = (status) => {
     const colors = {
-      solicitada: 'bg-yellow-100 text-yellow-800',
-      armado_packing: 'bg-blue-100 text-blue-800',
+      solicitada: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800',
+      armado_packing: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800',
       en_aduana: 'bg-orange-100 text-orange-800',
-      lista_para_envio: 'bg-green-100 text-green-800',
-      remitada: 'bg-indigo-100 text-indigo-800',
+      lista_para_envio: 'bg-green-100 dark:bg-green-900/30 text-green-800',
+      remitada: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800',
       entregada: 'bg-gray-100 text-gray-800',
-      cancelada: 'bg-red-100 text-red-800',
+      cancelada: 'bg-red-100 dark:bg-red-900/30 text-red-800',
     };
     const labels = {
       solicitada: 'Preparación',
@@ -1116,7 +1116,7 @@ export default function OperationDetail() {
       cancelada: 'Cancelada',
     };
     return (
-      <span className={`px-3 py-1.5 inline-flex text-xs leading-5 font-black uppercase tracking-wider rounded-lg ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-3 py-1.5 inline-flex text-xs leading-5 font-black uppercase tracking-wider rounded-lg ${colors[status] || 'bg-gray-100 dark:bg-slate-800/50 text-gray-800 dark:text-slate-200'}`}>
         {labels[status] || status}
       </span>
     );
@@ -1140,7 +1140,7 @@ export default function OperationDetail() {
   ));
 
   if (loading) return <div className="flex justify-center mt-20"><LogoSpinner size="w-16 h-16" /></div>;
-  if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
+  if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 dark:bg-red-900/20 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
   if (!operation) return <div className="text-center mt-10">No se encontró la operación</div>;
 
   const shipFlag = operation.ship_flag || (operation.ship ? operation.ship.flag : '');
@@ -1151,7 +1151,7 @@ export default function OperationDetail() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/')} className="text-slate-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30">
+              <button onClick={() => navigate('/')} className="text-slate-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30">
                 <i className="bi bi-arrow-left text-xl"></i>
               </button>
 
@@ -1191,7 +1191,7 @@ export default function OperationDetail() {
             <div className="flex items-center space-x-4">
 
               <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 hidden sm:block">Hola, {formatUserName(user)}</span>
-              <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors" title="Cerrar sesión">
+              <button onClick={logout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/30 rounded-full transition-colors" title="Cerrar sesión">
                 <i className="bi bi-box-arrow-right text-lg"></i>
               </button>
             </div>
@@ -1240,9 +1240,9 @@ export default function OperationDetail() {
         )}
         
         {toastMessage && (
-          <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' :
-            toastMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-              'bg-blue-50 text-blue-800 border-blue-200'
+          <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-800 border-red-200' :
+            toastMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 border-emerald-200' :
+              'bg-blue-50 dark:bg-blue-900/20 text-blue-800 border-blue-200'
             }`}>
             <i className={`bi text-lg ${toastMessage.type === 'error' ? 'bi-x-circle-fill text-red-500' : toastMessage.type === 'success' ? 'bi-check-circle-fill text-emerald-500' : 'bi-info-circle-fill text-blue-500'}`}></i>
             <span className="font-bold text-sm tracking-tight">{toastMessage.message}</span>
@@ -1259,7 +1259,7 @@ export default function OperationDetail() {
                 <h4 className="text-amber-800 font-bold">Notificación a Gerencia</h4>
                 <p className="text-amber-700 text-sm">{isOwner ? 'Un operador ha generado actividad reciente en esta operación.' : 'El administrador ha sido notificado del progreso de esta operación.'}</p>
                 {operation.mensaje_revision && (
-                  <div className="mt-2 p-2 bg-white/60 rounded text-amber-900 text-xs shadow-sm italic">
+                  <div className="mt-2 p-2 bg-white dark:bg-slate-800/60 rounded text-amber-900 text-xs shadow-sm italic">
                     "{operation.mensaje_revision}"
                   </div>
                 )}
@@ -1268,13 +1268,13 @@ export default function OperationDetail() {
           )}
 
           {operation.estado_revision === 'rejected' && isOperador && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
+            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
               <i className="bi bi-exclamation-octagon-fill text-red-500 text-xl mt-0.5"></i>
               <div>
                 <h4 className="text-red-800 font-bold">Se requieren correcciones</h4>
                 <p className="text-red-700 text-sm">El administrador ha rechazado tu solicitud previa.</p>
                 {operation.mensaje_revision && (
-                  <div className="mt-2 p-2 bg-white/60 rounded text-red-900 text-xs shadow-sm italic">
+                  <div className="mt-2 p-2 bg-white dark:bg-slate-800/60 rounded text-red-900 text-xs shadow-sm italic">
                     "{operation.mensaje_revision}"
                   </div>
                 )}
@@ -1283,13 +1283,13 @@ export default function OperationDetail() {
           )}
 
           {operation.estado_revision === 'approved' && isOperador && (
-            <div className="mb-6 bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
+            <div className="mb-6 bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-emerald-500 p-4 rounded-r-xl shadow-sm flex items-start gap-3">
               <i className="bi bi-shield-check text-emerald-500 text-xl mt-0.5"></i>
               <div>
                 <h4 className="text-emerald-800 font-bold">Revisión Aprobada</h4>
                 <p className="text-emerald-700 text-sm">El administrador dio el OK. Ahora puedes continuar la operación al siguiente nivel.</p>
                 {operation.mensaje_revision && (
-                  <div className="mt-2 p-2 bg-white/60 rounded text-emerald-900 text-xs shadow-sm italic">
+                  <div className="mt-2 p-2 bg-white dark:bg-slate-800/60 rounded text-emerald-900 text-xs shadow-sm italic">
                     "{operation.mensaje_revision}"
                   </div>
                 )}
@@ -1425,7 +1425,7 @@ export default function OperationDetail() {
                             <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
                           </h3>
                           {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                            <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white">
+                            <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
                               {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
                               Verificar Stock
                             </button>
@@ -1455,11 +1455,11 @@ export default function OperationDetail() {
                                   <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
                                   <td className="px-6 py-4 text-center">
                                     {isSuficiente ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
                                         <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 text-red-600 border border-red-200 uppercase">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
                                         <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
                                       </span>
                                     )}
@@ -1479,7 +1479,7 @@ export default function OperationDetail() {
                       </div>
 
                       {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                        <div className="m-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                        <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl flex items-start gap-3">
                           <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
                           <div>
                             <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
@@ -1559,7 +1559,7 @@ export default function OperationDetail() {
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                               {order.completada ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
                                   <i className="bi bi-check-circle-fill"></i> Completada
                                 </span>
                               ) : (
@@ -1623,7 +1623,7 @@ export default function OperationDetail() {
                     role="switch"
                     aria-checked={leaveMaterials}
                   >
-                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${leaveMaterials ? 'translate-x-5' : 'translate-x-0'}`} />
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-slate-800 shadow ring-0 transition duration-200 ease-in-out ${leaveMaterials ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
                 </div>
               )}
@@ -1683,7 +1683,7 @@ export default function OperationDetail() {
                           {operation.packing_list_file && (
                             <button
                               onClick={() => openPreview(operation.packing_list_file, 'Packing List')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento
                             </button>
@@ -1692,23 +1692,23 @@ export default function OperationDetail() {
                         <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
                           <button
                             onClick={handleOpenPackingModal}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                           >
                             <i className={`bi ${canEdit ? 'bi-pencil-square' : 'bi-eye-fill'}`}></i> {canEdit ? 'Editar' : 'Ver'}
                           </button>
                           <button
                             onClick={previewPackingListExcel}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                           >
                             <i className="bi bi-eye-fill"></i> Vista Previa
                           </button>
                           <button
                             onClick={downloadPackingListExcel}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                           >
                             <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
                           </button>
-                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                             <i className="bi bi-cloud-arrow-up-fill"></i> Subir
                             <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                           </label>
@@ -1722,13 +1722,13 @@ export default function OperationDetail() {
                           {operation.remito_file && (
                             <button
                               onClick={() => openPreview(operation.remito_file, 'Remito Firmado')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento
                             </button>
                           )}
                         </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
                           <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
@@ -1741,13 +1741,13 @@ export default function OperationDetail() {
                           {operation.rancho_file && (
                             <button
                               onClick={() => openPreview(operation.rancho_file)}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento
                             </button>
                           )}
                         </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
                           <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
@@ -1772,7 +1772,7 @@ export default function OperationDetail() {
                         {operation.solicitud_particular_file && (
                           <button
                             onClick={() => openPreview(operation.solicitud_particular_file, 'Solicitud Particular Externa')}
-                            className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 px-2 py-1 rounded"
+                            className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                           >
                             <i className="bi bi-eye-fill"></i> Ver Documento Subido
                           </button>
@@ -1782,12 +1782,12 @@ export default function OperationDetail() {
                         {canEdit && (
                           <button
                             onClick={() => setIsToolsModalOpen(true)}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                           >
                             <i className="bi bi-card-list"></i> Gestionar Herramientas
                           </button>
                         )}
-                        <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
                           <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
@@ -1833,7 +1833,7 @@ export default function OperationDetail() {
                       else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
 
                       return (
-                        <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
+                        <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
                           <div className="flex items-start gap-3">
                             <input
                               type="checkbox"
@@ -1861,7 +1861,7 @@ export default function OperationDetail() {
                           <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
                             <button
                               onClick={() => openPreview(getMediaUrl(adj.file), adj.filename)}
-                              className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
+                              className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
                             >
                               <i className="bi bi-eye-fill"></i> Ver
                             </button>
@@ -1957,7 +1957,7 @@ export default function OperationDetail() {
                       </>
                     ) : (
                       canEdit && operation.estado !== 'pausada' && (
-                        <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-slate-800/10 hover:bg-white dark:bg-slate-800/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
                           <i className="bi bi-pencil-fill"></i> Editar Info
                         </button>
                       )
@@ -2072,7 +2072,7 @@ export default function OperationDetail() {
                             <button
                               onClick={openPnaModal}
                               disabled={actionLoading}
-                              className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                              className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                             >
                               <i className="bi bi-file-earmark-pdf"></i> Generar Permiso PNA
                             </button>
@@ -2248,7 +2248,7 @@ export default function OperationDetail() {
                   </thead>
                   <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
                     {(isEditingPacking ? editPackingProducts : packingData.products).map((prod, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                      <tr key={idx} className="hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50">
                         <td className="px-4 py-3 text-sm font-bold text-slate-800 dark:text-white whitespace-nowrap">{prod.name}</td>
                         <td className="px-4 py-3 text-sm text-center font-bold text-slate-600 dark:text-slate-300">
                           {isEditingPacking ? (
@@ -2286,7 +2286,7 @@ export default function OperationDetail() {
                             <button
                               type="button"
                               onClick={() => handleRemoveEditRow(idx)}
-                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/30 transition-colors"
                               title="Eliminar fila"
                             >
                               <i className="bi bi-trash-fill"></i>
@@ -2338,7 +2338,7 @@ export default function OperationDetail() {
                     {actionLoading ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> : <i className="bi bi-check-circle-fill"></i>}
                     Guardar Cambios
                   </button>
-                  <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm" onClick={() => setIsEditingPacking(false)}>
+                  <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm" onClick={() => setIsEditingPacking(false)}>
                     Cancelar
                   </button>
                 </>
@@ -2352,7 +2352,7 @@ export default function OperationDetail() {
                       <i className="bi bi-pencil-fill"></i> Editar Packing List
                     </button>
                   )}
-                  <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPackingModal(false)}>
+                  <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPackingModal(false)}>
                     Cerrar
                   </button>
                 </>
@@ -2380,7 +2380,7 @@ export default function OperationDetail() {
               </p>
 
               <div className="space-y-4">
-                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${pnaType === 'frio' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${pnaType === 'frio' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                   <input type="radio" name="pnaType" value="frio" checked={pnaType === 'frio'} onChange={() => setPnaType('frio')} className="mt-1" />
                   <div>
                     <h4 className="font-bold text-sm text-slate-800 dark:text-white">Trabajo en Frío</h4>
@@ -2388,7 +2388,7 @@ export default function OperationDetail() {
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${pnaType === 'caliente' ? 'border-red-500 bg-red-50/50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${pnaType === 'caliente' ? 'border-red-500 bg-red-50/50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                   <input type="radio" name="pnaType" value="caliente" checked={pnaType === 'caliente'} onChange={() => setPnaType('caliente')} className="mt-1" />
                   <div>
                     <h4 className="font-bold text-sm text-slate-800 dark:text-white">Trabajo en Caliente</h4>
@@ -2417,7 +2417,7 @@ export default function OperationDetail() {
               >
                 Generar Documento
               </button>
-              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPnaModal(false)}>
+              <button type="button" className="mt-3 sm:mt-0 w-full sm:w-auto px-6 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center" onClick={() => setShowPnaModal(false)}>
                 Cancelar
               </button>
             </div>
@@ -2486,7 +2486,7 @@ export default function OperationDetail() {
             </div>
             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
               {previewFile.url && previewFile.type !== 'text' && (
-                <a href={previewFile.url} download target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm">
+                <a href={previewFile.url} download target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:bg-slate-900/30 dark:hover:bg-slate-700 font-medium text-sm">
                   <i className="bi bi-download me-1"></i> Descargar
                 </a>
               )}
@@ -2516,7 +2516,7 @@ export default function OperationDetail() {
                 setSelectedDocs([]);
                 setSelectedEmailAtts([]);
               }}
-              className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+              className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50 transition-colors"
             >
               Cancelar
             </button>
@@ -2608,7 +2608,7 @@ export default function OperationDetail() {
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
               </h3>
-              <button onClick={() => setShowCotizacionWordModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors bg-white dark:bg-slate-700 shadow-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50">
+              <button onClick={() => setShowCotizacionWordModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors bg-white dark:bg-slate-700 shadow-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:bg-slate-900/20">
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
@@ -2716,13 +2716,13 @@ export default function OperationDetail() {
               <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Idioma del Documento / Document Language</label>
                 <div className="flex gap-4">
-                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'en' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'en' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                     <input type="radio" name="cotizacionLang" value="en" checked={cotizacionLang === 'en'} onChange={(e) => setCotizacionLang(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
                     <div>
                       <span className={`block text-sm font-bold ${cotizacionLang === 'en' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Inglés (English)</span>
                     </div>
                   </label>
-                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'es' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'es' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                     <input type="radio" name="cotizacionLang" value="es" checked={cotizacionLang === 'es'} onChange={(e) => setCotizacionLang(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
                     <div>
                       <span className={`block text-sm font-bold ${cotizacionLang === 'es' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Español (Spanish)</span>
@@ -2735,14 +2735,14 @@ export default function OperationDetail() {
               <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Diseño de Plantilla</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'eva' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'eva' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                     <input type="radio" name="cotizacionTemplate" value="eva" checked={cotizacionTemplate === 'eva'} onChange={(e) => setCotizacionTemplate(e.target.value)} className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 mr-3" />
                     <div>
                       <span className={`block text-sm font-bold ${cotizacionTemplate === 'eva' ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-700 dark:text-slate-300'}`}>Diseño normal</span>
                       <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Diseño minimalista con tabla agrupada y líneas finas.</span>
                     </div>
                   </label>
-                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'proios' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'proios' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                     <input type="radio" name="cotizacionTemplate" value="proios" checked={cotizacionTemplate === 'proios'} onChange={(e) => setCotizacionTemplate(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
                     <div>
                       <span className={`block text-sm font-bold ${cotizacionTemplate === 'proios' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Próximamente (pruebas)</span>
@@ -2863,7 +2863,7 @@ export default function OperationDetail() {
                               onClick={() => setIncludeVat(!includeVat)}
                               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeVat ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                             >
-                              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${includeVat ? 'translate-x-5' : 'translate-x-0'}`} />
+                              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-slate-800 shadow ring-0 transition duration-200 ease-in-out ${includeVat ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                           </div>
                           {includeVat && (
@@ -2954,7 +2954,7 @@ export default function OperationDetail() {
             <div className="px-6 py-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
               <button
                 onClick={() => setShowCotizacionWordModal(false)}
-                className="px-5 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm"
+                className="px-5 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-600 transition-colors shadow-sm"
               >
                 Cancelar
               </button>
@@ -3026,7 +3026,7 @@ export default function OperationDetail() {
               <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
                 <button
                   onClick={() => setShowRechazoModal(false)}
-                  className="px-5 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                  className="px-5 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-600 transition-colors"
                 >
                   Cancelar
                 </button>

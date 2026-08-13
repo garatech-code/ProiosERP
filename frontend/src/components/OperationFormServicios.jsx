@@ -29,7 +29,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
   const isStockInsufficient = cantidad > stockActual;
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-100'
+    <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 dark:bg-slate-900/50 border-gray-100'
       }`}>
       <div className="sm:col-span-4">
         <AutocompleteCreate
@@ -53,7 +53,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           type="number"
           value={product.weight_kg || ''}
           disabled
-          className="block w-full py-2 px-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 sm:text-sm text-center"
+          className="block w-full py-2 px-2 border border-gray-200 rounded-lg bg-gray-100 dark:bg-slate-800/50 text-gray-500 sm:text-sm text-center"
         />
       </div>
 
@@ -64,7 +64,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           min="1"
           value={cantidad}
           onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50' : 'border-gray-300'
+          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-300'
             }`}
         />
         {isStockInsufficient && (
@@ -76,7 +76,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 
       <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-gray-700 mb-1">Stock</label>
-        <div className="text-sm font-semibold text-gray-800 text-center py-2">{stockActual}</div>
+        <div className="text-sm font-semibold text-gray-800 dark:text-slate-200 text-center py-2">{stockActual}</div>
       </div>
 
       <div className="sm:col-span-3">
@@ -95,7 +95,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
           title="Eliminar ítem"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -471,7 +471,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
 
   if (fetchingData) return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-2xl flex flex-col items-center">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl flex flex-col items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mb-4"></div>
         <p className="text-gray-600 font-medium">Preparando formulario...</p>
       </div>
@@ -493,13 +493,13 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
 
           {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
               <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
             </div>
           )}
 
           {!id && (
-            <div className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-xl p-5">
+            <div className="mb-8 bg-indigo-50 dark:bg-indigo-900/20/50 border border-indigo-100 rounded-xl p-5">
               <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
               <div className="flex gap-3">
                 <input
@@ -513,7 +513,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                       handleImoSearch();
                     }
                   }}
-                  className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white"
+                  className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-slate-800"
                 />
                 <button
                   type="button"
@@ -680,7 +680,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                     </div>
                     <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
                       {availableUsers.filter(u => (u.role === 'OPERADOR' || u.role === 'OPERADOR_JR') && (!filterOp || formatUserName(u).toLowerCase().includes(filterOp.toLowerCase()))).map(u => (
-                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
+                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
                           <input
                             type="checkbox"
                             checked={formData.operadores_id.includes(u.id)}
@@ -711,7 +711,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                     </div>
                     <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
                       {availableUsers.filter(u => u.role === 'OPERARIO' && (!filterUserOp || formatUserName(u).toLowerCase().includes(filterUserOp.toLowerCase()))).map(u => (
-                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
+                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
                           <input
                             type="checkbox"
                             checked={formData.operarios_usuarios_id.includes(u.id)}
@@ -747,7 +747,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                             onClick={() => {
                               setFilterStaffRole(prev => prev === r ? '' : r);
                             }}
-                            className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${filterStaffRole === r ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 text-slate-600 border-slate-200'}`}
+                            className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${filterStaffRole === r ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 dark:bg-slate-900/30 text-slate-600 border-slate-200'}`}
                           >
                             {r}
                           </button>
@@ -770,7 +770,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
 
                         return matchesSearch && matchesRole;
                       }).map(s => (
-                        <label key={s.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors border-b border-gray-50 dark:border-slate-600 last:border-0">
+                        <label key={s.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors border-b border-gray-50 dark:border-slate-600 last:border-0">
                           <input
                             type="checkbox"
                             checked={formData.operarios_id.includes(s.id)}
@@ -815,43 +815,43 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
             </div>
 
             {id && (
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                <h4 className="text-md font-bold text-gray-900 mb-4 border-b pb-2">Documentos de la Operación</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/50 p-5 rounded-xl border border-gray-200">
+                <h4 className="text-md font-bold text-gray-900 dark:text-white mb-4 border-b pb-2">Documentos de la Operación</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-sm font-bold text-gray-800 block">Packing List</span>
+                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Packing List</span>
                       {existingFiles.packing_list_file ? (
                         <a href={existingFiles.packing_list_file} target="_blank" rel="noreferrer" className="text-indigo-600 text-xs font-medium hover:underline">Ver Archivo</a>
                       ) : <span className="text-xs text-gray-400">Sin archivo</span>}
                     </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
                       {existingFiles.packing_list_file ? 'Reemplazar' : 'Subir'}
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'packing_list_file')} disabled={uploading} />
                     </label>
                   </div>
 
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-sm font-bold text-gray-800 block">Remito</span>
+                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Remito</span>
                       {existingFiles.remito_file ? (
                         <a href={existingFiles.remito_file} target="_blank" rel="noreferrer" className="text-emerald-600 text-xs font-medium hover:underline">Ver Archivo</a>
                       ) : <span className="text-xs text-gray-400">Sin archivo</span>}
                     </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
                       {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
                     </label>
                   </div>
 
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-sm font-bold text-gray-800 block">Rancho</span>
+                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Rancho</span>
                       {existingFiles.rancho_file ? (
                         <a href={existingFiles.rancho_file} target="_blank" rel="noreferrer" className="text-amber-600 text-xs font-medium hover:underline">Ver Archivo</a>
                       ) : <span className="text-xs text-gray-400">Sin archivo</span>}
                     </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
+                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
                       {existingFiles.rancho_file ? 'Reemplazar' : 'Subir'}
                       <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'rancho_file')} disabled={uploading} />
                     </label>

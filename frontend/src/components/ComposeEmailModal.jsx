@@ -238,7 +238,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
                 <button
                   type="button"
                   onClick={() => setShowTemplateManager(true)}
-                  className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase shadow-sm"
+                  className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase shadow-sm"
                 >
                   <i className="bi bi-file-earmark-text"></i>
                   Insertar Plantilla
@@ -266,7 +266,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
             <div className="mt-4 border-t border-slate-100 dark:border-slate-700/50 pt-4">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between">
                 <span>Archivos Adjuntos</span>
-                <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase shadow-sm">
+                <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase shadow-sm">
                   <i className="bi bi-paperclip"></i> Adjuntar Archivo
                   <input type="file" multiple onChange={handleFileChange} className="hidden" />
                 </label>
@@ -294,7 +294,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors shadow-sm"
+              className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors shadow-sm"
             >
               Descartar
             </button>

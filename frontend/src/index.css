@@ -6,6 +6,30 @@
   body {
     @apply bg-proios-bg text-proios-dark font-sans dark:bg-slate-900 dark:text-gray-100 transition-colors duration-200;
   }
+
+  /* Global Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-700 rounded-full transition-colors;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-600;
+  }
+
+  /* Firefox Scrollbar Styling */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent; /* slate-300 */
+  }
+  html.dark {
+    scrollbar-color: #334155 transparent; /* slate-700 */
+  }
 }
 
 @layer components {

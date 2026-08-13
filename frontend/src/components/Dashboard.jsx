@@ -97,14 +97,14 @@ export default function Dashboard() {
   // Badges estéticos de la VERSIÓN VIEJA
   const getStatusBadge = (status) => {
     const maps = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pendiente' },
+      pending: { color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800', label: 'Pendiente' },
       pendiente_aprobacion: { color: 'bg-orange-100 text-orange-800 border bg-orange-50 border-orange-200 animate-pulse', label: 'Requiere Aprobación' },
-      price_checked: { color: 'bg-blue-100 text-blue-800', label: 'Verificado' },
-      confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmada' },
+      price_checked: { color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800', label: 'Verificado' },
+      confirmed: { color: 'bg-green-100 dark:bg-green-900/30 text-green-800', label: 'Confirmada' },
       in_coordination: { color: 'bg-purple-100 text-purple-800', label: 'En proceso' },
-      delivered: { color: 'bg-indigo-100 text-indigo-800', label: 'Entregada' },
+      delivered: { color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800', label: 'Entregada' },
       closed: { color: 'bg-gray-100 text-gray-800', label: 'Cerrada' },
-      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
+      cancelled: { color: 'bg-red-100 dark:bg-red-900/30 text-red-800', label: 'Cancelada' },
     };
     const mapped = maps[status] || { color: 'bg-gray-100 text-gray-800', label: status };
     return (
@@ -136,26 +136,26 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900/20 flex flex-col font-sans">
       {/* Header Sticky Mobile-First (Estética Vieja) */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
+      <nav className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-indigo-600 text-white rounded flex items-center justify-center font-bold text-lg shadow-sm">
                 P
               </div>
-              <h1 className="text-xl font-bold text-gray-900 hidden sm:block tracking-tight">ProIOS</h1>
-              <h1 className="text-lg font-bold text-gray-900 sm:hidden tracking-tight">ProIOS</h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white hidden sm:block tracking-tight">ProIOS</h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white sm:hidden tracking-tight">ProIOS</h1>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex flex-col text-right">
-                <span className="text-sm font-semibold text-gray-900 leading-tight">{formatUserName(user)}</span>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">{formatUserName(user)}</span>
                 <span className="text-xs text-indigo-600 font-medium">{roleDisplay[user?.role] || user?.role}</span>
               </div>
               <button
                 onClick={logout}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 rounded-full transition-colors"
                 title="Cerrar sesión"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
@@ -171,14 +171,14 @@ export default function Dashboard() {
         {/* Top Controls Area */}
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex justify-between items-end">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Tablero Operativo</h2>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Tablero Operativo</h2>
 
             {/* Botones Desktop integrados con la lógica de Modales */}
             {!isOperario && (
               <div className="hidden sm:flex items-center gap-3">
                 <button
                   onClick={() => setShowNormalForm(true)}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-white dark:bg-slate-800 border border-gray-300 hover:bg-gray-50 shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   + Sin IMO
                 </button>
@@ -201,14 +201,14 @@ export default function Dashboard() {
               <input
                 type="text"
                 placeholder="Buscar cliente, buque..."
-                className="pl-10 block w-full py-2.5 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm transition"
+                className="pl-10 block w-full py-2.5 border border-gray-300 rounded-xl leading-5 bg-white dark:bg-slate-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm transition"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
             <select
-              className="flex-shrink-0 py-2.5 pl-3 pr-8 border border-gray-300 bg-white rounded-xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm appearance-none font-medium"
+              className="flex-shrink-0 py-2.5 pl-3 pr-8 border border-gray-300 bg-white dark:bg-slate-800 rounded-xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm appearance-none font-medium"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -230,7 +230,7 @@ export default function Dashboard() {
         )}
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-lg shadow-sm">
             <p className="text-red-700 font-medium">{error}</p>
           </div>
         )}
@@ -239,16 +239,16 @@ export default function Dashboard() {
         {!loading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredOps?.length === 0 ? (
-              <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300">
+              <div className="col-span-full py-16 text-center bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No hay operaciones</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No hay operaciones</h3>
                 <p className="mt-1 text-sm text-gray-500">Crea una nueva operación para comenzar.</p>
               </div>
             ) : (
               filteredOps?.map((op) => (
                 <div
                   key={op.id}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition-all flex flex-col group relative"
+                  className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition-all flex flex-col group relative"
                 >
                   {/* Decorative indicator band */}
                   <div className={`absolute top-0 left-0 w-1 h-full ${op.status === 'pendiente_aprobacion' ? 'bg-orange-400 animate-pulse' : op.status === 'closed' ? 'bg-gray-300' : 'bg-indigo-500'}`}></div>
@@ -260,7 +260,7 @@ export default function Dashboard() {
                           <span className="text-xs font-bold text-gray-400">#OP-{String(op.id).padStart(4, '0')}</span>
                           {getStatusBadge(op.status)}
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-1" title={op.nombre || op.ship_name || 'Operación sin nombre'}>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight group-hover:text-indigo-600 transition-colors line-clamp-1" title={op.nombre || op.ship_name || 'Operación sin nombre'}>
                           {op.nombre || op.ship_name || 'Operación sin nombre'}
                         </h3>
                         <p className="text-sm font-medium text-gray-600 flex flex-wrap items-center gap-1">
@@ -271,14 +271,14 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-gray-600 mt-2 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm text-gray-600 mt-2 mb-4 bg-slate-50 dark:bg-slate-900/20 p-3 rounded-xl border border-slate-100">
                       <div>
                         <p className="text-xs text-gray-400 font-medium mb-0.5">Puerto</p>
-                        <p className="font-semibold text-gray-800 line-clamp-1">{op.port_name || op.port || 'N/A'}</p>
+                        <p className="font-semibold text-gray-800 dark:text-slate-200 line-clamp-1">{op.port_name || op.port || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-400 font-medium mb-0.5">Método</p>
-                        <p className="font-semibold text-gray-800 capitalize">{op.delivery_method || 'Muelle'}</p>
+                        <p className="font-semibold text-gray-800 dark:text-slate-200 capitalize">{op.delivery_method || 'Muelle'}</p>
                       </div>
                       <div className="col-span-2 flex items-center gap-2 text-gray-500 text-xs">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -291,12 +291,12 @@ export default function Dashboard() {
                         {!isOperario ? (
                           <>
                             <span className="text-xs text-gray-400 font-medium">Valor Total</span>
-                            <span className="text-sm font-bold text-gray-900">${calculateTotal(op.products).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">${calculateTotal(op.products).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </>
                         ) : (
                           <>
                             <span className="text-xs text-gray-400 font-medium">Items de Carga</span>
-                            <span className="text-sm font-bold text-gray-900">{op.products?.length || 0} ítems</span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">{op.products?.length || 0} ítems</span>
                           </>
                         )}
                       </div>
@@ -315,7 +315,7 @@ export default function Dashboard() {
                         {!isOperario && op.status !== 'closed' && op.status !== 'cancelled' && (
                           <button
                             onClick={(e) => cancelOperation(op.id, e)}
-                            className="px-3 py-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 text-xs font-semibold rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 text-xs font-semibold rounded-lg transition-colors"
                           >
                             Anular
                           </button>
@@ -323,7 +323,7 @@ export default function Dashboard() {
 
                         <button
                           onClick={() => navigate(`/operations/${op.id}`)}
-                          className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                          className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
                         >
                           Ver Detalles
                         </button>
@@ -331,7 +331,7 @@ export default function Dashboard() {
                         {isOperario && (
                           <button
                             onClick={() => navigate(`/operations/${op.id}`)}
-                            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0 cursor-pointer hover:bg-indigo-100"
+                            className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-lg shrink-0 cursor-pointer hover:bg-indigo-100 dark:bg-indigo-900/30"
                             title="Ingresar a la orden operativa"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>

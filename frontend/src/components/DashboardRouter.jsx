@@ -11,7 +11,7 @@ const ContableDashboard = lazy(() => import('../dashboards/ContableDashboard'));
 const OperarioDashboard = lazy(() => import('../dashboards/OperarioDashboard'));
 
 const LoadingFallback = () => (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900/20 flex flex-col items-center justify-center space-y-4">
         <LogoSpinner size="w-16 h-16" />
         <p className="text-gray-500 font-medium tracking-wide">Cargando tu espacio de trabajo...</p>
     </div>

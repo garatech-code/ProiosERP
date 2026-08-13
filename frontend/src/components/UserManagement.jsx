@@ -173,7 +173,7 @@ export default function UserManagement() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                     {users.map((u) => (
-                                        <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                                        <tr key={u.id} className="hover:bg-slate-50 dark:bg-slate-900/20/50 dark:hover:bg-slate-700/30 transition-colors">
                                             <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">
                                                 {u.username}
                                             </td>
@@ -201,7 +201,7 @@ export default function UserManagement() {
                                             <td className="px-6 py-4 text-right">
                                                 <button
                                                     onClick={() => handleDeleteUser(u.id, u.username)}
-                                                    className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors"
+                                                    className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-950/30 rounded-xl transition-colors"
                                                     title="Eliminar usuario"
                                                 >
                                                     <i className="bi bi-trash text-lg"></i>
@@ -234,7 +234,7 @@ export default function UserManagement() {
                                         </div>
                                         <button
                                             onClick={() => handleDeleteUser(u.id, u.username)}
-                                            className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors"
+                                            className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-950/30 rounded-xl transition-colors"
                                         >
                                             <i className="bi bi-trash text-lg"></i>
                                         </button>
@@ -364,7 +364,7 @@ export default function UserManagement() {
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors"
+                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors"
                                 >
                                     Cancelar
                                 </button>

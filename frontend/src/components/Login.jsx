@@ -18,12 +18,12 @@ export default function Login() {
     setError('');
     try {
       await login(username, password);
-      
+
       // Determine where to redirect
       const queryParams = new URLSearchParams(location.search);
       const redirectToUrl = queryParams.get('redirect_to');
       const stateFrom = location.state?.from;
-      
+
       const destination = redirectToUrl || stateFrom || '/';
       navigate(destination, { replace: true });
     } catch (err) {
@@ -39,7 +39,7 @@ export default function Login() {
         <div className="text-center">
           <img src={logo} alt="Proios Logo" className="mx-auto h-20 w-auto object-contain mb-4" />
           <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            Proios Manager
+            TECHSHIP
           </h2>
           <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
             Sistema de Gestión de Operaciones

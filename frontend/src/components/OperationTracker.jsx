@@ -90,7 +90,7 @@ export default function OperationTracker({ currentState, operationType }) {
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 h-full flex flex-col sticky top-24 min-h-[500px]">
             <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-4 shrink-0">
                 <i className="bi bi-signpost-split text-indigo-500 text-lg"></i>
-                Estado del Flujo {isService && <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded ml-auto">SERVICIOS</span>}
+                Estado del Flujo {isService && <span className="text-[10px] bg-slate-100 dark:bg-slate-900/30 text-slate-600 px-2 py-0.5 rounded ml-auto">SERVICIOS</span>}
             </h3>
 
             <div className="flex-1 relative py-2">
@@ -129,7 +129,7 @@ export default function OperationTracker({ currentState, operationType }) {
                                     <p className="text-xs font-medium text-slate-500 dark:text-slate-500 mt-0.5 leading-tight">{step.desc}</p>
 
                                     {isCurrent && (
-                                        <span className="inline-block mt-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black rounded uppercase tracking-wider animate-pulse">
+                                        <span className="inline-block mt-2 px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 text-[9px] font-black rounded uppercase tracking-wider animate-pulse">
                                             Fase Actual
                                         </span>
                                     )}

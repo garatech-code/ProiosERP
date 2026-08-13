@@ -157,7 +157,7 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
                         const isSelected = selectedDocs.includes(doc.id);
                         
                         return (
-                            <div key={doc.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
+                            <div key={doc.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {toggleSelectDoc && (
                                         <input
@@ -185,7 +185,7 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
                                         <button
                                             type="button"
                                             onClick={() => openPreview(getMediaUrl(doc.archivo))}
-                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
+                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
                                         >
                                             <i className="bi bi-eye-fill"></i> Ver
                                         </button>
@@ -202,7 +202,7 @@ export default function OperationDocuments({ operacionId, documentos, onDocument
                                     {canEdit && (
                                         <button 
                                             onClick={() => handleDelete(doc.id)} 
-                                            className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                            className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-950/30 transition-colors"
                                         >
                                             <i className="bi bi-trash text-base"></i>
                                         </button>

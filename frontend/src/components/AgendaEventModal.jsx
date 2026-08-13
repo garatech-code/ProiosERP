@@ -233,7 +233,7 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                                                     ? 'bg-indigo-500 text-white'
                                                     : state.isFocused
                                                         ? 'bg-indigo-50 dark:bg-slate-700 text-gray-900 dark:text-white'
-                                                        : 'text-gray-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
+                                                        : 'text-gray-700 dark:text-slate-300 hover:bg-indigo-50 dark:bg-indigo-900/20 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
                                             }`,
                                         singleValue: () => 'text-gray-900 dark:text-white',
                                         input: () => 'text-gray-900 dark:text-white',
@@ -253,7 +253,7 @@ export default function AgendaEventModal({ isOpen, onClose, eventToEdit, onSave 
                             <button
                                 type="button"
                                 onClick={handleDelete}
-                                className="px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
+                                className="px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
                                 disabled={loading}
                             >
                                 <i className="bi bi-trash"></i> Eliminar

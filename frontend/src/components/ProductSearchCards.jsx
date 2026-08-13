@@ -121,7 +121,7 @@ export default function ProductSearchCards({ initialProducts = [] }) {
                       />
                     </div>
                   </div>
-                  <button onClick={finishEditing} className="w-full py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-700">
+                  <button onClick={finishEditing} className="w-full py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-700">
                     Guardar
                   </button>
                 </div>
@@ -154,7 +154,7 @@ export default function ProductSearchCards({ initialProducts = [] }) {
                   <a 
                     href={searchEngine === 'google' ? getMercadoLibreLink(p.nombre) : getGoogleLink(p.nombre)}
                     target="_blank" rel="noopener noreferrer"
-                    className="w-full text-center py-1.5 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-500 transition-colors"
+                    className="w-full text-center py-1.5 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-500 transition-colors"
                   >
                     Alternativa: {searchEngine === 'google' ? 'MercadoLibre' : 'Google'}
                   </a>
@@ -167,7 +167,7 @@ export default function ProductSearchCards({ initialProducts = [] }) {
         {/* Carta para agregar nuevo manual */}
         <div 
           onClick={addNewProduct}
-          className="bg-transparent border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all min-h-[140px] opacity-70 hover:opacity-100"
+          className="bg-transparent border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/20 transition-all min-h-[140px] opacity-70 hover:opacity-100"
         >
           <i className="bi bi-plus-circle text-2xl text-gray-400 dark:text-slate-500 mb-2"></i>
           <span className="text-sm font-bold text-gray-500 dark:text-slate-400">Añadir Otro Producto</span>

@@ -74,14 +74,14 @@ export default function DebugFeedback({ onClose }) {
     const colSolucionados = feedbacks.filter(f => f.estado === 'resuelto');
 
     const FeedbackCard = ({ fb }) => (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-3 group hover:shadow-md transition-all relative">
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 shadow-sm mb-3 group hover:shadow-md transition-all relative">
             {user?.role === 'OWNER' && (
                 <button onClick={() => deleteFeedback(fb.id)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>
             )}
             <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-indigo-500 font-bold flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-md">
+                <span className="text-xs text-indigo-500 font-bold flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded-md">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     {fb.creado_por_username} {/* Usando el campo correcto de tu serializador */}
                 </span>
@@ -93,13 +93,13 @@ export default function DebugFeedback({ onClose }) {
             {user?.role === 'OWNER' && (
                 <div className="flex gap-1 pt-3 border-t border-slate-100">
                     {fb.estado !== 'pendiente' && (
-                        <button onClick={() => updateStatus(fb.id, 'pendiente')} className="flex-1 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold rounded transition-colors">A Pendiente</button>
+                        <button onClick={() => updateStatus(fb.id, 'pendiente')} className="flex-1 py-1 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-600 text-[10px] font-bold rounded transition-colors">A Pendiente</button>
                     )}
                     {fb.estado === 'pendiente' && (
                         <button onClick={() => updateStatus(fb.id, 'en_progreso')} className="flex-1 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 text-[10px] font-bold rounded transition-colors">Revisar</button>
                     )}
                     {fb.estado !== 'resuelto' && (
-                        <button onClick={() => updateStatus(fb.id, 'resuelto')} className="flex-1 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold rounded transition-colors">Solucionar</button>
+                        <button onClick={() => updateStatus(fb.id, 'resuelto')} className="flex-1 py-1 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold rounded transition-colors">Solucionar</button>
                     )}
                 </div>
             )}
@@ -108,12 +108,12 @@ export default function DebugFeedback({ onClose }) {
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+            <div className="bg-slate-50 dark:bg-slate-900/20 rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
 
                 {/* Header */}
-                <div className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center z-10 shrink-0">
+                <div className="px-6 py-4 bg-white dark:bg-slate-800 border-b border-slate-200 flex justify-between items-center z-10 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-xl flex items-center justify-center">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
                         </div>
                         <div>
@@ -126,7 +126,7 @@ export default function DebugFeedback({ onClose }) {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                             Nuevo Reporte
                         </button>
-                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:bg-slate-900/30 rounded-xl transition-colors">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
@@ -134,7 +134,7 @@ export default function DebugFeedback({ onClose }) {
 
                 <div className="flex-1 overflow-hidden relative flex">
                     {/* Panel Lateral de Nuevo Reporte (Deslizable y con estructura Flex corregida) */}
-                    <div className={`absolute top-0 bottom-0 left-0 w-80 bg-white border-r border-slate-200 flex flex-col z-20 transition-transform duration-300 transform ${showForm ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+                    <div className={`absolute top-0 bottom-0 left-0 w-80 bg-white dark:bg-slate-800 border-r border-slate-200 flex flex-col z-20 transition-transform duration-300 transform ${showForm ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
                         <div className="p-6 pb-4 border-b border-slate-200 shrink-0">
                             <h3 className="font-bold text-slate-800">Crear Ticket</h3>
                         </div>
@@ -151,7 +151,7 @@ export default function DebugFeedback({ onClose }) {
                                 </div>
 
                                 <div className="flex gap-2 pt-4 mt-auto">
-                                    <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-colors">Cancelar</button>
+                                    <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-colors">Cancelar</button>
                                     <button type="submit" disabled={submitting} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50">Enviar</button>
                                 </div>
                             </form>
@@ -162,7 +162,7 @@ export default function DebugFeedback({ onClose }) {
                     {loading ? (
                         <div className="flex-1 flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div></div>
                     ) : (
-                        <div className="flex-1 flex gap-6 p-6 overflow-x-auto bg-slate-100/50">
+                        <div className="flex-1 flex gap-6 p-6 overflow-x-auto bg-slate-100 dark:bg-slate-900/30/50">
                             {/* Columna Pendientes */}
                             <div className="flex-1 min-w-[300px] max-w-sm flex flex-col h-full">
                                 <div className="flex items-center justify-between mb-3 px-1 shrink-0">
@@ -197,7 +197,7 @@ export default function DebugFeedback({ onClose }) {
                                     <h3 className="font-extrabold text-emerald-700 uppercase tracking-wider text-xs flex items-center gap-2">
                                         <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Solucionados
                                     </h3>
-                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{colSolucionados.length}</span>
+                                    <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{colSolucionados.length}</span>
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-4">
                                     {colSolucionados.map(fb => <FeedbackCard key={fb.id} fb={fb} />)}

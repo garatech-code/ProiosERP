@@ -30,7 +30,7 @@ export default function ReadEmailModal({ email, onClose, onReply, openPreview })
           <div className="flex items-center gap-2">
             <button 
               onClick={() => onReply(email)} 
-              className="hidden sm:flex px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-sm font-bold rounded-lg items-center gap-2 transition-colors border border-indigo-200 dark:border-indigo-800"
+              className="hidden sm:flex px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-sm font-bold rounded-lg items-center gap-2 transition-colors border border-indigo-200 dark:border-indigo-800"
             >
               <i className="bi bi-reply-fill"></i> Responder
             </button>
@@ -59,7 +59,7 @@ export default function ReadEmailModal({ email, onClose, onReply, openPreview })
         </div>
 
         {/* Email Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white dark:bg-slate-800 prose dark:prose-invert prose-sm sm:prose-base max-w-none text-slate-800 dark:text-slate-200 custom-scrollbar">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white prose prose-sm sm:prose-base max-w-none text-slate-900 custom-scrollbar border-y border-slate-200 dark:border-slate-700">
           {email.body_html ? (
             <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(email.body_html) }} />
           ) : (

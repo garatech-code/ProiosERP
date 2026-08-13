@@ -85,7 +85,7 @@ export default function NotificationMenu() {
                                 {notifications.map(n => (
                                     <div 
                                         key={n.id} 
-                                        className={`p-4 transition-colors ${!n.leida ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                        className={`p-4 transition-colors ${!n.leida ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}
                                         onClick={() => !n.leida && markAsRead(n.id)}
                                     >
                                         <div className="flex gap-3 items-start cursor-pointer">

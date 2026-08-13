@@ -100,7 +100,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
                             />
                             <i className="bi bi-search absolute left-3.5 top-3 text-gray-400"></i>
                         </div>
-                        <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-bold hover:bg-indigo-200">
+                        <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 rounded-xl font-bold hover:bg-indigo-200">
                             <i className="bi bi-plus-lg"></i>
                         </button>
                     </div>
@@ -111,15 +111,15 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Nombre del {categoria === 'Empaque' ? 'Envase' : 'Químico'} *</label>
-                                <input type="text" placeholder="Ej: Bidón 20L" className="w-full border p-2 rounded-lg text-sm" value={newProduct.nombre} onChange={e => setNewProduct({...newProduct, nombre: e.target.value})} />
+                                <input type="text" placeholder="Ej: Bidón 20L" className="w-full border p-2 rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={newProduct.nombre} onChange={e => setNewProduct({...newProduct, nombre: e.target.value})} />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Presentación *</label>
-                                <input type="text" placeholder="Ej: 20 Litros" className="w-full border p-2 rounded-lg text-sm" value={newProduct.presentacion} onChange={e => setNewProduct({...newProduct, presentacion: e.target.value})} />
+                                <input type="text" placeholder="Ej: 20 Litros" className="w-full border p-2 rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={newProduct.presentacion} onChange={e => setNewProduct({...newProduct, presentacion: e.target.value})} />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Costo Unitario ($) *</label>
-                                <input type="number" placeholder="Ej: 15.00" step="0.01" className="w-full border p-2 rounded-lg text-sm" value={newProduct.costo} onChange={e => setNewProduct({...newProduct, costo: e.target.value})} />
+                                <input type="number" placeholder="Ej: 15.00" step="0.01" className="w-full border p-2 rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={newProduct.costo} onChange={e => setNewProduct({...newProduct, costo: e.target.value})} />
                             </div>
                         </div>
                         <div className="flex gap-2 justify-end mt-2">
@@ -140,7 +140,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
                             <div 
                                 key={c.id} 
                                 onClick={() => onSelect(c)}
-                                className="flex justify-between items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-indigo-50/50 dark:hover:bg-slate-700/50 hover:border-indigo-200 dark:hover:border-slate-600 transition-all cursor-pointer group"
+                                className="flex justify-between items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:bg-indigo-900/20/50 dark:hover:bg-slate-700/50 hover:border-indigo-200 dark:hover:border-slate-600 transition-all cursor-pointer group"
                             >
                                 <div>
                                     <h4 className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{c.nombre}</h4>
@@ -162,7 +162,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
                 <div className="px-6 py-4 border-t flex justify-end bg-gray-50 dark:bg-slate-750">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                        className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-700 transition-colors"
                     >
                         Cerrar
                     </button>
@@ -180,16 +180,16 @@ const ProductCard = ({ product, onEdit, onDelete, onMovimiento, onLogs, onRowCli
     const maxStock = Number(product.stock_maximo) || 0;
     
     const getBadge = () => {
-        if (stockNum === 0) return <span className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-full">Sin stock</span>;
-        if (minStock > 0 && stockNum <= minStock) return <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">Stock bajo</span>;
+        if (stockNum === 0) return <span className="bg-red-100 dark:bg-red-900/30 text-red-800 text-xs px-2 py-0.5 rounded-full">Sin stock</span>;
+        if (minStock > 0 && stockNum <= minStock) return <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 text-xs px-2 py-0.5 rounded-full">Stock bajo</span>;
         if (maxStock > 0 && stockNum >= maxStock) return <span className="bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded-full">Stock alto</span>;
-        return <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">Normal</span>;
+        return <span className="bg-green-100 dark:bg-green-900/30 text-green-800 text-xs px-2 py-0.5 rounded-full">Normal</span>;
     };
     
     return (
-        <div className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => onRowClick(product)}>
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => onRowClick(product)}>
             <div className="flex justify-between items-start">
-                <h3 className="font-bold text-gray-900">{product.nombre}</h3>
+                <h3 className="font-bold text-gray-900 dark:text-white">{product.nombre}</h3>
                 <div className="flex gap-1">
                     <button onClick={(e) => { e.stopPropagation(); onEdit(product); }} className="text-indigo-500 hover:text-indigo-700"><i className="bi bi-pencil-square"></i></button>
                     <button onClick={(e) => { e.stopPropagation(); onDelete(product); }} className="text-red-500 hover:text-red-700"><i className="bi bi-trash"></i></button>
@@ -290,7 +290,7 @@ const IncompleteProductsModal = ({ isOpen, onClose, onEdit, onRowClick }) => {
                     )}
                 </div>
                 <div className="px-6 py-4 border-t dark:border-slate-700 flex justify-end bg-gray-50 dark:bg-slate-750">
-                    <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700">Cerrar</button>
+                    <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cerrar</button>
                 </div>
             </div>
         </div>,
@@ -304,10 +304,10 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
         const s = Number(stock);
         const min = Number(minStock);
         const max = Number(maxStock);
-        if (s === 0) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Sin stock</span>;
-        if (min > 0 && s <= min) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Stock bajo</span>;
+        if (s === 0) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800">Sin stock</span>;
+        if (min > 0 && s <= min) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800">Stock bajo</span>;
         if (max > 0 && s >= max) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">Stock alto</span>;
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Normal</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800">Normal</span>;
     };
 
     const ubicacionesUnicas = [...new Set(products.map(p => p.ubicacion).filter(Boolean))];
@@ -366,20 +366,20 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                 <input type="checkbox" checked={allSelected} onChange={onSelectAll} />
                             </th>
-                            <th onClick={() => onSort('nombre')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Nombre</th>
-                            <th onClick={() => onSort('presentacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Presentación</th>
-                            <th onClick={() => onSort('stock_actual')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Stock</th>
-                            <th onClick={() => onSort('stock_minimo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Stock Mínimo</th>
-                            <th onClick={() => onSort('stock_maximo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Stock Máximo</th>
-                            <th onClick={() => onSort('categoria')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Categoría</th>
-                            <th onClick={() => onSort('ubicacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Ubicación</th>
-                            <th onClick={() => onSort('estado')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700">Estado</th>
+                            <th onClick={() => onSort('nombre')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Nombre</th>
+                            <th onClick={() => onSort('presentacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Presentación</th>
+                            <th onClick={() => onSort('stock_actual')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Stock</th>
+                            <th onClick={() => onSort('stock_minimo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Stock Mínimo</th>
+                            <th onClick={() => onSort('stock_maximo')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Stock Máximo</th>
+                            <th onClick={() => onSort('categoria')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Categoría</th>
+                            <th onClick={() => onSort('ubicacion')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Ubicación</th>
+                            <th onClick={() => onSort('estado')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-700">Estado</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                         {products.map(product => (
-                            <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer">
+                            <tr key={product.id} className="hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-700 cursor-pointer">
                                 <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                     <input type="checkbox" checked={!!selectedRows[product.id]} onChange={() => onSelectRow(product.id)} />
                                 </td>
@@ -433,9 +433,9 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
 const StockDetailModal = ({ product, onClose }) => {
     return createPortal(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-                <div className="sticky top-0 bg-white px-6 py-4 border-b flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-gray-900">Detalle de {product.nombre}</h3>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white dark:bg-slate-800 px-6 py-4 border-b flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Detalle de {product.nombre}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><i className="bi bi-x-lg text-xl"></i></button>
                 </div>
                 <div className="p-6 space-y-4">
@@ -453,7 +453,7 @@ const StockDetailModal = ({ product, onClose }) => {
                         <div className="col-span-2"><span className="font-semibold">Observaciones:</span> {product.descripcion || 'N/A'}</div>
                     </div>
                 </div>
-                <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+                <div className="px-6 py-4 border-t bg-gray-50 dark:bg-slate-900/50 flex justify-end">
                     <button onClick={onClose} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Cerrar</button>
                 </div>
             </div>
@@ -780,18 +780,26 @@ export default function InventoryManagement() {
     
     const fetchProveedores = async () => {
         try {
+            setLoading(true);
             const res = await axios.get('/inventario/proveedores/');
             setProveedores(res.data);
         } catch (err) {
             showToast('Error al cargar proveedores', 'error');
+        } finally {
+            setLoading(false);
         }
     };
     
     const fetchFormulas = async () => {
         try {
+            setLoading(true);
             const res = await axios.get('/produccion/formulas/');
             setFormulas(res.data);
-        } catch (err) {}
+        } catch (err) {
+            console.error('Error fetching formulas:', err);
+        } finally {
+            setLoading(false);
+        }
     };
     
     const calcularProductosCriticos = () => {
@@ -1307,8 +1315,8 @@ export default function InventoryManagement() {
         const stock = Number(product.stock_actual);
         const minStock = Number(product.stock_minimo) || 0;
         const maxStock = Number(product.stock_maximo) || 0;
-        if (stock === 0) return 'bg-red-50';
-        if (minStock > 0 && stock > 0 && stock <= minStock) return 'bg-yellow-50';
+        if (stock === 0) return 'bg-red-50 dark:bg-red-900/20';
+        if (minStock > 0 && stock > 0 && stock <= minStock) return 'bg-yellow-50 dark:bg-yellow-900/20';
         if (maxStock > 0 && stock >= maxStock) return 'bg-orange-50';
         return 'bg-white';
     };
@@ -1354,7 +1362,7 @@ export default function InventoryManagement() {
     return (
         <div className="animate-fadeIn pb-12">
             {toastMessage && (
-                <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200'}`}>
+                <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-800 border-red-200' : 'bg-green-50 dark:bg-green-900/20 text-green-800 border-green-200'}`}>
                     <i className={`bi ${toastMessage.type === 'error' ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} text-lg`}></i>
                     <span className="font-bold text-sm tracking-tight">{toastMessage.message}</span>
                 </div>
@@ -1381,7 +1389,7 @@ export default function InventoryManagement() {
             {/* Top Actions */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">
                         {activeTab === 'todo' && 'Inventario completo'}
                         {activeTab === 'formulas' && 'Fórmulas de producción (BOM)'}
                         {activeTab === 'proveedores' && 'Gestión de Proveedores'}
@@ -1397,14 +1405,14 @@ export default function InventoryManagement() {
                 <div className="flex gap-2 w-full sm:w-auto flex-wrap">
                     {activeTab === 'todo' && (
                         <>
-                            <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                            <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white dark:bg-slate-800 hover:bg-gray-50 cursor-pointer">
                                 {uploadingExcel ? 'Subiendo...' : <><i className="bi bi-file-earmark-spreadsheet mr-1 text-green-600"></i> Importar Excel</>}
                                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} disabled={uploadingExcel} />
                             </label>
                             <button
                                 onClick={exportStockData}
                                 disabled={exportingStock}
-                                className="inline-flex items-center px-4 py-2 border border-emerald-300 text-sm font-medium rounded-xl shadow-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
+                                className="inline-flex items-center px-4 py-2 border border-emerald-300 text-sm font-medium rounded-xl shadow-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:bg-emerald-900/30 disabled:opacity-50"
                             >
                                 {exportingStock ? 'Descargando...' : <><i className="bi bi-file-earmark-excel mr-1 text-emerald-600"></i> Exportar Excel</>}
                             </button>
@@ -1418,7 +1426,7 @@ export default function InventoryManagement() {
                                 <button
                                     onClick={handleMultiDeleteTable}
                                     disabled={selectedRowsCount === 0 || deletingMultiple}
-                                    className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-l-xl text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
+                                    className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-l-xl text-red-700 bg-white dark:bg-slate-800 hover:bg-red-50 dark:bg-red-900/20 disabled:opacity-50"
                                 >
                                     {deletingMultiple ? 'Borrando...' : <><i className="bi bi-trash mr-1"></i> Borrar seleccionados ({selectedRowsCount})</>}
                                 </button>
@@ -1431,7 +1439,7 @@ export default function InventoryManagement() {
                                     Borrar TODO
                                 </button>
                             </div>
-                            <button onClick={downloadStandardTemplate} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                            <button onClick={downloadStandardTemplate} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white dark:bg-slate-800 hover:bg-gray-50">
                                 <i className="bi bi-download mr-1 text-emerald-600"></i> Plantilla Excel
                             </button>
                             <button onClick={openCreateModal} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
@@ -1446,10 +1454,10 @@ export default function InventoryManagement() {
                     )}
                     {activeTab === 'proveedores' && (
                         <>
-                            <button onClick={downloadProveedorTemplate} className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                            <button onClick={downloadProveedorTemplate} className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white dark:bg-slate-800 hover:bg-gray-50">
                                 <i className="bi bi-download mr-1 text-emerald-600"></i> Descargar plantilla
                             </button>
-                            <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                            <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white dark:bg-slate-800 hover:bg-gray-50 cursor-pointer">
                                 {uploadingProveedores ? 'Subiendo...' : <><i className="bi bi-file-earmark-spreadsheet mr-1 text-green-600"></i> Cargar Excel</>}
                                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleProveedorExcelUpload} disabled={uploadingProveedores} />
                             </label>
@@ -1463,7 +1471,7 @@ export default function InventoryManagement() {
             
             {/* Feedback */}
             {proveedorExcelFeedback && (
-                <div className={`mb-4 p-3 rounded-md ${proveedorExcelFeedback.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+                <div className={`mb-4 p-3 rounded-md ${proveedorExcelFeedback.type === 'success' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
                     <p className="text-sm font-medium">{proveedorExcelFeedback.message}</p>
                     {proveedorExcelFeedback.errores?.length > 0 && (
                         <ul className="mt-1 text-xs text-red-600 list-disc list-inside">
@@ -1473,7 +1481,7 @@ export default function InventoryManagement() {
                 </div>
             )}
             {excelFeedback && (
-                <div className={`mb-4 p-3 rounded-md ${excelFeedback.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+                <div className={`mb-4 p-3 rounded-md ${excelFeedback.type === 'success' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
                     <p className="text-sm font-medium">{excelFeedback.message}</p>
                     {excelFeedback.errors?.length > 0 && (
                         <ul className="mt-1 text-xs text-red-600 list-disc list-inside">
@@ -1506,7 +1514,7 @@ export default function InventoryManagement() {
                     <div className="flex justify-end mb-2">
                         <button
                             onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white dark:bg-slate-800 hover:bg-gray-50"
                         >
                             {viewMode === 'table' ? (
                                 <><i className="bi bi-grid-3x3-gap-fill mr-1"></i> Vista tarjetas</>
@@ -1577,7 +1585,7 @@ export default function InventoryManagement() {
                                     </thead>
                                     <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                                         {filteredFormulas.map(formula => (
-                                            <tr key={formula.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                                            <tr key={formula.id} className="hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-700/30 transition-colors">
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">{formula.nombre}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-slate-300">
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">
@@ -1710,8 +1718,8 @@ export default function InventoryManagement() {
                                                         </div>
                                                         <div className="w-32"><label className="block text-xs text-gray-500">Cantidad</label><input type="number" min="0" step="1" value={cantidad} onChange={(e) => updateCantidadForBudget(product.id, e.target.value)} className="w-full px-2 py-1 border rounded text-center" /></div>
                                                         <div className="flex items-end gap-2">
-                                                            <button onClick={() => toggleSelectForBudget(product.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{isSelected ? 'Seleccionado' : 'Seleccionar'}</button>
-                                                            <button onClick={() => handleAskProviderForProduct(product)} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200"><i className="bi bi-envelope-paper me-1"></i>Presupuesto</button>
+                                                            <button onClick={() => toggleSelectForBudget(product.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-slate-800/50 text-gray-700 hover:bg-gray-200'}`}>{isSelected ? 'Seleccionado' : 'Seleccionar'}</button>
+                                                            <button onClick={() => handleAskProviderForProduct(product)} className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200"><i className="bi bi-envelope-paper me-1"></i>Presupuesto</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1730,14 +1738,14 @@ export default function InventoryManagement() {
             {showProveedorModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowProveedorModal(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50"><h3 className="text-lg font-bold">{editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3><button onClick={() => setShowProveedorModal(false)}><i className="bi bi-x-lg"></i></button></div>
+                        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 dark:bg-slate-900/20"><h3 className="text-lg font-bold">{editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3><button onClick={() => setShowProveedorModal(false)}><i className="bi bi-x-lg"></i></button></div>
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
                             <form onSubmit={handleProveedorSubmit} className="space-y-4">
                                 {[{ label: 'Razón Social *', field: 'nombre' }, { label: 'Contacto', field: 'contacto' }, { label: 'Teléfono', field: 'telefono' }, { label: 'Email', field: 'email' }, { label: 'Rubro', field: 'rubro' }].map(({ label, field }) => (
-                                    <div key={field}><label className="block text-sm font-bold mb-1">{label}</label><input type="text" value={proveedorForm[field]} onChange={e => setProveedorForm({...proveedorForm, [field]: e.target.value})} className="w-full border rounded-lg px-3 py-2" required={field === 'nombre'} /></div>
+                                    <div key={field}><label className="block text-sm font-bold mb-1">{label}</label><input type="text" value={proveedorForm[field]} onChange={e => setProveedorForm({...proveedorForm, [field]: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required={field === 'nombre'} /></div>
                                 ))}
-                                <div><label className="block text-sm font-bold mb-1">Dirección</label><textarea value={proveedorForm.direccion} onChange={e => setProveedorForm({...proveedorForm, direccion: e.target.value})} rows={2} className="w-full border rounded-lg px-3 py-2" /></div>
-                                <div><label className="block text-sm font-bold mb-1">Condición de Pago</label><select value={proveedorForm.condicion_pago} onChange={e => setProveedorForm({...proveedorForm, condicion_pago: e.target.value})} className="w-full border rounded-lg px-3 py-2">{condicionPagoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
+                                <div><label className="block text-sm font-bold mb-1">Dirección</label><textarea value={proveedorForm.direccion} onChange={e => setProveedorForm({...proveedorForm, direccion: e.target.value})} rows={2} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
+                                <div><label className="block text-sm font-bold mb-1">Condición de Pago</label><select value={proveedorForm.condicion_pago} onChange={e => setProveedorForm({...proveedorForm, condicion_pago: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white">{condicionPagoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
                                 <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setShowProveedorModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" disabled={submittingProveedor} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">{submittingProveedor ? 'Guardando...' : 'Guardar'}</button></div>
                             </form>
                         </div>
@@ -1749,20 +1757,20 @@ export default function InventoryManagement() {
             {showProductModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowProductModal(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50"><h3 className="text-lg font-bold">{editingProduct ? 'Editar registro' : 'Nuevo artículo'}</h3><button onClick={() => setShowProductModal(false)}><i className="bi bi-x-lg"></i></button></div>
+                        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 dark:bg-slate-900/20"><h3 className="text-lg font-bold">{editingProduct ? 'Editar registro' : 'Nuevo artículo'}</h3><button onClick={() => setShowProductModal(false)}><i className="bi bi-x-lg"></i></button></div>
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
-                            {validationError && <div className="mb-4 text-xs font-bold text-red-600 bg-red-50 p-2 rounded">{validationError}</div>}
+                            {validationError && <div className="mb-4 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">{validationError}</div>}
                             <form onSubmit={handleProductSubmit} className="space-y-4">
-                                <div><label className="block text-sm font-bold mb-1">Nombre *</label><input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full border rounded-lg px-3 py-2" required /></div>
-                                <div><label className="block text-sm font-bold mb-1">Descripción</label><input type="text" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
-                                <div><label className="block text-sm font-bold mb-1">Presentación *</label><input type="text" value={formData.presentacion} onChange={e => setFormData({...formData, presentacion: e.target.value})} className="w-full border rounded-lg px-3 py-2" required placeholder="Ej: Tambor 200L" /></div>
+                                <div><label className="block text-sm font-bold mb-1">Nombre *</label><input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required /></div>
+                                <div><label className="block text-sm font-bold mb-1">Descripción</label><input type="text" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
+                                <div><label className="block text-sm font-bold mb-1">Presentación *</label><input type="text" value={formData.presentacion} onChange={e => setFormData({...formData, presentacion: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required placeholder="Ej: Tambor 200L" /></div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-bold mb-1">Peso Base (kg) *</label><input type="number" step="0.01" value={formData.peso_kg} onChange={e => setFormData({...formData, peso_kg: e.target.value})} className="w-full border rounded-lg px-3 py-2" required /></div>
-                                    <div><label className="block text-sm font-bold mb-1">Stock Físico</label><input type="number" step="0.01" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: e.target.value})} className="w-full border rounded-lg px-3 py-2" /></div>
+                                    <div><label className="block text-sm font-bold mb-1">Peso Base (kg) *</label><input type="number" step="0.01" value={formData.peso_kg} onChange={e => setFormData({...formData, peso_kg: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required /></div>
+                                    <div><label className="block text-sm font-bold mb-1">Stock Físico</label><input type="number" step="0.01" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta amarilla" /></div>
-                                    <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta naranja" /></div>
+                                    <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Alerta amarilla" /></div>
+                                    <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Alerta naranja" /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -1773,7 +1781,7 @@ export default function InventoryManagement() {
                                             min="0" 
                                             value={formData.costo} 
                                             onChange={e => setFormData({...formData, costo: e.target.value})} 
-                                            className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100 dark:disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed" 
+                                            className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100 dark:bg-slate-800/50 dark:disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed" 
                                             disabled={
                                                 (editingProduct && user?.role !== 'OWNER' && user?.role !== 'OPERADOR') ||
                                                 formulas.some(f => f.articulo_final_id === editingProduct?.id)
@@ -1790,12 +1798,12 @@ export default function InventoryManagement() {
                                             min="0" 
                                             value={formData.precio_venta} 
                                             onChange={e => setFormData({...formData, precio_venta: e.target.value})} 
-                                            className="w-full border rounded-lg px-3 py-2" 
+                                            className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" 
                                         />
                                     </div>
                                 </div>
                                 <div><label className="block text-sm font-bold mb-1">Categoría</label>
-                                    <input type="text" list="categorias-list" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Ej: insumos" />
+                                    <input type="text" list="categorias-list" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Ej: insumos" />
                                     <datalist id="categorias-list">
                                         {allCategorias.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                                     </datalist>
@@ -1839,7 +1847,7 @@ export default function InventoryManagement() {
             {showBudgetModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBudgetModal(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b bg-indigo-50 flex justify-between items-center"><h3 className="text-lg font-black">Solicitar presupuesto a {currentProveedor?.nombre}</h3><button onClick={() => setShowBudgetModal(false)}><i className="bi bi-x-lg"></i></button></div>
+                        <div className="px-6 py-4 border-b bg-indigo-50 dark:bg-indigo-900/20 flex justify-between items-center"><h3 className="text-lg font-black">Solicitar presupuesto a {currentProveedor?.nombre}</h3><button onClick={() => setShowBudgetModal(false)}><i className="bi bi-x-lg"></i></button></div>
                         <div className="p-6 flex-1 overflow-y-auto">
                             <textarea rows={12} value={budgetText} onChange={(e) => setBudgetText(e.target.value)} className="w-full border rounded-lg p-3 font-mono text-sm dark:bg-slate-700 dark:text-white dark:border-slate-600"></textarea>
                             <div className="flex justify-end gap-3 mt-4">
@@ -1881,9 +1889,9 @@ export default function InventoryManagement() {
             {showMultiDeleteModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowMultiDeleteModal(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                        <div className="p-6 border-b bg-red-50"><h3 className="text-lg font-black text-red-800">Eliminación Masiva</h3></div>
+                        <div className="p-6 border-b bg-red-50 dark:bg-red-900/20"><h3 className="text-lg font-black text-red-800">Eliminación Masiva</h3></div>
                         <div className="p-4 overflow-y-auto flex-1"><table className="w-full text-sm"><thead><tr><th className="p-2"><input type="checkbox" checked={selectedCountChem > 0 && selectedCountChem === filteredProducts.length} onChange={toggleSelectAllChem} /></th><th className="p-2">Nombre</th></tr></thead><tbody>{filteredProducts.map(p => (<tr key={p.id}><td className="p-2"><input type="checkbox" checked={selectedProducts[p.id] || false} onChange={() => toggleSelectProduct(p.id)} /></td><td className="p-2 font-medium">{p.nombre}</td></tr>))}</tbody></table></div>
-                        <div className="p-4 border-t flex justify-between items-center bg-gray-50"><span className="text-xs font-bold">{selectedCountChem} elegidos</span><div className="flex gap-2"><button onClick={() => setShowMultiDeleteModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button onClick={handleMultiDeleteChem} disabled={selectedCountChem===0 || deletingMultipleChem} className="px-4 py-2 bg-red-600 text-white rounded-lg">Borrar</button></div></div>
+                        <div className="p-4 border-t flex justify-between items-center bg-gray-50 dark:bg-slate-900/50"><span className="text-xs font-bold">{selectedCountChem} elegidos</span><div className="flex gap-2"><button onClick={() => setShowMultiDeleteModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button><button onClick={handleMultiDeleteChem} disabled={selectedCountChem===0 || deletingMultipleChem} className="px-4 py-2 bg-red-600 text-white rounded-lg">Borrar</button></div></div>
                     </div>
                 </div>,
                 document.body
@@ -1959,7 +1967,7 @@ export default function InventoryManagement() {
                                     <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400">Ingredientes Químicos *</label>
                                     <button
                                         onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '', obj: null, is_envase: false }])}
-                                        className="text-xs bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                                        className="text-xs bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
                                     >
                                         + Agregar Químico
                                     </button>
@@ -2037,7 +2045,7 @@ export default function InventoryManagement() {
                                     <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400">Envase / Empaque</label>
                                     <button
                                         onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '', obj: null, is_envase: true }])}
-                                        className="text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                                        className="text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
                                     >
                                         + Agregar Envase
                                     </button>
@@ -2141,7 +2149,7 @@ export default function InventoryManagement() {
                         <div className="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 dark:bg-slate-750">
                             <button
                                 onClick={() => setShowFormulaModal(false)}
-                                className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                                className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-700 transition-colors"
                             >
                                 Cancelar
                             </button>
@@ -2176,13 +2184,13 @@ export default function InventoryManagement() {
             {movimientosModal.open && createPortal(
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4" onClick={() => setMovimientosModal({ open: false, producto: null, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '' }, page: 1, totalPages: 1, exportando: false })}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b bg-indigo-50 flex justify-between items-center shrink-0"><h3 className="text-xl font-black">Movimientos de {movimientosModal.producto?.nombre}</h3><button onClick={() => setMovimientosModal(prev => ({ ...prev, open: false }))}><i className="bi bi-x-lg text-xl"></i></button></div>
+                        <div className="px-6 py-4 border-b bg-indigo-50 dark:bg-indigo-900/20 flex justify-between items-center shrink-0"><h3 className="text-xl font-black">Movimientos de {movimientosModal.producto?.nombre}</h3><button onClick={() => setMovimientosModal(prev => ({ ...prev, open: false }))}><i className="bi bi-x-lg text-xl"></i></button></div>
                         <div className="p-4 flex gap-2 flex-wrap border-b shrink-0">
-                            <select className="px-3 py-1.5 border rounded-lg text-sm" value={movimientosModal.filters.tipo} onChange={e => fetchMovimientos(movimientosModal.producto?.id, 1, { ...movimientosModal.filters, tipo: e.target.value })}>
+                            <select className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosModal.filters.tipo} onChange={e => fetchMovimientos(movimientosModal.producto?.id, 1, { ...movimientosModal.filters, tipo: e.target.value })}>
                                 <option value="">Todos los tipos</option><option value="INGRESO">Ingreso</option><option value="SALIDA">Salida</option><option value="AJUSTE">Ajuste</option>
                             </select>
-                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm" value={movimientosModal.filters.fecha_desde} onChange={e => fetchMovimientos(movimientosModal.producto?.id, 1, { ...movimientosModal.filters, fecha_desde: e.target.value })} />
-                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm" value={movimientosModal.filters.fecha_hasta} onChange={e => fetchMovimientos(movimientosModal.producto?.id, 1, { ...movimientosModal.filters, fecha_hasta: e.target.value })} />
+                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosModal.filters.fecha_desde} onChange={e => fetchMovimientos(movimientosModal.producto?.id, 1, { ...movimientosModal.filters, fecha_desde: e.target.value })} />
+                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosModal.filters.fecha_hasta} onChange={e => fetchMovimientos(movimientosModal.producto?.id, 1, { ...movimientosModal.filters, fecha_hasta: e.target.value })} />
                             <button onClick={() => exportMovimientos(movimientosModal.producto?.id, 'excel')} disabled={movimientosModal.exportando} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm">Exportar Excel</button>
                             <button onClick={() => exportMovimientos(movimientosModal.producto?.id, 'csv')} disabled={movimientosModal.exportando} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">Exportar CSV</button>
                         </div>
@@ -2190,12 +2198,12 @@ export default function InventoryManagement() {
                             {movimientosModal.loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-10 h-10" /></div> : (
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-xs font-medium">Fecha</th><th className="px-4 py-3 text-left text-xs font-medium">Tipo</th><th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th><th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th><th className="px-4 py-3 text-left text-xs font-medium">Razón</th><th className="px-4 py-3 text-left text-xs font-medium">Operación</th></tr></thead>
+                                        <thead className="bg-gray-50 dark:bg-slate-900/50"><tr><th className="px-4 py-3 text-left text-xs font-medium">Fecha</th><th className="px-4 py-3 text-left text-xs font-medium">Tipo</th><th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th><th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th><th className="px-4 py-3 text-left text-xs font-medium">Razón</th><th className="px-4 py-3 text-left text-xs font-medium">Operación</th></tr></thead>
                                         <tbody className="divide-y divide-gray-200">
                                             {movimientosModal.movimientos.map(m => (
                                                 <tr key={m.id}>
                                                     <td className="px-4 py-2 text-sm">{new Date(m.fecha).toLocaleString()}</td>
-                                                    <td className="px-4 py-2 text-sm"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{m.tipo}</span></td>
+                                                    <td className="px-4 py-2 text-sm"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'}`}>{m.tipo}</span></td>
                                                     <td className="px-4 py-2 text-sm">{m.cantidad}</td>
                                                     <td className="px-4 py-2 text-sm">{m.stock_resultante}</td>
                                                     <td className="px-4 py-2 text-sm">{m.razon}</td>
@@ -2208,7 +2216,7 @@ export default function InventoryManagement() {
                             )}
                             {movimientosModal.movimientos.length === 0 && !movimientosModal.loading && <p className="text-center text-gray-500 py-10">No hay movimientos.</p>}
                         </div>
-                        <div className="p-4 border-t flex justify-between items-center bg-gray-50 shrink-0">
+                        <div className="p-4 border-t flex justify-between items-center bg-gray-50 dark:bg-slate-900/50 shrink-0">
                             <button disabled={movimientosModal.page <= 1} onClick={() => fetchMovimientos(movimientosModal.producto?.id, movimientosModal.page - 1, movimientosModal.filters)} className="px-3 py-1.5 border rounded-lg disabled:opacity-50">Anterior</button>
                             <span className="text-sm">Página {movimientosModal.page} de {movimientosModal.totalPages}</span>
                             <button disabled={movimientosModal.page >= movimientosModal.totalPages} onClick={() => fetchMovimientos(movimientosModal.producto?.id, movimientosModal.page + 1, movimientosModal.filters)} className="px-3 py-1.5 border rounded-lg disabled:opacity-50">Siguiente</button>
@@ -2221,14 +2229,14 @@ export default function InventoryManagement() {
             {logsModal.open && createPortal(
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4" onClick={() => setLogsModal({ open: false, producto: null, logs: [], loading: false })}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center shrink-0"><h3 className="text-xl font-black">Historial de cambios - {logsModal.producto?.nombre}</h3><button onClick={() => setLogsModal(prev => ({ ...prev, open: false }))}><i className="bi bi-x-lg text-xl"></i></button></div>
+                        <div className="px-6 py-4 border-b bg-gray-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0"><h3 className="text-xl font-black">Historial de cambios - {logsModal.producto?.nombre}</h3><button onClick={() => setLogsModal(prev => ({ ...prev, open: false }))}><i className="bi bi-x-lg text-xl"></i></button></div>
                         <div className="flex-1 overflow-y-auto p-4">
                             {logsModal.loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-10 h-10" /></div> : (
                                 <div className="space-y-4">
                                     {logsModal.logs.map(log => (
-                                        <div key={log.id} className="border rounded-lg p-4 bg-white">
+                                        <div key={log.id} className="border rounded-lg p-4 bg-white dark:bg-slate-800">
                                             <div className="flex justify-between text-sm text-gray-500"><span>{new Date(log.fecha).toLocaleString()}</span><span>Usuario: {log.usuario_nombre || 'Sistema'}</span><span>IP: {log.ip || '-'}</span></div>
-                                            <p className="font-bold mt-2 text-gray-800">{log.accion === 'CREATE' ? 'Creación' : log.accion === 'UPDATE' ? 'Actualización' : 'Eliminación'}</p>
+                                            <p className="font-bold mt-2 text-gray-800 dark:text-slate-200">{log.accion === 'CREATE' ? 'Creación' : log.accion === 'UPDATE' ? 'Actualización' : 'Eliminación'}</p>
                                             {log.campos_modificados && Object.keys(log.campos_modificados).length > 0 && (
                                                 <details className="mt-2"><summary className="text-xs cursor-pointer text-indigo-600">Ver detalles</summary><ul className="mt-1 text-xs text-gray-600 list-disc list-inside">{Object.entries(log.campos_modificados).map(([campo, val]) => <li key={campo}><strong>{campo}:</strong> {val.old} → {val.new}</li>)}</ul></details>
                                             )}
@@ -2238,7 +2246,7 @@ export default function InventoryManagement() {
                             )}
                             {logsModal.logs.length === 0 && !logsModal.loading && <p className="text-center text-gray-500 py-10">No hay registros de cambios.</p>}
                         </div>
-                        <div className="p-4 border-t flex justify-end bg-gray-50 shrink-0"><button onClick={() => setLogsModal(prev => ({ ...prev, open: false }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">Cerrar</button></div>
+                        <div className="p-4 border-t flex justify-end bg-gray-50 dark:bg-slate-900/50 shrink-0"><button onClick={() => setLogsModal(prev => ({ ...prev, open: false }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">Cerrar</button></div>
                     </div>
                 </div>,
                 document.body
@@ -2247,12 +2255,12 @@ export default function InventoryManagement() {
             {movimientosGlobal.open && createPortal(
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4" onClick={() => setMovimientosGlobal(prev => ({ ...prev, open: false }))}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b bg-indigo-50 flex justify-between items-center shrink-0"><h3 className="text-xl font-black">Informe general de movimientos</h3><button onClick={() => setMovimientosGlobal(prev => ({ ...prev, open: false }))}><i className="bi bi-x-lg text-xl"></i></button></div>
+                        <div className="px-6 py-4 border-b bg-indigo-50 dark:bg-indigo-900/20 flex justify-between items-center shrink-0"><h3 className="text-xl font-black">Informe general de movimientos</h3><button onClick={() => setMovimientosGlobal(prev => ({ ...prev, open: false }))}><i className="bi bi-x-lg text-xl"></i></button></div>
                         <div className="p-4 flex gap-2 flex-wrap border-b shrink-0">
-                            <input type="text" placeholder="ID Producto" className="px-3 py-1.5 border rounded-lg text-sm w-32" value={movimientosGlobal.filters.articulo_id} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, articulo_id: e.target.value } }))} />
-                            <select className="px-3 py-1.5 border rounded-lg text-sm" value={movimientosGlobal.filters.tipo} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, tipo: e.target.value } }))}><option value="">Todos los tipos</option><option value="INGRESO">Ingreso</option><option value="SALIDA">Salida</option><option value="AJUSTE">Ajuste</option></select>
-                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm" value={movimientosGlobal.filters.fecha_desde} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, fecha_desde: e.target.value } }))} />
-                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm" value={movimientosGlobal.filters.fecha_hasta} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, fecha_hasta: e.target.value } }))} />
+                            <input type="text" placeholder="ID Producto" className="px-3 py-1.5 border rounded-lg text-sm w-32 dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosGlobal.filters.articulo_id} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, articulo_id: e.target.value } }))} />
+                            <select className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosGlobal.filters.tipo} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, tipo: e.target.value } }))}><option value="">Todos los tipos</option><option value="INGRESO">Ingreso</option><option value="SALIDA">Salida</option><option value="AJUSTE">Ajuste</option></select>
+                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosGlobal.filters.fecha_desde} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, fecha_desde: e.target.value } }))} />
+                            <input type="date" className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={movimientosGlobal.filters.fecha_hasta} onChange={e => setMovimientosGlobal(prev => ({ ...prev, filters: { ...prev.filters, fecha_hasta: e.target.value } }))} />
                             <button onClick={() => openMovimientosGlobal(1)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">Filtrar</button>
                             <button onClick={() => exportMovimientos(null, 'excel')} disabled={movimientosGlobal.exportando} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm">Exportar Excel</button>
                             <button onClick={() => exportMovimientos(null, 'csv')} disabled={movimientosGlobal.exportando} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">Exportar CSV</button>
@@ -2261,13 +2269,13 @@ export default function InventoryManagement() {
                             {movimientosGlobal.loading ? <div className="flex justify-center py-20"><LogoSpinner size="w-10 h-10" /></div> : (
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-xs font-medium">Fecha</th><th className="px-4 py-3 text-left text-xs font-medium">Producto</th><th className="px-4 py-3 text-left text-xs font-medium">Tipo</th><th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th><th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th><th className="px-4 py-3 text-left text-xs font-medium">Razón</th><th className="px-4 py-3 text-left text-xs font-medium">Operación</th></tr></thead>
+                                        <thead className="bg-gray-50 dark:bg-slate-900/50"><tr><th className="px-4 py-3 text-left text-xs font-medium">Fecha</th><th className="px-4 py-3 text-left text-xs font-medium">Producto</th><th className="px-4 py-3 text-left text-xs font-medium">Tipo</th><th className="px-4 py-3 text-left text-xs font-medium">Cantidad</th><th className="px-4 py-3 text-left text-xs font-medium">Stock resultante</th><th className="px-4 py-3 text-left text-xs font-medium">Razón</th><th className="px-4 py-3 text-left text-xs font-medium">Operación</th></tr></thead>
                                         <tbody className="divide-y divide-gray-200">
                                             {movimientosGlobal.movimientos.map(m => (
                                                 <tr key={m.id}>
                                                     <td className="px-4 py-2 text-sm">{new Date(m.fecha).toLocaleString()}</td>
                                                     <td className="px-4 py-2 text-sm">{m.articulo_nombre}</td>
-                                                    <td className="px-4 py-2 text-sm"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{m.tipo}</span></td>
+                                                    <td className="px-4 py-2 text-sm"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${m.tipo === 'INGRESO' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' : m.tipo === 'SALIDA' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'}`}>{m.tipo}</span></td>
                                                     <td className="px-4 py-2 text-sm">{m.cantidad}</td>
                                                     <td className="px-4 py-2 text-sm">{m.stock_resultante}</td>
                                                     <td className="px-4 py-2 text-sm">{m.razon}</td>
@@ -2280,7 +2288,7 @@ export default function InventoryManagement() {
                             )}
                             {movimientosGlobal.movimientos.length === 0 && !movimientosGlobal.loading && <p className="text-center text-gray-500 py-10">No hay movimientos.</p>}
                         </div>
-                        <div className="p-4 border-t flex justify-between items-center bg-gray-50 shrink-0">
+                        <div className="p-4 border-t flex justify-between items-center bg-gray-50 dark:bg-slate-900/50 shrink-0">
                             <button disabled={movimientosGlobal.page <= 1} onClick={() => openMovimientosGlobal(movimientosGlobal.page - 1)} className="px-3 py-1.5 border rounded-lg disabled:opacity-50">Anterior</button>
                             <span className="text-sm">Página {movimientosGlobal.page} de {movimientosGlobal.totalPages}</span>
                             <button disabled={movimientosGlobal.page >= movimientosGlobal.totalPages} onClick={() => openMovimientosGlobal(movimientosGlobal.page + 1)} className="px-3 py-1.5 border rounded-lg disabled:opacity-50">Siguiente</button>
@@ -2293,21 +2301,21 @@ export default function InventoryManagement() {
             {movimientoModal.open && createPortal(
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4" onClick={() => setMovimientoModal(prev => ({ ...prev, open: false }))}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b bg-emerald-50 flex justify-between items-center">
+                        <div className="px-6 py-4 border-b bg-emerald-50 dark:bg-emerald-900/20 flex justify-between items-center">
                             <h3 className="text-lg font-black">Registrar movimiento - {movimientoModal.producto?.nombre}</h3>
                             <button onClick={() => setMovimientoModal(prev => ({ ...prev, open: false }))} className="text-gray-500 hover:text-gray-700"><i className="bi bi-x-lg text-xl"></i></button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div><label className="block text-sm font-bold mb-1">Tipo</label>
-                                <select value={movimientoModal.tipo} onChange={e => setMovimientoModal(prev => ({ ...prev, tipo: e.target.value }))} className="w-full border rounded-lg px-3 py-2">
+                                <select value={movimientoModal.tipo} onChange={e => setMovimientoModal(prev => ({ ...prev, tipo: e.target.value }))} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white">
                                     <option value="INGRESO">Ingreso</option>
                                     <option value="SALIDA">Salida</option>
                                     <option value="AJUSTE">Ajuste (setea stock)</option>
                                 </select>
                                 <p className="text-xs text-gray-500 mt-1">{movimientoModal.tipo === 'INGRESO' ? 'Aumenta el stock' : movimientoModal.tipo === 'SALIDA' ? 'Reduce el stock' : 'Establece el stock exacto'}</p>
                             </div>
-                            <div><label className="block text-sm font-bold mb-1">Cantidad</label><input type="number" step="0.01" value={movimientoModal.cantidad} onChange={e => setMovimientoModal(prev => ({ ...prev, cantidad: parseFloat(e.target.value) || 0 }))} className="w-full border rounded-lg px-3 py-2" /></div>
-                            <div><label className="block text-sm font-bold mb-1">Razón</label><textarea value={movimientoModal.razon} onChange={e => setMovimientoModal(prev => ({ ...prev, razon: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2" placeholder="Ej: Compra, Devolución, Ajuste..." /></div>
+                            <div><label className="block text-sm font-bold mb-1">Cantidad</label><input type="number" step="0.01" value={movimientoModal.cantidad} onChange={e => setMovimientoModal(prev => ({ ...prev, cantidad: parseFloat(e.target.value) || 0 }))} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
+                            <div><label className="block text-sm font-bold mb-1">Razón</label><textarea value={movimientoModal.razon} onChange={e => setMovimientoModal(prev => ({ ...prev, razon: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Ej: Compra, Devolución, Ajuste..." /></div>
                             <div className="flex justify-end gap-3 pt-2">
                                 <button onClick={() => setMovimientoModal(prev => ({ ...prev, open: false }))} className="px-4 py-2 border rounded-lg">Cancelar</button>
                                 <button onClick={registrarMovimiento} disabled={registrandoMovimiento} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">{registrandoMovimiento ? 'Registrando...' : 'Registrar'}</button>

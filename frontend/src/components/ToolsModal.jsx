@@ -135,13 +135,13 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
             <div className="flex gap-2">
               <button 
                 onClick={handleAddRow}
-                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-indigo-200"
+                className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-indigo-200"
               >
                 <i className="bi bi-plus-circle-fill"></i> Añadir Fila
               </button>
               <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-emerald-200"
+                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-emerald-200"
               >
                 <i className="bi bi-file-earmark-excel-fill"></i> Importar Excel
               </button>
@@ -164,7 +164,7 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                 {tools.map((tool, index) => (
-                  <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <tr key={index} className="hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="px-4 py-2 whitespace-nowrap text-sm font-bold text-slate-500">{index + 1}</td>
                     <td className="px-4 py-2">
                       <input 
@@ -196,7 +196,7 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
                     <td className="px-4 py-2 whitespace-nowrap text-right">
                       <button 
                         onClick={() => handleRemoveRow(index)}
-                        className="text-red-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                        className="text-red-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/30 transition-colors"
                         title="Eliminar fila"
                       >
                         <i className="bi bi-trash-fill"></i>

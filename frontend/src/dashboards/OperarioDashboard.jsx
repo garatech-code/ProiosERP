@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from '../api/axios';
+import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import LogoSpinner from '../components/LogoSpinner';
@@ -119,11 +120,10 @@ export default function OperarioDashboard() {
         </button>
 
         <div className={`p-6 flex items-center border-b border-slate-800 ${isSidebarOpen ? 'gap-3' : 'justify-center'}`}>
-          <div className="w-10 h-10 bg-indigo-500 rounded-xl flex shrink-0 items-center justify-center font-black text-xl shadow-lg">P</div>
+          <img src={logo} alt="TECHSHIP Logo" className="w-10 h-10 object-contain shrink-0" />
           {isSidebarOpen && (
             <div className="animate-fadeIn">
-              <h1 className="font-black text-xl tracking-tight leading-none text-white whitespace-nowrap">ProIOS</h1>
-              <span className="text-[10px] uppercase text-indigo-300 font-bold tracking-widest block">Producción</span>
+              <h1 className="font-black text-xl tracking-tight leading-none text-white whitespace-nowrap">TECHSHIP</h1>
             </div>
           )}
         </div>
@@ -166,8 +166,8 @@ export default function OperarioDashboard() {
       {/* Navbar Mobile */}
       <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
-          <h1 className="font-black text-lg">ProIOS</h1>
+          <img src={logo} alt="TECHSHIP Logo" className="w-8 h-8 object-contain shrink-0" />
+          <h1 className="font-black text-lg">TECHSHIP</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={toggleTheme} className="bg-indigo-900/80 text-indigo-300 p-2 rounded-lg">
@@ -208,7 +208,7 @@ export default function OperarioDashboard() {
           )}
 
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
+            <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
               <p className="text-red-700 font-medium">{error}</p>
               <button onClick={fetchOperaciones} className="mt-2 text-sm text-red-600 underline">Reintentar</button>
             </div>
@@ -314,7 +314,7 @@ export default function OperarioDashboard() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                                   {productos.map((prod, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                                    <tr key={idx} className="hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-700/30">
                                       <td className="px-3 py-2 font-medium text-gray-800 dark:text-white">{prod.product_name}</td>
                                       <td className="px-3 py-2 text-center text-gray-700 dark:text-slate-300">{prod.quantity}</td>
                                       <td className="px-3 py-2 text-gray-600 dark:text-slate-400">{prod.presentation || '-'}</td>

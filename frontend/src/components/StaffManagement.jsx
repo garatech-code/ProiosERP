@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import LogoSpinner from './LogoSpinner';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../context/AuthContext';
 
 export default function StaffManagement() {
+    const { user } = useAuth();
     const [staff, setStaff] = useState([]);
     const [filteredStaff, setFilteredStaff] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -35,12 +37,30 @@ export default function StaffManagement() {
         setTimeout(() => setToast(null), 4000);
     };
 
+    const formatDni = (dni) => dni ? String(dni).replace(/\.0$/, '') : '';
+
     const downloadTemplate = () => {
         const headers = [['NOMBRES', 'APELLIDOS', 'DNI', 'ROL']];
         const ws = XLSX.utils.aoa_to_sheet(headers);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
         XLSX.writeFile(wb, "plantel_template.xlsx");
+    };
+
+    const exportToExcel = () => {
+        const dataToExport = filteredStaff.map(member => ({
+            'Nombres': member.nombres,
+            'Apellidos': member.apellidos,
+            'DNI': formatDni(member.dni),
+            'Rol': member.rol,
+            'Estado': member.activo ? 'Activo' : 'Inactivo',
+            'Fecha de Registro': member.fecha_registro ? new Date(member.fecha_registro).toLocaleDateString() : '-'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Plantel");
+        XLSX.writeFile(wb, "plantel_export.xlsx");
     };
 
     const fetchStaff = async () => {
@@ -71,7 +91,7 @@ export default function StaffManagement() {
             filtered = filtered.filter(s =>
                 s.nombres.toLowerCase().includes(term) ||
                 s.apellidos.toLowerCase().includes(term) ||
-                s.dni.includes(term) ||
+                formatDni(s.dni).toLowerCase().includes(term) ||
                 s.rol.toLowerCase().includes(term)
             );
         }
@@ -86,7 +106,7 @@ export default function StaffManagement() {
 
     const handleOpenEdit = (member) => {
         setEditingMember(member);
-        setFormData({ ...member });
+        setFormData({ ...member, dni: formatDni(member.dni) });
         setShowFormModal(true);
     };
 
@@ -199,9 +219,17 @@ export default function StaffManagement() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                    {user?.role === 'OWNER' && (
+                        <button
+                            onClick={exportToExcel}
+                            className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-sm font-bold rounded-xl hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-2"
+                        >
+                            <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
+                        </button>
+                    )}
                     <button
                         onClick={downloadTemplate}
-                        className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-sm font-bold rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-2"
+                        className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-sm font-bold rounded-xl hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 transition-all flex items-center gap-2"
                     >
                         <i className="bi bi-file-earmark-arrow-down"></i> Formato
                     </button>
@@ -308,7 +336,7 @@ export default function StaffManagement() {
                             ) : filteredStaff.map((member, idx) => (
                                 <tr 
                                     key={member.id} 
-                                    className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-all group animate-slideUp"
+                                    className="hover:bg-slate-50 dark:bg-slate-900/20/50 dark:hover:bg-slate-900/30 transition-all group animate-slideUp"
                                     style={{ animationDelay: `${idx * 0.05}s` }}
                                 >
                                     <td className="p-4">
@@ -331,7 +359,7 @@ export default function StaffManagement() {
                                         </div>
                                     </td>
                                     <td className="p-4">
-                                        <span className="text-sm font-mono text-gray-600 dark:text-slate-300">{member.dni}</span>
+                                        <span className="text-sm font-mono text-gray-600 dark:text-slate-300">{formatDni(member.dni)}</span>
                                     </td>
                                     <td className="p-4">
                                         <span className="text-xs font-bold px-2 py-1 bg-slate-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-lg">{member.rol}</span>
@@ -348,14 +376,14 @@ export default function StaffManagement() {
                                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button 
                                                 onClick={() => handleOpenEdit(member)}
-                                                className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                                className="p-2 text-indigo-600 hover:bg-indigo-50 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                                 title="Editar"
                                             >
                                                 <i className="bi bi-pencil-fill"></i>
                                             </button>
                                             <button 
                                                 onClick={() => handleDelete(member.id, `${member.nombres} ${member.apellidos}`)}
-                                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                                className="p-2 text-red-600 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                                                 title="Eliminar"
                                             >
                                                 <i className="bi bi-trash-fill"></i>
@@ -446,7 +474,7 @@ export default function StaffManagement() {
                                 <button 
                                     type="button"
                                     onClick={() => setShowFormModal(false)}
-                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors shadow-sm"
+                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors shadow-sm"
                                 >
                                     Cancelar
                                 </button>
@@ -496,7 +524,7 @@ export default function StaffManagement() {
                             </div>
 
                             <div className="space-y-4">
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all">
+                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-900/50 transition-all">
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
                                         <i className="bi bi-cloud-arrow-up text-3xl text-indigo-500 mb-2"></i>
                                         <p className="text-sm font-bold text-gray-600 dark:text-slate-300">Haz clic para subir archivo</p>
@@ -514,7 +542,7 @@ export default function StaffManagement() {
 
                                 {importFeedback && (
                                     <div className={`p-3 rounded-xl text-xs font-bold ${
-                                        importFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                        importFeedback.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 border border-emerald-200' : 'bg-red-50 dark:bg-red-900/20 text-red-700 border border-red-200'
                                     }`}>
                                         {importFeedback.message}
                                     </div>

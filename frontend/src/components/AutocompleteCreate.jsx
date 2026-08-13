@@ -201,7 +201,7 @@ export default function AutocompleteCreate({
           ))}
 
           <div
-            className="cursor-pointer select-none relative py-2 pl-3 pr-9 border-t border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-600 hover:bg-indigo-50 dark:hover:bg-slate-500 text-indigo-600 dark:text-indigo-400 font-medium transition-colors"
+            className="cursor-pointer select-none relative py-2 pl-3 pr-9 border-t border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-600 hover:bg-indigo-50 dark:bg-indigo-900/20 dark:hover:bg-slate-500 text-indigo-600 dark:text-indigo-400 font-medium transition-colors"
             onClick={handleOpenCreate}
           >
             + Crear nuevo {searchTerm ? `"${searchTerm}"` : ''}

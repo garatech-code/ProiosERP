@@ -25,13 +25,13 @@ export default function StockModal({ operationId, onClose }) {
   const getStockStatusBadge = (suficiente) => {
     if (suficiente) {
       return (
-        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center gap-1 w-fit">
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 flex items-center gap-1 w-fit">
           <i className="bi bi-check-circle-fill"></i> Suficiente
         </span>
       );
     }
     return (
-      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 flex items-center gap-1 w-fit">
+      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 flex items-center gap-1 w-fit">
         <i className="bi bi-exclamation-triangle-fill"></i> Insuficiente
       </span>
     );
@@ -44,11 +44,11 @@ export default function StockModal({ operationId, onClose }) {
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
 
         {/* HEADER */}
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 shrink-0">
-          <h3 className="text-lg leading-6 font-bold text-gray-900" id="modal-title">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 dark:bg-slate-900/20 shrink-0">
+          <h3 className="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">
             Verificación de Stock - Operación #{operationId}
           </h3>
         </div>
@@ -64,7 +64,7 @@ export default function StockModal({ operationId, onClose }) {
             )}
 
             {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+              <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-md">
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
             )}
@@ -72,7 +72,7 @@ export default function StockModal({ operationId, onClose }) {
             {!loading && !error && stockData && (
               <>
                 {!stockData.todo_suficiente && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex gap-2">
+                  <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg flex gap-2">
                     <i className="bi bi-exclamation-triangle-fill text-red-600 mt-0.5"></i>
                     <p className="text-red-800 text-sm font-medium">
                       Stock insuficiente para confirmar la operación.
@@ -83,7 +83,7 @@ export default function StockModal({ operationId, onClose }) {
                 {stockData.detalles && stockData.detalles.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-gray-50 dark:bg-slate-900/50">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Producto
@@ -100,10 +100,10 @@ export default function StockModal({ operationId, onClose }) {
                         </tr>
                       </thead>
 
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200">
                         {stockData.detalles.map((item, idx) => (
-                          <tr key={idx} className={!item.suficiente ? 'bg-red-50' : ''}>
-                            <td className="px-4 py-3 text-sm text-gray-900">
+                          <tr key={idx} className={!item.suficiente ? 'bg-red-50 dark:bg-red-900/20' : ''}>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                               {item.nombre}
                               {item.error && (
                                 <span className="ml-2 text-xs text-red-600">
@@ -112,12 +112,12 @@ export default function StockModal({ operationId, onClose }) {
                               )}
                             </td>
 
-                            <td className="px-4 py-3 text-sm text-gray-900">
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                               {item.cantidad_necesaria}
                             </td>
 
                             <td className="px-4 py-3 text-sm">
-                              <span className={!item.suficiente ? 'text-red-600 font-bold' : 'text-gray-900'}>
+                              <span className={!item.suficiente ? 'text-red-600 font-bold' : 'text-gray-900 dark:text-white'}>
                                 {item.stock_actual}
                               </span>
                             </td>
@@ -142,10 +142,10 @@ export default function StockModal({ operationId, onClose }) {
         </div>
 
         {/* FOOTER */}
-        <div className="bg-slate-50 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
+        <div className="bg-slate-50 dark:bg-slate-900/20 px-4 py-3 border-t border-gray-100 sm:px-6 sm:flex sm:flex-row-reverse shrink-0">
           <button
             type="button"
-            className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+            className="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-base font-bold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
             onClick={onClose}
           >
             Cerrar

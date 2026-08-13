@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/logo.png';
 import { formatUserName, getUserInitials } from '../utils/formatters';
 import OperationTypeSelector from '../components/OperationTypeSelector';
 import OperationFormProductos from '../components/OperationFormProductos';
@@ -229,21 +230,21 @@ export default function OwnerDashboard() {
 
     const getStatusBadge = (status) => {
         const maps = {
-            pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Solicitada' },
-            solicitada: { color: 'bg-yellow-100 text-yellow-800', label: 'Solicitada' },
+            pending: { color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800', label: 'Solicitada' },
+            solicitada: { color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800', label: 'Solicitada' },
             draft: { color: 'bg-orange-100 text-orange-800', label: 'Borrador' },
-            price_checked: { color: 'bg-blue-100 text-blue-800', label: 'Presupuestada' },
-            presupuestada: { color: 'bg-blue-100 text-blue-800', label: 'Presupuestada' },
-            confirmed: { color: 'bg-green-100 text-green-800', label: 'Lista para envío' },
-            lista_para_envio: { color: 'bg-green-100 text-green-800', label: 'Lista para envío' },
+            price_checked: { color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800', label: 'Presupuestada' },
+            presupuestada: { color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800', label: 'Presupuestada' },
+            confirmed: { color: 'bg-green-100 dark:bg-green-900/30 text-green-800', label: 'Lista para envío' },
+            lista_para_envio: { color: 'bg-green-100 dark:bg-green-900/30 text-green-800', label: 'Lista para envío' },
             in_coordination: { color: 'bg-purple-100 text-purple-800', label: 'En producción' },
             en_produccion: { color: 'bg-purple-100 text-purple-800', label: 'En producción' },
-            delivered: { color: 'bg-indigo-100 text-indigo-800', label: 'Remitada' },
-            remitada: { color: 'bg-indigo-100 text-indigo-800', label: 'Remitada' },
+            delivered: { color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800', label: 'Remitada' },
+            remitada: { color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800', label: 'Remitada' },
             closed: { color: 'bg-gray-100 text-gray-800', label: 'Entregada' },
             entregada: { color: 'bg-gray-100 text-gray-800', label: 'Entregada' },
-            cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
-            cancelada: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
+            cancelled: { color: 'bg-red-100 dark:bg-red-900/30 text-red-800', label: 'Cancelada' },
+            cancelada: { color: 'bg-red-100 dark:bg-red-900/30 text-red-800', label: 'Cancelada' },
         };
         const mapped = maps[status] || { color: 'bg-gray-100 text-gray-800', label: status };
         return (
@@ -270,13 +271,13 @@ export default function OwnerDashboard() {
     const renderDocSemaphore = (label, fileUrl, opStatus) => {
         let statusConfig = {};
         if (fileUrl) {
-            statusConfig = { dot: 'bg-emerald-500', box: 'bg-emerald-50 border-emerald-200 text-emerald-700', title: 'Completado' };
+            statusConfig = { dot: 'bg-emerald-500', box: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 text-emerald-700', title: 'Completado' };
         } else {
             const inProgressStates = ['in_coordination', 'en_produccion', 'confirmed', 'lista_para_envio', 'delivered', 'remitada'];
             if (inProgressStates.includes(opStatus)) {
                 statusConfig = { dot: 'bg-amber-400 animate-pulse', box: 'bg-amber-50 border-amber-200 text-amber-700', title: 'En Proceso' };
             } else {
-                statusConfig = { dot: 'bg-red-500', box: 'bg-red-50 border-red-200 text-red-700', title: 'Faltante' };
+                statusConfig = { dot: 'bg-red-500', box: 'bg-red-50 dark:bg-red-900/20 border-red-200 text-red-700', title: 'Faltante' };
             }
         }
         return (
@@ -669,11 +670,10 @@ export default function OwnerDashboard() {
                 </button>
 
                 <div className={`p-6 flex items-center border-b border-slate-800 ${isSidebarOpen ? 'gap-3' : 'justify-center'}`}>
-                    <div className="w-10 h-10 bg-indigo-500 rounded-xl flex shrink-0 items-center justify-center font-black text-xl shadow-lg">P</div>
+                    <img src={logo} alt="TECHSHIP Logo" className="w-10 h-10 object-contain shrink-0" />
                     {isSidebarOpen && (
                         <div className="animate-fadeIn">
-                            <h1 className="font-black text-xl tracking-tight leading-none text-white whitespace-nowrap">ProIOS</h1>
-                            <span className="text-[10px] uppercase text-indigo-300 font-bold tracking-widest block">Management</span>
+                            <h1 className="font-black text-xl tracking-tight leading-none text-white whitespace-nowrap">TECHSHIP</h1>
                         </div>
                     )}
                 </div>
@@ -782,8 +782,8 @@ export default function OwnerDashboard() {
             {/* Navbar Mobile */}
             <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-black">P</div>
-                    <h1 className="font-black text-lg">ProIOS</h1>
+                    <img src={logo} alt="TECHSHIP Logo" className="w-8 h-8 object-contain shrink-0" />
+                    <h1 className="font-black text-lg">TECHSHIP</h1>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -941,7 +941,7 @@ export default function OwnerDashboard() {
                         </div>
                     )}
                     {error && (
-                        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
+                        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-lg shadow-sm mb-6">
                             <p className="text-red-700 font-medium">{error}</p>
                         </div>
                     )}

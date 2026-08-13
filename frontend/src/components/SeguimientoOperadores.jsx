@@ -255,7 +255,7 @@ export default function SeguimientoOperadores() {
 
       {/* Alertas */}
       {delayedQuotedOps.length > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-sm">
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-xl shadow-sm">
           <div className="flex items-center gap-2 text-red-800 font-bold mb-2">
             <i className="bi bi-exclamation-triangle-fill"></i>
             Operaciones Demoradas para Cotizar ({'>'}24hs)
