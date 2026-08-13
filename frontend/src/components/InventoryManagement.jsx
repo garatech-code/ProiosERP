@@ -4,30 +4,69 @@ import axios from '../api/axios';
 import AutocompleteCreate from './AutocompleteCreate';
 import LogoSpinner from './LogoSpinner';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../context/AuthContext';
 
 // ================= COMPONENTE DE SELECCIÓN DE INGREDIENTE QUÍMICO =================
-const ChemicalSelectionModal = ({ isOpen, onClose, onSelect }) => {
+const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimicos', title = 'Seleccionar Producto' }) => {
     const [chemicals, setChemicals] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // Quick create state
+    const [showCreate, setShowCreate] = useState(false);
+    const [newProduct, setNewProduct] = useState({ nombre: '', presentacion: '', costo: 0 });
+    const [creating, setCreating] = useState(false);
+
+    const fetchChemicals = async () => {
+        setLoading(true);
+        try {
+            const res = await axios.get(`/inventario/products/?categoria=${categoria}&page_size=10000`);
+            const data = res.data.results || res.data;
+            setChemicals(data || []);
+        } catch (err) {
+            console.error('Error al cargar productos:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen) {
-            const fetchChemicals = async () => {
-                setLoading(true);
-                try {
-                    const res = await axios.get('/inventario/products/?categoria=quimicos&page_size=10000');
-                    const data = res.data.results || res.data;
-                    setChemicals(data || []);
-                } catch (err) {
-                    console.error('Error al cargar químicos:', err);
-                } finally {
-                    setLoading(false);
-                }
-            };
+            setShowCreate(false);
+            setSearchTerm('');
             fetchChemicals();
         }
-    }, [isOpen]);
+    }, [isOpen, categoria]);
+
+    const handleCreate = async () => {
+        if (!newProduct.nombre) return;
+        setCreating(true);
+        try {
+            const payload = {
+                nombre: newProduct.nombre,
+                presentacion: newProduct.presentacion,
+                costo: parseFloat(newProduct.costo) || 0,
+                categoria: categoria,
+                peso_kg: 1.0,
+                stock_minimo: 0.0,
+                stock_maximo: 0.0,
+                unidad: categoria === 'Empaque' ? 'u' : 'L',
+                estado: 'Bueno',
+                ubicacion: '-',
+                stock_actual: 0,
+                precio_venta: 0
+            };
+            const res = await axios.post('/inventario/products/', payload);
+            setNewProduct({ nombre: '', presentacion: '', costo: 0 });
+            setShowCreate(false);
+            fetchChemicals();
+            onSelect(res.data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setCreating(false);
+        }
+    };
 
     const filtered = useMemo(() => {
         return chemicals.filter(c => 
@@ -43,29 +82,59 @@ const ChemicalSelectionModal = ({ isOpen, onClose, onSelect }) => {
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="px-6 py-4 border-b bg-indigo-50 dark:bg-indigo-950/20 flex justify-between items-center">
                     <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-400">
-                        Seleccionar Ingrediente Químico
+                        {title}
                     </h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
                         <i className="bi bi-x-lg text-lg"></i>
                     </button>
                 </div>
-                <div className="p-4 border-b">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Buscar químico por nombre o presentación..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                        />
-                        <i className="bi bi-search absolute left-3.5 top-3 text-gray-400"></i>
+                {!showCreate && (
+                    <div className="p-4 border-b flex gap-2">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre o presentación..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                            />
+                            <i className="bi bi-search absolute left-3.5 top-3 text-gray-400"></i>
+                        </div>
+                        <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-bold hover:bg-indigo-200">
+                            <i className="bi bi-plus-lg"></i>
+                        </button>
                     </div>
-                </div>
+                )}
+                {showCreate && (
+                    <div className="p-4 border-b bg-gray-50 dark:bg-slate-700/50 space-y-3">
+                        <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300">Crear Nuevo Producto</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre del {categoria === 'Empaque' ? 'Envase' : 'Químico'} *</label>
+                                <input type="text" placeholder="Ej: Bidón 20L" className="w-full border p-2 rounded-lg text-sm" value={newProduct.nombre} onChange={e => setNewProduct({...newProduct, nombre: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Presentación *</label>
+                                <input type="text" placeholder="Ej: 20 Litros" className="w-full border p-2 rounded-lg text-sm" value={newProduct.presentacion} onChange={e => setNewProduct({...newProduct, presentacion: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Costo Unitario ($) *</label>
+                                <input type="number" placeholder="Ej: 15.00" step="0.01" className="w-full border p-2 rounded-lg text-sm" value={newProduct.costo} onChange={e => setNewProduct({...newProduct, costo: e.target.value})} />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-end mt-2">
+                            <button onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-sm font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
+                            <button onClick={handleCreate} disabled={creating || !newProduct.nombre} className="px-3 py-1.5 text-sm font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                                {creating ? 'Guardando...' : 'Guardar y Seleccionar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     {loading ? (
                         <div className="flex justify-center py-8"><LogoSpinner size="w-8 h-8" /></div>
                     ) : filtered.length === 0 ? (
-                        <p className="text-center text-sm text-gray-500 py-8 italic">No se encontraron productos químicos.</p>
+                        <p className="text-center text-sm text-gray-500 py-8 italic">No se encontraron productos.</p>
                     ) : (
                         filtered.map(c => (
                             <div 
@@ -395,6 +464,7 @@ const StockDetailModal = ({ product, onClose }) => {
 
 // ================= COMPONENTE PRINCIPAL =================
 export default function InventoryManagement() {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('todo');
     const [loading, setLoading] = useState(true);
     const [toastMessage, setToastMessage] = useState(null);
@@ -446,7 +516,7 @@ export default function InventoryManagement() {
     const [sendingEmail, setSendingEmail] = useState(false);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-' });
+    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-', costo: 0, precio_venta: 0 });
     const [submitting, setSubmitting] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -461,6 +531,7 @@ export default function InventoryManagement() {
     const [formulaName, setFormulaName] = useState('');
     const [ingredients, setIngredients] = useState([]);
     const [isChemicalBrowserOpen, setIsChemicalBrowserOpen] = useState(false);
+    const [isEnvaseBrowserOpen, setIsEnvaseBrowserOpen] = useState(false);
     const [activeIngredientIdx, setActiveIngredientIdx] = useState(null);
     const [showIncompleteModal, setShowIncompleteModal] = useState(false);
 
@@ -472,19 +543,46 @@ export default function InventoryManagement() {
             }
         } else if (typeof activeIngredientIdx === 'number') {
             const newIng = [...ingredients];
+            
+            // Auto-fill capacity if it's an envase
+            let defaultCantidad = newIng[activeIngredientIdx].cantidad;
+            if (newIng[activeIngredientIdx].is_envase && chemical.presentacion) {
+                const match = chemical.presentacion.match(/\d+(\.\d+)?/);
+                if (match && match[0]) {
+                    defaultCantidad = match[0];
+                }
+            }
+
             newIng[activeIngredientIdx] = {
                 ...newIng[activeIngredientIdx],
                 insumo_id: chemical.id,
-                obj: chemical
+                obj: chemical,
+                cantidad: defaultCantidad
             };
             setIngredients(newIng);
         }
         setIsChemicalBrowserOpen(false);
+        setIsEnvaseBrowserOpen(false);
     };
 
     const totalPercentage = useMemo(() => {
         return ingredients.reduce((sum, ing) => sum + (parseFloat(ing.cantidad) || 0), 0);
     }, [ingredients]);
+    const costoPreparacion = useMemo(() => {
+        return ingredients.reduce((sum, ing) => {
+            const qty = parseFloat(ing.cantidad) || 0;
+            const cost = parseFloat(ing.obj?.costo) || 0;
+            if (ing.is_envase) {
+                return sum + (qty > 0 ? (cost / qty) : 0);
+            }
+            return sum + (qty * cost);
+        }, 0);
+    }, [ingredients]);
+    const precioVentaFinal = useMemo(() => {
+        return parseFloat(selectedQuimico?.precio_venta) || 0;
+    }, [selectedQuimico]);
+    const gananciaReceta = precioVentaFinal - costoPreparacion;
+    const gananciaPorcentaje = costoPreparacion > 0 ? (gananciaReceta / costoPreparacion) * 100 : 0;
     const [movimientosModal, setMovimientosModal] = useState({ open: false, producto: null, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '' }, page: 1, totalPages: 1, exportando: false });
     const [logsModal, setLogsModal] = useState({ open: false, producto: null, logs: [], loading: false });
     const [movimientosGlobal, setMovimientosGlobal] = useState({ open: false, movimientos: [], loading: false, filters: { tipo: '', fecha_desde: '', fecha_hasta: '', articulo_id: '' }, page: 1, totalPages: 1, exportando: false });
@@ -904,7 +1002,7 @@ export default function InventoryManagement() {
         let defaultCategoria = activeTab === 'quimicos' ? 'quimicos' : 'otros';
         const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
         if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0 }); }
-        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria }); }
+        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria, costo: 0, precio_venta: 0 }); }
         else setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
         setValidationError('');
         setShowProductModal(true);
@@ -921,6 +1019,8 @@ export default function InventoryManagement() {
             stock_maximo: product.stock_maximo || 0,
             proveedor: product.proveedor || '',
             categoria: product.categoria || 'otros',
+            costo: product.costo || 0,
+            precio_venta: product.precio_venta || 0
         });
         setValidationError('');
         setShowProductModal(true);
@@ -948,6 +1048,8 @@ export default function InventoryManagement() {
                 stock_minimo: stockMinimo,
                 stock_maximo: stockMaximo,
                 proveedor: formData.proveedor || null,
+                costo: parseFloat(formData.costo) || 0,
+                precio_venta: parseFloat(formData.precio_venta) || 0,
             };
             if (editingProduct) await axios.put(`/inventario/products/${editingProduct.id}/`, payload);
             else await axios.post('/inventario/products/', payload);
@@ -1037,11 +1139,15 @@ export default function InventoryManagement() {
         setEditingFormula(formula);
         setSelectedQuimico({ id: formula.articulo_final_id, nombre: formula.articulo_final_nombre });
         setFormulaName(formula.nombre);
-        setIngredients(formula.componentes.map(c => ({
-            insumo_id: c.insumo_id,
-            cantidad: Number((parseFloat(c.cantidad_requerida) * 100).toFixed(4)).toString(),
-            obj: { id: c.insumo_id, nombre: c.insumo_nombre, presentacion: c.insumo_presentacion || '' }
-        })));
+        setIngredients(formula.componentes.map(c => {
+            const is_envase = c.insumo_categoria === 'Empaque';
+            return {
+                insumo_id: c.insumo_id,
+                is_envase: is_envase,
+                cantidad: is_envase ? Number(1 / parseFloat(c.cantidad_requerida)).toFixed(0) : Number(parseFloat(c.cantidad_requerida).toFixed(2)).toString(),
+                obj: { id: c.insumo_id, nombre: c.insumo_nombre, presentacion: c.insumo_presentacion || '', costo: c.insumo_costo, categoria: c.insumo_categoria }
+            };
+        }));
         setShowFormulaModal(true);
     };
 
@@ -1061,10 +1167,7 @@ export default function InventoryManagement() {
             return;
         }
 
-        if (Math.abs(totalPercentage - 100) > 0.001) {
-            showToast('El total de los porcentajes de ingredientes debe ser exactamente 100%', 'error');
-            return;
-        }
+
 
         const payload = {
             nombre: formulaName,
@@ -1072,7 +1175,7 @@ export default function InventoryManagement() {
             activa: true,
             componentes: ingredients.map(ing => ({
                 insumo_id: ing.insumo_id,
-                cantidad_requerida: parseFloat(ing.cantidad) / 100
+                cantidad_requerida: ing.is_envase ? (1 / parseFloat(ing.cantidad)) : parseFloat(ing.cantidad)
             }))
         };
         setSubmitting(true);
@@ -1465,6 +1568,9 @@ export default function InventoryManagement() {
                                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Nombre de la Receta</th>
                                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Artículo Final (Producto)</th>
                                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Ingredientes (BOM)</th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Costo Prep.</th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Precio Venta</th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Ganancia</th>
                                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Estado</th>
                                             <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-slate-300 uppercase tracking-wider">Acciones</th>
                                         </tr>
@@ -1490,6 +1596,22 @@ export default function InventoryManagement() {
                                                         ) : (
                                                             <span className="text-xs text-gray-400 italic">Sin ingredientes definidos</span>
                                                         )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-slate-300 text-right font-medium">
+                                                    ${parseFloat(formula.costo_preparacion || 0).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-600 dark:text-slate-300 text-right font-medium">
+                                                    ${parseFloat(formula.precio_venta || 0).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-right">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className={`font-bold ${parseFloat(formula.ganancia || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                            ${parseFloat(formula.ganancia || 0).toFixed(2)}
+                                                        </span>
+                                                        <span className={`text-[10px] font-bold ${parseFloat(formula.ganancia || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                            {parseFloat(formula.ganancia_porcentaje || 0).toFixed(2)}%
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1641,6 +1763,36 @@ export default function InventoryManagement() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta amarilla" /></div>
                                     <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Alerta naranja" /></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-bold mb-1">Costo Unitario ($)</label>
+                                        <input 
+                                            type="number" 
+                                            step="0.01" 
+                                            min="0" 
+                                            value={formData.costo} 
+                                            onChange={e => setFormData({...formData, costo: e.target.value})} 
+                                            className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100 dark:disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed" 
+                                            disabled={
+                                                (editingProduct && user?.role !== 'OWNER' && user?.role !== 'OPERADOR') ||
+                                                formulas.some(f => f.articulo_final_id === editingProduct?.id)
+                                            }
+                                            title={formulas.some(f => f.articulo_final_id === editingProduct?.id) ? "El costo de este producto es calculado automáticamente por su fórmula." : (editingProduct && user?.role !== 'OWNER' && user?.role !== 'OPERADOR' ? "No tiene permisos para editar el costo de un producto existente." : "")}
+                                        />
+                                        {formulas.some(f => f.articulo_final_id === editingProduct?.id) && <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mt-1 block"><i className="bi bi-info-circle mr-1"></i>Calculado por fórmula</span>}
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold mb-1">Precio de Venta ($)</label>
+                                        <input 
+                                            type="number" 
+                                            step="0.01" 
+                                            min="0" 
+                                            value={formData.precio_venta} 
+                                            onChange={e => setFormData({...formData, precio_venta: e.target.value})} 
+                                            className="w-full border rounded-lg px-3 py-2" 
+                                        />
+                                    </div>
                                 </div>
                                 <div><label className="block text-sm font-bold mb-1">Categoría</label>
                                     <input type="text" list="categorias-list" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full border rounded-lg px-3 py-2" placeholder="Ej: insumos" />
@@ -1804,16 +1956,16 @@ export default function InventoryManagement() {
                             {/* Ingredientes / Componentes */}
                             <div>
                                 <div className="mb-2 flex justify-between items-center">
-                                    <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400">Ingredientes (BOM) *</label>
+                                    <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400">Ingredientes Químicos *</label>
                                     <button
-                                        onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '', obj: null }])}
+                                        onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '', obj: null, is_envase: false }])}
                                         className="text-xs bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
                                     >
-                                        + Agregar ingrediente
+                                        + Agregar Químico
                                     </button>
                                 </div>
-                                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                                    {ingredients.map((ing, idx) => (
+                                <div className="space-y-3 max-h-60 overflow-y-auto pr-1 mb-4">
+                                    {ingredients.map((ing, idx) => !ing.is_envase && (
                                         <div key={idx} className="flex gap-2 items-start bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
                                             <div className="flex-1">
                                                 <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Ingrediente Químico *</label>
@@ -1843,7 +1995,7 @@ export default function InventoryManagement() {
                                                 )}
                                             </div>
                                             <div className="w-28">
-                                                <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Porcentaje (%)</label>
+                                                <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Cantidad (Lts)</label>
                                                 <input
                                                     type="number"
                                                     step="0.01"
@@ -1853,9 +2005,14 @@ export default function InventoryManagement() {
                                                         newIng[idx].cantidad = e.target.value;
                                                         setIngredients(newIng);
                                                     }}
-                                                    placeholder="0.00"
+                                                    placeholder="Ej: 100"
                                                     className="w-full border rounded px-2.5 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                                 />
+                                                {ing.obj?.costo !== undefined && (
+                                                    <span className="block text-[10px] text-gray-500 dark:text-slate-400 mt-1 font-medium text-right">
+                                                        Costo U: ${parseFloat(ing.obj.costo).toFixed(2)}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="pt-7 shrink-0">
                                                 <button
@@ -1871,19 +2028,113 @@ export default function InventoryManagement() {
                                             </div>
                                         </div>
                                     ))}
-                                    {ingredients.length === 0 && (
-                                        <p className="text-xs text-gray-400 italic text-center py-4">No se han agregado ingredientes a la receta.</p>
+                                    {ingredients.filter(i => !i.is_envase).length === 0 && (
+                                        <p className="text-xs text-gray-400 italic text-center py-4">No se han agregado químicos a la receta.</p>
                                     )}
                                 </div>
 
-                                {/* Indicador de Total de Porcentajes */}
-                                <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                        Total Porcentajes Ingredientes:
-                                    </span>
-                                    <span className={`text-base font-black ${Math.abs(totalPercentage - 100) < 0.001 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                                        {totalPercentage.toFixed(2)}%
-                                    </span>
+                                <div className="mb-2 flex justify-between items-center border-t pt-4">
+                                    <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400">Envase / Empaque</label>
+                                    <button
+                                        onClick={() => setIngredients([...ingredients, { insumo_id: '', cantidad: '', obj: null, is_envase: true }])}
+                                        className="text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                                    >
+                                        + Agregar Envase
+                                    </button>
+                                </div>
+                                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                                    {ingredients.map((ing, idx) => ing.is_envase && (
+                                        <div key={idx} className="flex gap-2 items-start bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                                            <div className="flex-1">
+                                                <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Envase *</label>
+                                                {ing.insumo_id ? (
+                                                    <div className="flex justify-between items-center bg-white dark:bg-slate-800 border rounded-lg px-3 py-1.5 text-sm dark:border-slate-600 dark:text-white border-slate-200">
+                                                        <span className="font-medium">{ing.obj?.nombre || 'Envase seleccionado'} ({ing.obj?.presentacion || ''})</span>
+                                                        <button 
+                                                            onClick={() => {
+                                                                setActiveIngredientIdx(idx);
+                                                                setIsEnvaseBrowserOpen(true);
+                                                            }}
+                                                            className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline text-xs ml-2"
+                                                        >
+                                                            Cambiar
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setActiveIngredientIdx(idx);
+                                                            setIsEnvaseBrowserOpen(true);
+                                                        }}
+                                                        className="w-full text-left bg-white dark:bg-slate-800 border border-dashed border-gray-300 hover:border-emerald-400 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm text-gray-400 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-all"
+                                                    >
+                                                        <i className="bi bi-box mr-2"></i> Seleccionar Envase...
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="w-28">
+                                                <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 mb-1">Capacidad (Lts)</label>
+                                                <input
+                                                    type="number"
+                                                    step="1"
+                                                    value={ing.cantidad}
+                                                    onChange={e => {
+                                                        const newIng = [...ingredients];
+                                                        newIng[idx].cantidad = e.target.value;
+                                                        setIngredients(newIng);
+                                                    }}
+                                                    placeholder="Ej: 20"
+                                                    className="w-full border rounded px-2.5 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                                />
+                                                {ing.obj?.costo !== undefined && (
+                                                    <span className="block text-[10px] text-gray-500 dark:text-slate-400 mt-1 font-medium text-right">
+                                                        Costo U: ${parseFloat(ing.obj.costo).toFixed(2)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="pt-7 shrink-0">
+                                                <button
+                                                    onClick={() => {
+                                                        const newIng = [...ingredients];
+                                                        newIng.splice(idx, 1);
+                                                        setIngredients(newIng);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                                >
+                                                    <i className="bi bi-trash text-lg"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {ingredients.filter(i => i.is_envase).length === 0 && (
+                                        <p className="text-xs text-gray-400 italic text-center py-4">No se han agregado envases.</p>
+                                    )}
+                                </div>
+
+                                {/* Panel Financiero */}
+                                <div className="mt-4 p-4 bg-gradient-to-r from-slate-50 to-indigo-50 dark:from-slate-700/50 dark:to-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800 shadow-sm">
+                                    <h4 className="text-xs font-black uppercase text-indigo-800 dark:text-indigo-300 mb-3 tracking-wider">Análisis Financiero de Preparación</h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                            <span className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase">Costo Preparación</span>
+                                            <span className="text-lg font-black text-slate-800 dark:text-white">${costoPreparacion.toFixed(2)}</span>
+                                        </div>
+                                        <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                            <span className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase">Precio Venta (Unidad)</span>
+                                            <span className="text-lg font-black text-slate-800 dark:text-white">${precioVentaFinal.toFixed(2)}</span>
+                                        </div>
+                                        <div className={`p-3 rounded-lg border ${gananciaReceta >= 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                                            <span className={`block text-[10px] font-bold uppercase ${gananciaReceta >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Ganancia Estimada</span>
+                                            <div className="flex items-end gap-2">
+                                                <span className={`text-lg font-black ${gananciaReceta >= 0 ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'}`}>
+                                                    ${gananciaReceta.toFixed(2)}
+                                                </span>
+                                                <span className={`text-sm font-bold mb-0.5 ${gananciaReceta >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                    ({gananciaPorcentaje.toFixed(2)}%)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1907,10 +2158,19 @@ export default function InventoryManagement() {
                 document.body
             )}
 
-            <ChemicalSelectionModal
+            <ProductSelectionModal
                 isOpen={isChemicalBrowserOpen}
                 onClose={() => setIsChemicalBrowserOpen(false)}
                 onSelect={handleSelectChemical}
+                categoria="quimicos"
+                title="Seleccionar Ingrediente Químico"
+            />
+            <ProductSelectionModal
+                isOpen={isEnvaseBrowserOpen}
+                onClose={() => setIsEnvaseBrowserOpen(false)}
+                onSelect={handleSelectChemical}
+                categoria="Empaque"
+                title="Seleccionar Envase / Empaque"
             />
             
             {movimientosModal.open && createPortal(

@@ -232,6 +232,26 @@ class ProductViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         producto = self.get_object()
         old_stock = producto.stock_actual
+        old_costo = producto.costo
+        
+        # Check if costo is being updated
+        if 'costo' in serializer.validated_data:
+            new_costo = serializer.validated_data['costo']
+            if new_costo != old_costo:
+                user_role = getattr(self.request.user, 'role', '')
+                if user_role not in ['OWNER', 'OPERADOR']:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied("No tienes permisos para modificar el costo de un producto existente.")
+                
+                if user_role == 'OPERADOR':
+                    from apps.usuarios.models import Notificacion, User
+                    owners = User.objects.filter(role='OWNER')
+                    for owner in owners:
+                        Notificacion.objects.create(
+                            usuario_destino=owner,
+                            mensaje=f"El Operador Senior {self.request.user.username} ha modificado el costo del producto '{producto.nombre}' de {old_costo} a {new_costo}."
+                        )
+        
         producto = serializer.save()
         if old_stock != producto.stock_actual:
             from apps.inventario.models import MovimientoStock

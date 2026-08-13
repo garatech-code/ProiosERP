@@ -118,6 +118,7 @@ class StockItem(models.Model):
         ('Anclas', 'Anclas'),
         ('Cadenas', 'Cadenas'),
         ('Químicos', 'Químicos'),
+        ('Empaque', 'Empaque'),
         ('Herramientas', 'Herramientas'),
         ('Patio', 'Patio'),
     )

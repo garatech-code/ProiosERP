@@ -5,10 +5,12 @@ from apps.inventario.models import Articulo
 class ComponenteBOMSerializer(serializers.ModelSerializer):
     insumo_nombre = serializers.SerializerMethodField()
     insumo_presentacion = serializers.SerializerMethodField()
+    insumo_costo = serializers.SerializerMethodField()
+    insumo_categoria = serializers.SerializerMethodField()
 
     class Meta:
         model = ComponenteBOM
-        fields = ['id', 'insumo_id', 'insumo_nombre', 'insumo_presentacion', 'cantidad_requerida']
+        fields = ['id', 'insumo_id', 'insumo_nombre', 'insumo_presentacion', 'insumo_costo', 'insumo_categoria', 'cantidad_requerida']
 
     def get_insumo_nombre(self, obj):
         try:
@@ -22,13 +24,30 @@ class ComponenteBOMSerializer(serializers.ModelSerializer):
         except Articulo.DoesNotExist:
             return ""
 
+    def get_insumo_costo(self, obj):
+        try:
+            return float(Articulo.objects.get(id=obj.insumo_id).costo)
+        except Articulo.DoesNotExist:
+            return 0.0
+
+    def get_insumo_categoria(self, obj):
+        try:
+            return Articulo.objects.get(id=obj.insumo_id).categoria
+        except Articulo.DoesNotExist:
+            return ""
+
 class FormulaBOMSerializer(serializers.ModelSerializer):
     componentes = ComponenteBOMSerializer(many=True, required=False)
     articulo_final_nombre = serializers.SerializerMethodField()
 
+    costo_preparacion = serializers.SerializerMethodField()
+    precio_venta = serializers.SerializerMethodField()
+    ganancia = serializers.SerializerMethodField()
+    ganancia_porcentaje = serializers.SerializerMethodField()
+
     class Meta:
         model = FormulaBOM
-        fields = ['id', 'nombre', 'articulo_final_id', 'articulo_final_nombre', 'activa', 'componentes']
+        fields = ['id', 'nombre', 'articulo_final_id', 'articulo_final_nombre', 'activa', 'componentes', 'costo_preparacion', 'precio_venta', 'ganancia', 'ganancia_porcentaje']
 
     def get_articulo_final_nombre(self, obj):
         try:
@@ -36,14 +55,44 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
         except Articulo.DoesNotExist:
             return "Artículo Eliminado"
 
+    def get_costo_preparacion(self, obj):
+        from decimal import Decimal
+        total = Decimal('0.0')
+        for comp in obj.componentes.all():
+            try:
+                insumo = Articulo.objects.get(id=comp.insumo_id)
+                total += Decimal(str(insumo.costo)) * Decimal(str(comp.cantidad_requerida))
+            except Articulo.DoesNotExist:
+                pass
+        return float(total)
+
+    def get_precio_venta(self, obj):
+        try:
+            art = Articulo.objects.get(id=obj.articulo_final_id)
+            return float(art.precio_venta)
+        except Articulo.DoesNotExist:
+            return 0.0
+
+    def get_ganancia(self, obj):
+        costo = self.get_costo_preparacion(obj)
+        precio = self.get_precio_venta(obj)
+        return float(precio) - costo
+
+    def get_ganancia_porcentaje(self, obj):
+        costo = self.get_costo_preparacion(obj)
+        ganancia = self.get_ganancia(obj)
+        if costo > 0:
+            return (ganancia / costo) * 100
+        return 0.0
+
     def validate(self, data):
         articulo_final_id = data.get('articulo_final_id')
         if articulo_final_id:
             try:
                 art_final = Articulo.objects.get(id=articulo_final_id)
-                if art_final.categoria != 'quimicos':
+                if art_final.categoria.lower() not in ['quimicos', 'químicos']:
                     raise serializers.ValidationError(
-                        {"articulo_final_id": "El artículo final debe tener la categoría 'quimicos'."}
+                        {"articulo_final_id": "El artículo final debe tener la categoría 'Químicos'."}
                     )
             except Articulo.DoesNotExist:
                 raise serializers.ValidationError(
@@ -51,21 +100,14 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
                 )
 
         componentes = data.get('componentes', [])
-        if componentes:
-            from decimal import Decimal
-            total_qty = sum(Decimal(str(comp.get('cantidad_requerida', 0))) for comp in componentes)
-            if abs(total_qty - Decimal('1.0')) > Decimal('0.0001'):
-                raise serializers.ValidationError(
-                    {"componentes": "La suma de los porcentajes de los ingredientes debe ser exactamente 100%."}
-                )
         for comp in componentes:
             insumo_id = comp.get('insumo_id')
             if insumo_id:
                 try:
                     insumo = Articulo.objects.get(id=insumo_id)
-                    if insumo.categoria != 'quimicos':
+                    if insumo.categoria.lower() not in ['quimicos', 'químicos', 'empaque']:
                         raise serializers.ValidationError(
-                            {"componentes": f"El ingrediente '{insumo.nombre}' debe tener la categoría 'quimicos'."}
+                            {"componentes": f"El ingrediente '{insumo.nombre}' debe tener la categoría 'Químicos' o 'Empaque'."}
                         )
                 except Articulo.DoesNotExist:
                     raise serializers.ValidationError(
@@ -78,6 +120,8 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
         formula = FormulaBOM.objects.create(**validated_data)
         for comp_data in componentes_data:
             ComponenteBOM.objects.create(formula=formula, **comp_data)
+            
+        self._update_articulo_costo(formula)
         return formula
 
     def update(self, instance, validated_data):
@@ -93,7 +137,16 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
             for comp_data in componentes_data:
                 ComponenteBOM.objects.create(formula=instance, **comp_data)
                 
+        self._update_articulo_costo(instance)
         return instance
+
+    def _update_articulo_costo(self, formula):
+        try:
+            art = Articulo.objects.get(id=formula.articulo_final_id)
+            art.costo = round(self.get_costo_preparacion(formula), 4)
+            art.save()
+        except Articulo.DoesNotExist:
+            pass
 
 class OrdenFabricacionSerializer(serializers.ModelSerializer):
     formula_nombre = serializers.SerializerMethodField()
