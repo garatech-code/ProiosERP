@@ -27,7 +27,11 @@ export default function GlobalTour() {
                 roleSteps = tourSteps.owner[currentTourId];
             }
         }
-        else if (role === 'operador') roleSteps = tourSteps.operador;
+        else if (role === 'operador' || role === 'operador_jr') {
+            if (currentTourId && tourSteps.operador && tourSteps.operador[currentTourId]) {
+                roleSteps = tourSteps.operador[currentTourId];
+            }
+        }
         else if (role === 'operario') roleSteps = tourSteps.operario;
 
         setSteps(roleSteps);
@@ -35,7 +39,8 @@ export default function GlobalTour() {
 
     useEffect(() => {
         if (!user || !isClient) return;
-        if (user.role.toLowerCase() === 'owner') return; // Owner auto-start is handled in OwnerDashboard
+        const role = user.role.toLowerCase();
+        if (role === 'owner' || role === 'operador' || role === 'operador_jr') return; // Owner/Operador auto-start is handled in their Dashboards
 
         // Auto-start logic for legacy roles
         const tourKey = `hasSeenTour_${user.id}`;
@@ -51,7 +56,8 @@ export default function GlobalTour() {
 
     const handleCallback = (data) => {
         // En roles antiguos (no modular), marcamos el tour global
-        if (user && user.role.toLowerCase() !== 'owner') {
+        const role = user?.role?.toLowerCase();
+        if (role && role !== 'owner' && role !== 'operador' && role !== 'operador_jr') {
             const { status, action } = data;
             if (['finished', 'skipped'].includes(status) || action === 'close' || action === 'skip') {
                 localStorage.setItem(`hasSeenTour_${user.id}`, 'true');

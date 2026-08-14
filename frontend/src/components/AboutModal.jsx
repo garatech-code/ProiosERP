@@ -14,7 +14,8 @@ export default function AboutModal({ isOpen, onClose, frontendVersion, backendVe
             toursToClear.forEach(t => localStorage.removeItem(`hasSeenTour_${user.id}_${t}`));
         }
         setTimeout(() => {
-            if (user?.role?.toLowerCase() === 'owner') {
+            const role = user?.role?.toLowerCase();
+            if (['owner', 'operador', 'operador_jr'].includes(role)) {
                 useTourStore.getState().startTour('welcome');
             } else {
                 useTourStore.getState().startTour();

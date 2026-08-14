@@ -15,6 +15,7 @@ import DebugFeedback from '../components/DebugFeedback';
 import AgendaEventModal from '../components/AgendaEventModal';
 import NotificationMenu from '../components/NotificationMenu';
 import { useTheme } from '../context/ThemeContext';
+import { useTourStore } from '../stores/tourStore';
 import LogoSpinner from '../components/LogoSpinner';
 import AppVersionInfo from '../components/AppVersionInfo';
 
@@ -91,6 +92,8 @@ export default function OperadorDashboard() {
         fetchAgendaEvents();
     }, []);
 
+    const { startTour } = useTourStore();
+
     useEffect(() => {
         localStorage.setItem('operadorDashboard_activeTab', activeTab);
         if (activeTab === 'calendar') {
@@ -98,6 +101,41 @@ export default function OperadorDashboard() {
             localStorage.setItem('last_seen_agenda', new Date().toISOString());
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        if (!user || (user.role !== 'OPERADOR' && user.role !== 'OPERADOR_JR')) return;
+        
+        const isAllDisabled = localStorage.getItem(`tours_disabled_${user.id}`) === 'true';
+        if (isAllDisabled) return;
+
+        // 2. Check Welcome Tour
+        const welcomeSeen = localStorage.getItem(`hasSeenTour_${user.id}_welcome`) === 'true';
+        if (!welcomeSeen) {
+            const timer = setTimeout(() => {
+                startTour('welcome');
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+
+        // 3. Check Contextual Tab Tour
+        const tabTourMap = {
+            'operations': 'operations',
+            'calendar': 'calendar',
+            'inbox': 'inbox',
+            'inventory': 'inventory'
+        };
+
+        const currentTabTour = tabTourMap[activeTab];
+        if (currentTabTour) {
+            const hasSeen = localStorage.getItem(`hasSeenTour_${user.id}_${currentTabTour}`) === 'true';
+            if (!hasSeen) {
+                const timer = setTimeout(() => {
+                    startTour(currentTabTour);
+                }, 800);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [activeTab, user, startTour]);
 
     useEffect(() => {
         localStorage.setItem('operadorDashboard_agendaEventModalState', JSON.stringify(agendaEventModalState));
@@ -281,12 +319,12 @@ export default function OperadorDashboard() {
                 <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Agenda y Arribos Estimados (ETA)</h2>
                 <button
                     onClick={() => setAgendaEventModalState({ isOpen: true, eventToEdit: null })}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
+                    className="tour-cal-new bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
                 >
                     <i className="bi bi-plus-lg"></i> Nuevo Evento
                 </button>
             </div>
-            <div className="flex-1 min-h-0">
+            <div className="tour-cal-view flex-1 min-h-0">
                 <Calendar
                     localizer={localizer}
                     events={calendarEvents}
@@ -319,10 +357,10 @@ export default function OperadorDashboard() {
 
     const renderOperationsList = () => (
         <div className="animate-fadeIn">
-            <div className="flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
+            <div className="tour-ops-search flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 hidden sm:block">Mis Operaciones (Asignadas)</h2>
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="tour-ops-filters flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-64">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i className="bi bi-search text-gray-400"></i>
@@ -362,7 +400,7 @@ export default function OperadorDashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+            <div className="tour-ops-list grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
                 {filteredOps?.length === 0 ? (
                     <div className="col-span-full py-16 text-center bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600">
                         <p className="text-gray-500 dark:text-slate-400">No hay operaciones que coincidan con los filtros.</p>
@@ -578,7 +616,7 @@ export default function OperadorDashboard() {
                     <div className="flex items-center gap-4">
                         <NotificationMenu />
                         {activeTab !== 'inventory' && (
-                            <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                            <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="tour-new-op-btn bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                                 <i className="bi bi-plus-lg text-lg"></i>
                                 Nueva Operación
                             </button>

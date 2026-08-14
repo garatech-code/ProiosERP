@@ -281,56 +281,148 @@ export const tourSteps = {
             }
         ]
     },
-    operador: [
-        {
-            target: 'body',
-            placement: 'center',
-            title: '¡Bienvenido a TECHSHIP!',
-            content: 'Este es tu panel logístico y de oficina. Te mostraremos cómo utilizar tus herramientas de trabajo diarias.',
-            skipBeacon: true,
-            showSkipButton: true,
-        },
-        {
-            target: '.tour-operador-ops',
-            title: 'Mis Operaciones',
-            content: 'Aquí verás las operaciones asignadas a tu cargo. Podrás gestionar presupuestos, listas de empaque y seguimiento.',
-            placement: 'right',
-            skipBeacon: true,
-            showSkipButton: true,
-        },
-        {
-            target: '.tour-operador-agenda',
-            title: 'Agenda',
-            content: 'Tu planificador personal. Carga vencimientos, reuniones o revisa los ETA de los buques a tu cargo.',
-            placement: 'right',
-            skipBeacon: true,
-            showSkipButton: true,
-        },
-        {
-            target: '.tour-operador-inbox',
-            title: 'Bandeja de Entrada',
-            content: 'Revisa los correos entrantes y crea cotizaciones rápidas basadas en el texto de las solicitudes.',
-            placement: 'right',
-            skipBeacon: true,
-            showSkipButton: true,
-        },
-        {
-            target: '.tour-operador-inventory',
-            title: 'Consultas de Inventario',
-            content: 'Verifica la disponibilidad de stock, precios y recetas para presupuestar con precisión.',
-            placement: 'right',
-            skipBeacon: true,
-            showSkipButton: true,
-        },
-        {
-            target: '.tour-navbar-add',
-            title: 'Acción Rápida',
-            content: 'Usa este botón en cualquier momento para registrar una nueva operación manualmente sin salir de la vista actual.',
-            placement: 'left',
-            skipBeacon: true,
-            showSkipButton: true,
-        }
-    ],
+    operador: {
+        welcome: [
+            {
+                target: 'body',
+                placement: 'center',
+                title: '¡Bienvenido a TECHSHIP!',
+                content: 'Este es tu panel logístico y de oficina. A medida que explores las pestañas, te iremos mostrando pequeños recorridos para cada sección. Si ya conoces el sistema, presiona "Desactivar tours" ahora para silenciar todos los recorridos.',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-operador-ops',
+                placement: 'right',
+                title: 'Navegación Inteligente',
+                content: '¡Perfecto! A partir de ahora, cada vez que visites una pestaña nueva por primera vez, te explicaremos brevemente sus herramientas. Haz clic en "Finalizar" para continuar a tu panel.',
+                skipBeacon: true,
+                showSkipButton: true,
+            }
+        ],
+        operations: [
+            {
+                target: '.tour-new-op-btn',
+                title: 'Crear Operación',
+                content: 'Haz clic aquí para iniciar el registro de un nuevo requerimiento, cotización o servicio para un buque.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-ops-search',
+                title: 'Búsqueda Rápida',
+                content: 'Usa este buscador para encontrar rápidamente operaciones por cliente, buque o número de operación.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-ops-filters',
+                title: 'Filtrar Operaciones',
+                content: 'Filtra por tipo de operación o por el estado actual del trámite.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-ops-list',
+                title: 'Lista de Operaciones',
+                content: 'Aquí verás las operaciones asignadas a ti. Haz clic en cualquiera para ver los detalles.',
+                placement: 'top',
+                skipBeacon: true,
+                showSkipButton: true,
+            }
+        ],
+        calendar: [
+            {
+                target: '.tour-cal-new',
+                title: 'Crear Evento',
+                content: 'Añade eventos manuales a tu agenda como reuniones, recordatorios o tareas pendientes.',
+                placement: 'left',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-cal-view',
+                title: 'Vista de Agenda',
+                content: 'Aquí verás tus eventos manuales y las llegadas estimadas (ETA) de los buques. Puedes cambiar la vista a mes, semana o día.',
+                placement: 'top',
+                skipBeacon: true,
+                showSkipButton: true,
+            }
+        ],
+        inbox: [
+            {
+                target: '.tour-inbox-filters',
+                title: 'Bandejas y Filtros',
+                content: 'Filtra correos recibidos o enviados para organizar tu tráfico marítimo.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-inbox-compose',
+                title: 'Redactar Nuevo',
+                content: 'Inicia un nuevo correo desde cero si necesitas comunicarte proactivamente con un buque o cliente.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-inbox-search',
+                title: 'Buscador de Correos',
+                content: 'Encuentra rápidamente cualquier correo buscando por asunto o contenido.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            }
+        ],
+        inventory: [
+            {
+                target: '.tour-inv-tabs',
+                title: 'Navegación de Inventario',
+                content: 'Cambia entre la vista de Insumos (pañol), Químicos, y Recetas de producción.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-inv-actions',
+                title: 'Gestión Rápida',
+                content: 'Utiliza estos botones para añadir nuevos artículos, modificar stock manualmente o exportar el inventario actual.',
+                placement: 'left',
+                skipBeacon: true,
+                showSkipButton: true,
+            }
+        ],
+        operation_selector: [
+            {
+                target: '.tour-selector-productos',
+                title: 'Insumos y Repuestos',
+                content: 'Selecciona esta opción si necesitas cotizar repuestos generales, herramientas o provisiones de pañol para el buque.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-selector-quimicos',
+                title: 'Fórmulas Químicas',
+                content: 'Utiliza esta opción para despachos de especialidades químicas producidas por tu laboratorio.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            },
+            {
+                target: '.tour-selector-servicios',
+                title: 'Servicios Técnicos',
+                content: 'Para reparaciones a bordo o trabajos técnicos. Podrás cargar horas de técnicos y costos adicionales.',
+                placement: 'bottom',
+                skipBeacon: true,
+                showSkipButton: true,
+            }
+        ]
+    },
     operario: [
         {
             target: 'body',
