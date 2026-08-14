@@ -3,6 +3,7 @@ import axios from '../api/axios';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTourStore } from '../stores/tourStore';
 import LogoSpinner from '../components/LogoSpinner';
 import { format } from 'date-fns';
 import es from 'date-fns/locale/es';
@@ -12,6 +13,7 @@ import AppVersionInfo from '../components/AppVersionInfo';
 export default function OperarioDashboard() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+    const { startTour } = useTourStore();
   const [operaciones, setOperaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -132,14 +134,14 @@ export default function OperarioDashboard() {
           {isSidebarOpen && <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Principal</p>}
           <button
             title={!isSidebarOpen ? "Mis tareas" : ""}
-            className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} bg-indigo-600 text-white shadow-md cursor-default`}
+            className={`tour-operario-ops flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} bg-indigo-600 text-white shadow-md cursor-default`}
           >
             <i className="bi bi-clipboard-check text-lg shrink-0"></i>
             {isSidebarOpen && <span>Mis operaciones</span>}
           </button>
         </div>
 
-        <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
+        <div className={`tour-system-menu border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
           <div className={`flex items-center gap-3 ${isSidebarOpen ? 'mb-4 px-2' : ''}`}>
             <div className="w-9 h-9 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-indigo-400">
               {getUserInitials(user)}
@@ -170,6 +172,15 @@ export default function OperarioDashboard() {
           <h1 className="font-black text-lg">TECHSHIP</h1>
         </div>
         <div className="flex items-center gap-2">
+          
+<button
+    onClick={() => startTour()}
+    className="bg-indigo-100 text-indigo-600 hover:bg-indigo-200 p-2 rounded-lg font-bold text-sm transition-colors border border-indigo-200 dark:bg-indigo-900/40 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-800"
+    title="Ver Tutorial"
+>
+    <i className="bi bi-question-lg"></i>
+</button>
+
           <button onClick={toggleTheme} className="bg-indigo-900/80 text-indigo-300 p-2 rounded-lg">
             <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'}`}></i>
           </button>
@@ -195,6 +206,15 @@ export default function OperarioDashboard() {
             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Mis operaciones asignadas</h2>
             <p className="text-sm text-gray-500 dark:text-slate-400">Productos a entregar y órdenes de fabricación</p>
           </div>
+          
+<button
+    onClick={() => startTour()}
+    className="bg-indigo-100 text-indigo-600 hover:bg-indigo-200 p-2 rounded-lg font-bold text-sm transition-colors border border-indigo-200 dark:bg-indigo-900/40 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-800"
+    title="Ver Tutorial"
+>
+    <i className="bi bi-question-lg"></i>
+</button>
+
           <button onClick={toggleTheme} className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300">
             <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'} text-lg`}></i>
           </button>

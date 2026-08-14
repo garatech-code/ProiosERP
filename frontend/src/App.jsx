@@ -8,6 +8,7 @@ import OperationFormProductos from './components/OperationFormProductos';
 import OperationDetail from './components/OperationDetail';
 import ChangePassword from './components/ChangePassword';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import GlobalTour from './components/GlobalTour';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -128,15 +129,18 @@ const AppRoutes = () => {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    <>
+      <GlobalTour />
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
       <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
       <Route path="/operations/new" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id/edit" element={<ProtectedRoute><OperationFormProductos /></ProtectedRoute>} />
       <Route path="/operations/:id" element={<ProtectedRoute><ErrorBoundary><OperationDetail /></ErrorBoundary></ProtectedRoute>} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 

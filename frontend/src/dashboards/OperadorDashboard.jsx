@@ -453,17 +453,17 @@ export default function OperadorDashboard() {
                 <div className={`py-6 flex-1 space-y-1 overflow-y-auto ${isSidebarOpen ? 'px-4' : 'px-2 flex flex-col items-center'}`}>
                     {isSidebarOpen && <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Oficina / Logística</p>}
 
-                    <button title={!isSidebarOpen ? "Mis Operaciones" : ""} onClick={() => setActiveTab('operations')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Mis Operaciones" : ""} onClick={() => setActiveTab('operations')} className={`tour-operador-ops flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-list-check text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Mis Operaciones</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Agenda ETAs" : ""} onClick={() => setActiveTab('calendar')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Agenda ETAs" : ""} onClick={() => setActiveTab('calendar')} className={`tour-operador-agenda flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi relative bi-calendar-event text-lg shrink-0">
                             {hasNewAgendaEvent && activeTab !== 'calendar' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-pulse"></span>}
                         </i>
                         {isSidebarOpen && <span>Agenda ETAs</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Tráfico Marítimo" : ""} onClick={() => setActiveTab('inbox')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Tráfico Marítimo" : ""} onClick={() => setActiveTab('inbox')} className={`tour-operador-inbox flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <div className="flex items-center gap-3">
                             <i className="bi bi-envelope-open text-lg shrink-0"></i>
                             {isSidebarOpen && <span>Bandejas Entrada</span>}
@@ -476,7 +476,7 @@ export default function OperadorDashboard() {
                         <div className="w-full border-t border-slate-800 my-4"></div>
                     )}
 
-                    <button title={!isSidebarOpen ? "Inventario & Fórmulas" : ""} onClick={() => setActiveTab('inventory')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Inventario & Fórmulas" : ""} onClick={() => setActiveTab('inventory')} className={`tour-operador-inventory flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-box-seam text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Inventario & Fórmulas</span>}
                     </button>

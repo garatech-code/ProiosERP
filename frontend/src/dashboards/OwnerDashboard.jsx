@@ -15,6 +15,7 @@ import StaffManagement from '../components/StaffManagement';
 import DebugFeedback from '../components/DebugFeedback';
 import AgendaEventModal from '../components/AgendaEventModal';
 import { useTheme } from '../context/ThemeContext';
+import { useTourStore } from '../stores/tourStore';
 import LogoSpinner from '../components/LogoSpinner';
 import StockMovements from '../components/StockMovements'; // NUEVO
 import UserManagement from '../components/UserManagement';
@@ -44,6 +45,7 @@ const localizer = dateFnsLocalizer({
 export default function OwnerDashboard() {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
+    const { startTour } = useTourStore();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -680,21 +682,21 @@ export default function OwnerDashboard() {
 
                 <div className={`py-6 flex-1 space-y-1 overflow-y-auto ${isSidebarOpen ? 'px-4' : 'px-2 flex flex-col items-center'}`}>
                     {isSidebarOpen && <p className="px-2 text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Principal</p>}
-                    <button title={!isSidebarOpen ? "Resumen KPIs" : ""} onClick={() => setActiveTab('overview')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Resumen KPIs" : ""} onClick={() => setActiveTab('overview')} className={`tour-owner-kpis flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-pie-chart-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Resumen KPIs</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Agenda ETAs" : ""} onClick={() => setActiveTab('calendar')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Agenda ETAs" : ""} onClick={() => setActiveTab('calendar')} className={`tour-owner-agenda flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi relative bi-calendar-event text-lg shrink-0">
                             {hasNewAgendaEvent && activeTab !== 'calendar' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-pulse"></span>}
                         </i>
                         {isSidebarOpen && <span>Agenda ETAs</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Operaciones" : ""} onClick={() => setActiveTab('operations')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Operaciones" : ""} onClick={() => setActiveTab('operations')} className={`tour-owner-ops flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'operations' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-list-check text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Operaciones</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Bandeja de Entrada" : ""} onClick={() => setActiveTab('inbox')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Bandeja de Entrada" : ""} onClick={() => setActiveTab('inbox')} className={`tour-owner-inbox flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <div className="flex items-center gap-3">
                             <i className="bi bi-envelope-open text-lg shrink-0"></i>
                             {isSidebarOpen && <span>Correo Central</span>}
@@ -705,7 +707,7 @@ export default function OwnerDashboard() {
                             unreadEmailsCount > 0 ? <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-pulse"></span> : null
                         )}
                     </button>
-                    <button title={!isSidebarOpen ? "Notificaciones" : ""} onClick={() => setActiveTab('approvals')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'approvals' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Notificaciones" : ""} onClick={() => setActiveTab('approvals')} className={`tour-owner-approvals flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5 justify-between' : 'w-12 h-12 justify-center relative'} ${activeTab === 'approvals' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <div className="flex items-center gap-3">
                             <i className="bi bi-bell text-lg shrink-0"></i>
                             {isSidebarOpen && <span>Notificaciones</span>}
@@ -721,19 +723,19 @@ export default function OwnerDashboard() {
                     ) : (
                         <div className="w-full border-t border-slate-800 my-4"></div>
                     )}
-                    <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => setActiveTab('inventory')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Inventario & Recetas" : ""} onClick={() => setActiveTab('inventory')} className={`tour-owner-inventory flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-box-seam text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Inventario & Recetas</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Plantel Operarios" : ""} onClick={() => setActiveTab('staff')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'staff' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Plantel Operarios" : ""} onClick={() => setActiveTab('staff')} className={`tour-owner-staff flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'staff' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-people-fill text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Plantel Operarios</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Movimientos Stock" : ""} onClick={() => setActiveTab('stockMovements')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'stockMovements' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Movimientos Stock" : ""} onClick={() => setActiveTab('stockMovements')} className={`tour-owner-stock flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'stockMovements' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-boxes text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Movimientos Stock</span>}
                     </button>
-                    <button title={!isSidebarOpen ? "Gestión Usuarios" : ""} onClick={() => setActiveTab('users')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                    <button title={!isSidebarOpen ? "Gestión Usuarios" : ""} onClick={() => setActiveTab('users')} className={`tour-owner-users flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                         <i className="bi bi-person-gear text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Gestión Usuarios</span>}
                     </button>
@@ -743,7 +745,7 @@ export default function OwnerDashboard() {
                     </button>
                 </div>
 
-                <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
+                <div className={`tour-system-menu border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
                     <button
                         title={!isSidebarOpen ? "Reportar Error" : ""}
                         onClick={() => setShowDebugForm(true)}
