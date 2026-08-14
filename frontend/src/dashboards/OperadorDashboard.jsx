@@ -544,17 +544,17 @@ export default function OperadorDashboard() {
 
             {/* Mobile Bottom Tabs */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 z-30 flex justify-around p-2 pb-safe">
-                <button onClick={() => setActiveTab('operations')} className={`flex flex-col items-center p-2 ${activeTab === 'operations' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button onClick={() => setActiveTab('operations')} className={`tour-operador-ops flex flex-col items-center p-2 ${activeTab === 'operations' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi bi-list-check text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Operaciones</span>
                 </button>
-                <button onClick={() => setActiveTab('calendar')} className={`flex flex-col items-center p-2 ${activeTab === 'calendar' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button onClick={() => setActiveTab('calendar')} className={`tour-operador-agenda flex flex-col items-center p-2 ${activeTab === 'calendar' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi relative bi-calendar-event text-xl">
                         {hasNewAgendaEvent && activeTab !== 'calendar' && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 border-2 border-white rounded-full"></span>}
                     </i>
                     <span className="text-[10px] mt-1 font-semibold">Agenda</span>
                 </button>
-                <button onClick={() => setActiveTab('inbox')} className={`flex flex-col items-center p-2 ${activeTab === 'inbox' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                <button onClick={() => setActiveTab('inbox')} className={`tour-operador-inbox flex flex-col items-center p-2 ${activeTab === 'inbox' ? 'text-indigo-600' : 'text-gray-400'}`}>
                     <i className="bi relative bi-envelope-open text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Correo</span>
                 </button>

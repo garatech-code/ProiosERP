@@ -118,7 +118,7 @@ export default function StockMovements() {
   return (
     <div className="animate-fadeIn space-y-6">
       {/* Filtros */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 sm:p-6">
+      <div className="tour-movements-filters bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 sm:p-6">
         <div className="flex flex-wrap gap-4 items-end">
           {/* Producto autocomplete */}
           <div className="flex-1 min-w-[180px] relative">
@@ -208,7 +208,7 @@ export default function StockMovements() {
           </div>
 
           {/* Botones exportación */}
-          <div className="flex gap-2">
+          <div className="tour-movements-actions flex gap-2">
             <button
               onClick={() => exportData('excel')}
               className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1"
@@ -226,7 +226,7 @@ export default function StockMovements() {
       </div>
 
       {/* Tabla de movimientos */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+      <div className="tour-movements-table bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
             <thead className="bg-gray-50 dark:bg-slate-900">

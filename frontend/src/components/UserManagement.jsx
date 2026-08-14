@@ -115,7 +115,7 @@ export default function UserManagement() {
     return (
         <div className="space-y-6 animate-fadeIn text-slate-800 dark:text-slate-100">
             {/* Cabecera de Sección */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="tour-users-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Gestión de Usuarios del Sistema</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -159,7 +159,7 @@ export default function UserManagement() {
             ) : (
                 <>
                     {/* Tabla de Escritorio */}
-                    <div className="hidden md:block bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="tour-users-table hidden md:block bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left text-slate-600 dark:text-slate-300">
                                 <thead className="text-xs text-slate-700 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">

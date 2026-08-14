@@ -218,7 +218,7 @@ export default function StaffManagement() {
                     <p className="text-sm text-gray-500 dark:text-slate-400">Gestiona el personal operativo para asignación y documentación.</p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="tour-staff-actions flex flex-wrap gap-2">
                     {user?.role === 'OWNER' && (
                         <button
                             onClick={exportToExcel}
@@ -250,7 +250,7 @@ export default function StaffManagement() {
 
             {/* Filtros y Búsqueda */}
             <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm space-y-4">
-                <div className="flex flex-col md:flex-row gap-4">
+                <div className="tour-staff-filters flex flex-col md:flex-row gap-4">
                     <div className="flex-1 relative">
                         <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         <input 
@@ -296,7 +296,7 @@ export default function StaffManagement() {
             </div>
 
             {/* Tabla */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="tour-staff-table bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>

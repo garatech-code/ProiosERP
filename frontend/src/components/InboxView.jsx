@@ -172,7 +172,7 @@ export default function InboxView({ onCreateFromEmail }) {
       <div className={`w-full md:w-1/3 flex-col border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 ${selectedEmail ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col gap-4">
           <div className="flex justify-between items-center">
-            <div className="flex flex-wrap gap-2">
+            <div className="tour-inbox-filters flex flex-wrap gap-2">
               <button 
                 onClick={() => setFilter('inbound')}
                 className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${filter === 'inbound' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 dark:bg-slate-800/50'}`}
@@ -208,13 +208,13 @@ export default function InboxView({ onCreateFromEmail }) {
               </button>
             </div>
             
-            <button onClick={handleCompose} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 transition-colors flex items-center gap-2 shadow-sm shrink-0" title="Redactar">
+            <button onClick={handleCompose} className="tour-inbox-compose bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 transition-colors flex items-center gap-2 shadow-sm shrink-0" title="Redactar">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
               <span className="text-xs font-bold hidden lg:block">Redactar</span>
             </button>
           </div>
 
-          <div className="relative w-full">
+          <div className="tour-inbox-search relative w-full">
             <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
             <input 
               type="search" 

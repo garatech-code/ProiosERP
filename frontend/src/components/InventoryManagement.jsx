@@ -1370,7 +1370,7 @@ export default function InventoryManagement() {
             
             {/* Tabs */}
             <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-8 overflow-x-auto">
+                <nav className="tour-inv-tabs -mb-px flex space-x-8 overflow-x-auto">
                     <button onClick={() => { setActiveTab('todo'); setSearchTerm(''); }} className={`py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'todo' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                         <i className="bi bi-database-fill text-lg"></i> Todos los artículos
                     </button>
@@ -1402,7 +1402,7 @@ export default function InventoryManagement() {
                         {activeTab === 'abastecimiento' && 'Monitoree artículos con stock crítico y genere cotizaciones.'}
                     </p>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+                <div className="tour-inv-actions flex gap-2 w-full sm:w-auto flex-wrap">
                     {activeTab === 'todo' && (
                         <>
                             <label className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl shadow-sm text-gray-700 bg-white dark:bg-slate-800 hover:bg-gray-50 cursor-pointer">

@@ -67,3 +67,21 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.85; transform: scale(0.98); }
 }
+
+/* Forzar estilos de React Joyride */
+.react-joyride__tooltip button[data-action="primary"],
+.react-joyride__tooltip button[data-action="next"],
+.react-joyride__tooltip button[title="Siguiente"],
+.react-joyride__tooltip button[title="Finalizar"] {
+  background-color: #4f46e5 !important;
+  color: white !important;
+  border-radius: 6px !important;
+  font-weight: bold !important;
+}
+
+.react-joyride__tooltip button[data-action="primary"]:hover,
+.react-joyride__tooltip button[data-action="next"]:hover,
+.react-joyride__tooltip button[title="Siguiente"]:hover,
+.react-joyride__tooltip button[title="Finalizar"]:hover {
+  background-color: #4338ca !important;
+}

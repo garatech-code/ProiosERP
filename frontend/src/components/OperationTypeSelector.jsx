@@ -1,6 +1,25 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useTourStore } from '../stores/tourStore';
 
 export default function OperationTypeSelector({ onSelect, onClose }) {
+  const { user } = useAuth();
+  const { startTour, run } = useTourStore();
+
+  useEffect(() => {
+      if (!user || !user.id || run) return;
+      const isAllDisabled = localStorage.getItem(`tours_disabled_${user.id}`) === 'true';
+      if (isAllDisabled) return;
+
+      const seen = localStorage.getItem(`hasSeenTour_${user.id}_operation_selector`) === 'true';
+      if (!seen) {
+          const timer = setTimeout(() => {
+              startTour('operation_selector');
+          }, 500);
+          return () => clearTimeout(timer);
+      }
+  }, [user, startTour, run]);
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
@@ -20,7 +39,7 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
             {/* Productos */}
             <button
               onClick={() => onSelect('productos')}
-              className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-indigo-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-indigo-100"
+              className="tour-selector-productos bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-indigo-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-indigo-100"
             >
               <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <i className="bi bi-box-seam text-3xl"></i>
@@ -34,7 +53,7 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
             {/* Químicos */}
             <button
               onClick={() => onSelect('quimicos')}
-              className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-emerald-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-emerald-100"
+              className="tour-selector-quimicos bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-emerald-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-emerald-100"
             >
               <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <i className="bi bi-droplet-half text-3xl"></i>
@@ -48,7 +67,7 @@ export default function OperationTypeSelector({ onSelect, onClose }) {
             {/* Servicios */}
             <button
               onClick={() => onSelect('servicios')}
-              className="bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-amber-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-amber-100"
+              className="tour-selector-servicios bg-white dark:bg-slate-700 p-6 rounded-2xl border-2 border-transparent hover:border-amber-500 hover:shadow-lg transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-4 focus:ring-amber-100"
             >
               <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <i className="bi bi-tools text-3xl"></i>

@@ -45,7 +45,7 @@ const localizer = dateFnsLocalizer({
 export default function OwnerDashboard() {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
-    const { startTour } = useTourStore();
+    const { startTour, run } = useTourStore();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -140,6 +140,48 @@ export default function OwnerDashboard() {
     useEffect(() => {
         localStorage.setItem('ownerDashboard_agendaEventModalState', JSON.stringify(agendaEventModalState));
     }, [agendaEventModalState]);
+
+    // Contextual Tours Logic
+    useEffect(() => {
+        if (!user || !user.id || run) return;
+        
+        // 1. Check if all tours are permanently disabled
+        const isAllDisabled = localStorage.getItem(`tours_disabled_${user.id}`) === 'true';
+        if (isAllDisabled) return;
+
+        // 2. Check Welcome Tour
+        const welcomeSeen = localStorage.getItem(`hasSeenTour_${user.id}_welcome`) === 'true';
+        if (!welcomeSeen) {
+            const timer = setTimeout(() => {
+                startTour('welcome');
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+
+        // 3. Check Contextual Tab Tour
+        const tabTourMap = {
+            'overview': 'overview',
+            'calendar': 'calendar',
+            'operations': 'operations',
+            'inbox': 'inbox',
+            'inventory': 'inventory',
+            'staff': 'staff',
+            'stockMovements': 'movements',
+            'users': 'users',
+            'seguimiento_operadores': 'tracking'
+        };
+
+        const currentTabTour = tabTourMap[activeTab];
+        if (currentTabTour) {
+            const tabSeen = localStorage.getItem(`hasSeenTour_${user.id}_${currentTabTour}`) === 'true';
+            if (!tabSeen) {
+                const timer = setTimeout(() => {
+                    startTour(currentTabTour);
+                }, 500);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [user, activeTab, startTour, run]);
 
     const fetchOperators = async () => {
         try {
@@ -358,7 +400,7 @@ export default function OwnerDashboard() {
                 </div>
                 {opsExpanded && (
                     <>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="tour-kpi-ops grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-2xl flex flex-col justify-center items-center">
                                 <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest mb-1 text-center">Total</span>
                                 <span className="text-3xl sm:text-4xl font-black text-indigo-600">{metrics.operaciones?.total || metrics.total || 0}</span>
@@ -377,7 +419,7 @@ export default function OwnerDashboard() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                        <div className="tour-kpi-types grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                             <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
                                 <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600">
                                     <i className="bi bi-box-seam"></i>
@@ -421,7 +463,7 @@ export default function OwnerDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Inventario */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 transition-all">
+                <div className="tour-kpi-inventory bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 transition-all">
                     <div
                         className="flex justify-between items-center cursor-pointer select-none mb-4"
                         onClick={() => setInvExpanded(!invExpanded)}
@@ -495,7 +537,7 @@ export default function OwnerDashboard() {
                 <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Agenda y Arribos Estimados (ETA)</h2>
                 <div className="flex items-center gap-3">
                     <select
-                        className="py-1.5 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                        className="tour-cal-filter py-1.5 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                         value={selectedOperatorFilter}
                         onChange={(e) => setSelectedOperatorFilter(e.target.value)}
                     >
@@ -507,13 +549,13 @@ export default function OwnerDashboard() {
                     </select>
                     <button
                         onClick={() => setAgendaEventModalState({ isOpen: true, eventToEdit: null })}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
+                        className="tour-cal-new bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-1"
                     >
                         <i className="bi bi-plus-lg"></i> Nuevo Evento
                     </button>
                 </div>
             </div>
-            <div className="flex-1 min-h-0">
+            <div className="tour-cal-view flex-1 min-h-0">
                 <Calendar
                     localizer={localizer}
                     events={calendarEvents}
@@ -546,10 +588,10 @@ export default function OwnerDashboard() {
 
     const renderOperationsList = (opsToRender) => (
         <div className="animate-fadeIn">
-            <div className="flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
+            <div className="tour-ops-search flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 hidden sm:block">Listado de Operaciones</h2>
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="tour-ops-filters flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-64">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i className="bi bi-search text-gray-400"></i>
@@ -590,7 +632,7 @@ export default function OwnerDashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+            <div className="tour-ops-list grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
                 {opsToRender?.length === 0 ? (
                     <div className="col-span-full py-16 text-center bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600">
                         <p className="text-gray-500 dark:text-slate-400">No hay operaciones en esta vista.</p>
@@ -928,7 +970,7 @@ export default function OwnerDashboard() {
                     </div>
                     <div className="flex items-center gap-3">
                         {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && activeTab !== 'seguimiento_operadores' && (
-                            <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
+                            <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="tour-new-op-btn bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                                 <i className="bi bi-plus-lg text-lg"></i>
                                 Nueva Operación
                             </button>

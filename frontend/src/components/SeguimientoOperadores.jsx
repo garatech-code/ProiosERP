@@ -207,7 +207,7 @@ export default function SeguimientoOperadores() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="tour-tracking-header flex justify-between items-center mb-6">
         <h2 className="text-xl font-black text-gray-900 dark:text-white">Seguimiento Comercial</h2>
         <button 
           onClick={handleExportExcel}
@@ -219,7 +219,7 @@ export default function SeguimientoOperadores() {
       </div>
 
       {/* Panel de KPIs Globales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="tour-tracking-kpis grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Total Proyectado */}
         <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
            <div className="relative z-10">
@@ -275,7 +275,7 @@ export default function SeguimientoOperadores() {
 
       {/* Tarjetas de Operadores */}
       <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4">Rendimiento por Operador</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="tour-tracking-operators grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {operators.map(operator => {
           const metrics = calculateMetrics(operator.id);
           return (
