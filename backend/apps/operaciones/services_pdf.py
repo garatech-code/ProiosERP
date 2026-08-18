@@ -895,8 +895,8 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         print(f"DEBUG custom_items parsed: {custom_items_list}")
             
         if isinstance(custom_items_list, list):
-            if 'SERVICES' not in grupos:
-                grupos['SERVICES'] = []
+            if 'SERVICIOS' not in grupos:
+                grupos['SERVICIOS'] = []
             for c_item in custom_items_list:
                 qty = c_item.get('cantidad', 1)
                 if not qty or str(qty).strip() == '': qty = 1
@@ -905,7 +905,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                 
                 qty = float(qty)
                 price = float(price)
-                grupos['SERVICES'].append({
+                grupos['SERVICIOS'].append({
                     'desc': c_item.get('nombre', ''),
                     'qty': qty,
                     'unit': 'UN',

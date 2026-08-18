@@ -109,8 +109,14 @@ export default function OperationDetail() {
   const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
   const [deliveryTime, setDeliveryTime] = useState('5');
   const [cotizacionAttn, setCotizacionAttn] = useState('Operations / Technical Department');
-  const [scopeIncludes, setScopeIncludes] = useState('[detail what the supply / service comprises]');
-  const [scopeExcludes, setScopeExcludes] = useState('[freight, customs clearance, additional labour, parts not listed, etc.]');
+  
+  const defaultScopeIncEn = '[detail what the supply / service comprises]';
+  const defaultScopeIncEs = '[detallar qué comprende el suministro / servicio]';
+  const defaultScopeExcEn = '[freight, customs clearance, additional labour, parts not listed, etc.]';
+  const defaultScopeExcEs = '[fletes, despacho de aduana, mano de obra adicional, repuestos no listados, etc.]';
+
+  const [scopeIncludes, setScopeIncludes] = useState(defaultScopeIncEn);
+  const [scopeExcludes, setScopeExcludes] = useState(defaultScopeExcEn);
   
   const defaultNotesSrvEn = `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`;
   const defaultNotesSrvEs = `- Esta suma global cubre únicamente los trabajos designados enumerados en esta cotización. Cualquier acero, trabajo o daño adicional encontrado después del corte será recotizado y cobrado por separado.\n- Las reparaciones están sujetas a la aprobación y asistencia de la Sociedad de Clasificación.\n- Los andamios, la movilización/desmovilización, la pintura, las pruebas no destructivas (NDT), y los cargos de dique y puerto NO están incluidos en esta suma global y serán cobrados por separado.`;
@@ -135,16 +141,33 @@ export default function OperationDetail() {
         cotizacionNotes === defaultNotesProdEs ||
         cotizacionNotes === '[Other relevant note]' ||
         cotizacionNotes === '[Otra nota relevante]' ||
-        cotizacionNotes === `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.
-- Repairs are subject to Classification Society approval and attendance.
-- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`
+        cotizacionNotes === `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`
       ) {
         setCotizacionNotes(isEs ? defEs : defEn);
       }
       
+      if (scopeIncludes === defaultScopeIncEn || scopeIncludes === defaultScopeIncEs) {
+        setScopeIncludes(isEs ? defaultScopeIncEs : defaultScopeIncEn);
+      }
+      
+      if (scopeExcludes === defaultScopeExcEn || scopeExcludes === defaultScopeExcEs) {
+        setScopeExcludes(isEs ? defaultScopeExcEs : defaultScopeExcEn);
+      }
+
+      if (offerValidity === '15 days' || offerValidity === '15 días') {
+        setOfferValidity(isEs ? '15 días' : '15 days');
+      }
+
+      if (!paymentTermsIsManual) {
+        if (paymentTerms === '30 days from invoice date' || paymentTerms === '30 días fecha de factura') {
+          setPaymentTerms(isEs ? '30 días fecha de factura' : '30 days from invoice date');
+        }
+      }
+
       setDamageLocationTitle(isEs ? 'Ubicación y daños' : 'Location and damage');
       setDamageFramesTitle(isEs ? 'Cuaderna(s)' : 'Frame(s)');
       setDamageAreaTitle(isEs ? 'Área L x H (mm)' : 'Area L x H (mm)');
+      setCotizacionAttn(isEs ? 'Departamento de Operaciones / Técnico' : 'Operations / Technical Department');
     }
   }, [showCotizacionWordModal, operation, cotizacionLang]);
 
