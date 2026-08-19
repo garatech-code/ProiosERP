@@ -107,6 +107,9 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     return `
       <!DOCTYPE html>
       <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
       <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
         <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; margin-top: 20px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
           <tr>

@@ -300,7 +300,7 @@ def generar_reporte_servicio_pdf(operacion):
     story.append(Paragraph("<b>Tareas Realizadas:</b>", styles['Heading3']))
     detalle = operacion.detalle_servicio or "Detalle las tareas realizadas aquí."
     story.append(Paragraph(detalle.replace('\n', '<br/>'), styles['Normal']))
-    story.append(Spacer(1, 2*cm))
+    story.append(Spacer(1, 0.5*cm))
     
     # Firmas
     t = Table([['_________________________', '_________________________'], 
@@ -331,7 +331,8 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     from datetime import datetime
     from django.conf import settings
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, KeepTogether
-    from reportlab.lib.colors import HexColor
+    from reportlab.lib.colors import HexColor, Color
+    card_bg = Color(248/255.0, 250/255.0, 252/255.0, alpha=0.4)
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
     from reportlab.lib.units import cm
@@ -380,7 +381,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     cliente_nombre = operacion.cliente.name if operacion.cliente else "[Client Name]"
     current_date = datetime.now().strftime('%d %b %Y')
     
-    from_html = "<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>Tel:</font> +549 11 57265031<br/><font color='#64748b'>Email:</font> eva@proios.com"
+    from_html = "<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>Email:</font> operations@proios.com"
     to_html = f"<b>{cliente_nombre}</b><br/><br/><br/><font color='#64748b'>Attn:</font><br/>{attn}"
     details_html = f"<b>No. PS-COT-{operacion.id:04d}</b><br/>Date: {current_date}<br/>Valid: {offer_validity}<br/><br/>Vessel: <b>{buque}</b><br/>Port: {puerto}<br/>ETA: {eta_str}"
     
@@ -396,19 +397,19 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     cards_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         # Card 1
-        ('BACKGROUND', (0,0), (0,0), HexColor('#f8fafc')),
+        ('BACKGROUND', (0,0), (0,0), card_bg),
         ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')),
-        ('TOPPADDING', (0,0), (0,0), 12), ('BOTTOMPADDING', (0,0), (0,0), 12),
+        ('TOPPADDING', (0,0), (0,0), 6), ('BOTTOMPADDING', (0,0), (0,0), 6),
         ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
         # Card 2
-        ('BACKGROUND', (2,0), (2,0), HexColor('#f8fafc')),
+        ('BACKGROUND', (2,0), (2,0), card_bg),
         ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')),
-        ('TOPPADDING', (2,0), (2,0), 12), ('BOTTOMPADDING', (2,0), (2,0), 12),
+        ('TOPPADDING', (2,0), (2,0), 6), ('BOTTOMPADDING', (2,0), (2,0), 6),
         ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
         # Card 3
-        ('BACKGROUND', (4,0), (4,0), HexColor('#f8fafc')),
+        ('BACKGROUND', (4,0), (4,0), card_bg),
         ('BOX', (4,0), (4,0), 0.5, HexColor('#e2e8f0')),
-        ('TOPPADDING', (4,0), (4,0), 12), ('BOTTOMPADDING', (4,0), (4,0), 12),
+        ('TOPPADDING', (4,0), (4,0), 6), ('BOTTOMPADDING', (4,0), (4,0), 6),
         ('LEFTPADDING', (4,0), (4,0), 12), ('RIGHTPADDING', (4,0), (4,0), 12),
     ]))
     story.append(cards_table)
@@ -631,7 +632,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     ], colWidths=[10*cm, 8*cm])
     
     t_tot_outer.setStyle(TableStyle([
-        ('BACKGROUND', (1,0), (1,0), HexColor('#f8fafc')),
+        ('BACKGROUND', (1,0), (1,0), card_bg),
         ('BOX', (1,0), (1,0), 1, HexColor('#003366')),
         # Left border extra thick for styling
         ('LINEBEFORE', (1,0), (1,0), 4, HexColor('#003366')),
@@ -642,27 +643,35 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     ]))
     
     story.append(t_tot_outer)
-    story.append(PageBreak())
+    story.append(Spacer(1, 1*cm))
     
     # --- 6. PAGE 2: TWO COLUMN LAYOUT ---
     h_style = ParagraphStyle('HStyle', parent=bold_style, fontSize=12, textColor=HexColor('#003366'), spaceAfter=12)
     
     # Left Column: SCOPE & NOTES
     left_col = []
-    left_col.append(Paragraph("SCOPE OF SUPPLY", h_style))
-    left_col.append(Paragraph("<b>Includes:</b>", bold_style))
-    left_col.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
-    left_col.append(Spacer(1, 0.4*cm))
-    left_col.append(Paragraph("<b>Excludes:</b>", bold_style))
-    left_col.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
-    left_col.append(Spacer(1, 0.8*cm))
     
-    left_col.append(Paragraph("TECHNICAL NOTES", h_style))
-    notes_list = [
-        "Prices subject to confirmation of stock and availability at the time of the purchase order.",
-        "Quantities and specifications to be confirmed by the client before dispatch."
-    ]
-    if notes and str(notes).strip():
+    has_includes = scope_includes and str(scope_includes).strip() and not str(scope_includes).startswith('[detail') and not str(scope_includes).startswith('[detallar')
+    has_excludes = scope_excludes and str(scope_excludes).strip() and not str(scope_excludes).startswith('[freight') and not str(scope_excludes).startswith('[fletes')
+    
+    if has_includes or has_excludes:
+        left_col.append(Paragraph("SCOPE OF SUPPLY", h_style))
+        if has_includes:
+            left_col.append(Paragraph("<b>Includes:</b>", bold_style))
+            left_col.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
+            left_col.append(Spacer(1, 0.4*cm))
+        if has_excludes:
+            left_col.append(Paragraph("<b>Excludes:</b>", bold_style))
+            left_col.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
+            left_col.append(Spacer(1, 0.8*cm))
+    
+    has_notes = notes and str(notes).strip() and not str(notes).startswith('[Other') and not str(notes).startswith('[Otra')
+    if has_notes:
+        left_col.append(Paragraph("TECHNICAL NOTES", h_style))
+        notes_list = [
+            "Prices subject to confirmation of stock and availability at the time of the purchase order.",
+            "Quantities and specifications to be confirmed by the client before dispatch."
+        ]
         for line in str(notes).split('\n'):
             line = line.strip()
             if line:
@@ -672,22 +681,30 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
                 elif line.startswith('-') or line.startswith('–') or line.startswith('•'):
                     line = line[1:].strip()
                 notes_list.append(line)
-    
-    for nl in notes_list:
-        left_col.append(Paragraph(f"• {nl}", normal_style))
-        left_col.append(Spacer(1, 0.2*cm))
+        
+        for nl in notes_list:
+            left_col.append(Paragraph(f"• {nl}", normal_style))
+            left_col.append(Spacer(1, 0.2*cm))
+            
+    if not left_col:
+        left_col.append(Paragraph("", normal_style))
 
     # Right Column: TERMS
     right_col = []
-    right_col.append(Paragraph("TERMS & CONDITIONS", h_style))
+    right_col.append(Paragraph("TERMS &amp; CONDITIONS", h_style))
     terms_data = [
-        [Paragraph("<b>Currency</b>", normal_style), Paragraph("USD", normal_style)],
-        [Paragraph("<b>Offer validity</b>", normal_style), Paragraph(offer_validity, normal_style)],
-        [Paragraph("<b>Payment terms</b>", normal_style), Paragraph(payment_terms, normal_style)],
-        [Paragraph("<b>Delivery time</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
-        [Paragraph("<b>Place of delivery</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)]
+        [Paragraph("<b>Currency</b>", normal_style), Paragraph("USD", normal_style)]
     ]
-    t_terms = Table(terms_data, colWidths=[3.2*cm, 5.3*cm])
+    if offer_validity and str(offer_validity).strip():
+        terms_data.append([Paragraph("<b>Offer validity</b>", normal_style), Paragraph(offer_validity, normal_style)])
+    if payment_terms and str(payment_terms).strip():
+        terms_data.append([Paragraph("<b>Payment terms</b>", normal_style), Paragraph(payment_terms, normal_style)])
+    if delivery_time and str(delivery_time).strip():
+        terms_data.append([Paragraph("<b>Delivery time</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)])
+    if puerto or buque:
+        terms_data.append([Paragraph("<b>Place of delivery</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else f"{puerto or buque}", normal_style)])
+        
+    t_terms = Table(terms_data, colWidths=[2.8*cm, 4.8*cm])
     t_terms.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
@@ -699,14 +716,27 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     page2_table = Table([
         [left_col, "", right_col]
     ], colWidths=[8.5*cm, 1*cm, 8.5*cm])
-    page2_table.setStyle(TableStyle([
+    
+    table_styles = [
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('LEFTPADDING', (0,0), (-1,-1), 0),
-        ('RIGHTPADDING', (0,0), (-1,-1), 0),
-    ]))
+        ('BACKGROUND', (2,0), (2,0), card_bg),
+        ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')),
+        ('TOPPADDING', (2,0), (2,0), 6), ('BOTTOMPADDING', (2,0), (2,0), 6),
+        ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
+    ]
+    
+    if has_includes or has_excludes or has_notes:
+        table_styles.extend([
+            ('BACKGROUND', (0,0), (0,0), card_bg),
+            ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')),
+            ('TOPPADDING', (0,0), (0,0), 6), ('BOTTOMPADDING', (0,0), (0,0), 6),
+            ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
+        ])
+        
+    page2_table.setStyle(TableStyle(table_styles))
     story.append(page2_table)
     
-    story.append(Spacer(1, 2*cm))
+    story.append(Spacer(1, 0.5*cm))
     
     # --- 7. SIGNATURE BLOCK ---
     user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
@@ -736,13 +766,26 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     # --- 8. SOLID CORPORATE FOOTER (CALLBACK) ---
     def add_proios_corporate_footer(canvas, doc):
         canvas.saveState()
+        
+        # --- Add Watermark ---
+        logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
+        if os.path.exists(logo_path):
+            canvas.saveState()
+            canvas.setFillAlpha(0.08) # light transparency
+            img_width = 12 * cm
+            img_height = 12 * cm
+            x = (A4[0] - img_width) / 2
+            y = (A4[1] - img_height) / 2
+            canvas.drawImage(logo_path, x, y, width=img_width, height=img_height, preserveAspectRatio=True, mask='auto')
+            canvas.restoreState()
+
         # Draw a solid blue bar at the absolute bottom
         canvas.setFillColor(HexColor('#003366'))
         canvas.rect(0, 0, A4[0], 1.5*cm, fill=1, stroke=0)
         
         canvas.setFillColor(colors.white)
         canvas.setFont(DEFAULT_FONT, 7.5)
-        footer_text = "Proios S.A. | Comodoro Pedro Zanni 351 floor 5th 503 LN. Buenos Aires (C1104AAH) Argentina | +549 11 57265031 | eva@proios.com | WWW.PROIOS.COM"
+        footer_text = "Proios S.A. | Comodoro Pedro Zanni 351 floor 5th 503 LN. Buenos Aires (C1104AAH) Argentina | operations@proios.com | WWW.PROIOS.COM"
         canvas.drawCentredString(A4[0]/2.0, 0.6*cm, footer_text)
         
         canvas.restoreState()
@@ -756,8 +799,9 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     import io
     from datetime import datetime
     from django.conf import settings
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, KeepTogether, HRFlowable
-    from reportlab.lib.colors import HexColor
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, KeepTogether
+    from reportlab.lib.colors import HexColor, Color
+    card_bg = Color(248/255.0, 250/255.0, 252/255.0, alpha=0.4)
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
     from reportlab.lib.units import cm
@@ -777,8 +821,10 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             'currency': 'Currency', 'offer_val': 'Offer validity', 'payment': 'Payment terms', 'delivery': 'Delivery time',
             'place': 'Place of delivery', 'warranty': 'Warranty', 'taxes': 'Taxes',
             'damage_desc': 'DAMAGE DESCRIPTION', 'loc_damage': 'Location and damage', 'frames': 'Frame(s)', 'area': 'Area L x H (mm)',
-            'scope': 'SCOPE', 'includes': 'Includes:', 'excludes': 'Excludes:', 'notes': 'NOTES',
-            'faithfully': 'Yours faithfully,', 'attn': 'Attn:'
+            'scope': 'SCOPE OF SUPPLY', 'includes': 'Includes:', 'excludes': 'Excludes:', 'notes': 'TECHNICAL NOTES',
+            'faithfully': 'Yours faithfully,', 'attn': 'Attn:', 'days': 'days', 'not_included': 'Not included',
+            'vat_word': 'VAT', 'page': 'Page', 'operations': 'Operations', 'on_board': 'on board',
+            'details': 'DETAILS', 'terms_title': 'TERMS &amp; CONDITIONS'
         },
         'es': {
             'cat_quimicos': 'Químicos', 'cat_productos': 'Productos', 'cat_servicios': 'Servicios', 'cat_general': 'General',
@@ -791,27 +837,29 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             'currency': 'Moneda', 'offer_val': 'Validez de oferta', 'payment': 'Forma de pago', 'delivery': 'Tiempo de entrega',
             'place': 'Lugar de entrega', 'warranty': 'Garantía', 'taxes': 'Impuestos',
             'damage_desc': 'DESCRIPCIÓN DE DAÑOS', 'loc_damage': 'Ubicación y daño', 'frames': 'Cuaderna(s)', 'area': 'Área L x H (mm)',
-            'scope': 'ALCANCE', 'includes': 'Incluye:', 'excludes': 'Excluye:', 'notes': 'NOTAS',
-            'faithfully': 'Atentamente,', 'attn': 'Atención:'
+            'scope': 'ALCANCE DEL SUMINISTRO', 'includes': 'Incluye:', 'excludes': 'Excluye:', 'notes': 'NOTAS TÉCNICAS',
+            'faithfully': 'Atentamente,', 'attn': 'Atención:', 'days': 'días', 'not_included': 'No incluidos',
+            'vat_word': 'IVA', 'page': 'Página', 'operations': 'Operaciones', 'on_board': 'a bordo del',
+            'details': 'DETALLES', 'terms_title': 'TÉRMINOS Y CONDICIONES'
         }
     }
     
     txt = t.get(lang, t['en'])
     
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=2*cm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=3*cm)
     story = []
     
     styles = getSampleStyleSheet()
     normal_style = styles['Normal']
     normal_style.fontSize = 9
-    normal_style.leading = 12
+    normal_style.leading = 13
+    normal_style.textColor = HexColor('#1e293b')
     normal_style.fontName = DEFAULT_FONT
-    normal_style.textColor = colors.black
     
     bold_style = ParagraphStyle('BoldStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD)
-    
-    title_style = ParagraphStyle('TitleStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=24, leading=28, textColor=colors.black, alignment=TA_LEFT)
+    title_style = ParagraphStyle('TitleStyle', parent=normal_style, fontName=DEFAULT_FONT_BOLD, fontSize=28, leading=32, textColor=HexColor('#003366'), alignment=TA_LEFT, spaceAfter=0)
+    card_title_style = ParagraphStyle('CardTitle', parent=bold_style, fontSize=8, textColor=HexColor('#64748b'), spaceAfter=6, textTransform='uppercase')
     
     # --- 1. HEADER (TITLE & LOGO) ---
     logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
@@ -823,42 +871,42 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         [Paragraph(txt['quotation'], title_style), logo_img]
     ], colWidths=[13*cm, 5*cm])
     header_top.setStyle(TableStyle([
-        ('VALIGN', (0,0), (0,0), 'BOTTOM'), # QUOTATION bottom aligned
-        ('VALIGN', (1,0), (1,0), 'MIDDLE'), # Logo middle aligned to avoid bottom transparent padding pushing text up
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('ALIGN', (1,0), (1,0), 'RIGHT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
     ]))
     story.append(header_top)
-    story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#87CEEB'), spaceBefore=0, spaceAfter=10))
+    story.append(Spacer(1, 0.5*cm))
     
-    # --- 2. 3-COLUMN INFO ---
-    buque = operacion.ship.name if operacion.ship else "[Vessel]"
+    # --- 2. HEADER CARDS (FROM / TO / DETAILS) ---
+    buque = operacion.ship.name if operacion.ship else "[Vessel Name]"
     puerto = operacion.port.name if operacion.port else "[Port]"
     eta_str = operacion.eta.strftime("%d/%m/%Y") if operacion.eta else "[ETA]"
     cliente_nombre = operacion.cliente.name if operacion.cliente else "[Client Name]"
     current_date = datetime.now().strftime('%d %b %Y')
     
-    from_html = f"<b>Proios S.A.</b><br/>Buenos Aires, Argentina<br/>Comodoro Pedro Zanni 351,<br/>5th Fl. – 503 LN (C1104AAH)<br/><i>info@proios.com</i>"
-    to_html = f"<b>{cliente_nombre}</b><br/>{txt['attn']} {attn}"
+    from_html = f"<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>Email:</font> operations@proios.com"
+    to_html = f"<b>{cliente_nombre}</b><br/><br/><br/><font color='#64748b'>{txt['attn']}</font><br/>{attn}"
     
     loc_lbl = txt['location'] if operacion.tipo_operacion == 'servicios' else txt['port']
-    details_html = f"<b>{txt['no']}</b> {operacion.id:04d}<br/><b>{txt['date']}</b> {current_date}<br/><b>{txt['valid']}</b> {offer_validity}<br/><b>{txt['vessel']}</b> {buque}<br/><b>{loc_lbl}</b> {puerto}<br/><b>{txt['eta']}</b> {eta_str}"
-    
-    card_title_style = ParagraphStyle('CardTitle', parent=bold_style, fontSize=8, spaceAfter=4)
+    details_html = f"<b>{txt['no']} PS-COT-{operacion.id:04d}</b><br/>{txt['date']}: {current_date}<br/>{txt['valid']}: {offer_validity}<br/><br/>{txt['vessel']}: <b>{buque}</b><br/>{loc_lbl}: {puerto}<br/>{txt['eta']}: {eta_str}"
     
     card_from = [Paragraph(txt['from'], card_title_style), Paragraph(from_html, normal_style)]
     card_to = [Paragraph(txt['to'], card_title_style), Paragraph(to_html, normal_style)]
-    card_details = [Paragraph(txt['quotation'], card_title_style), Paragraph(details_html, normal_style)]
+    card_details = [Paragraph(txt['details'], card_title_style), Paragraph(details_html, normal_style)]
     
-    info_table = Table([
-        [card_from, card_to, card_details]
-    ], colWidths=[6.5*cm, 6.5*cm, 5*cm])
+    cards_table = Table([
+        [card_from, "", card_to, "", card_details]
+    ], colWidths=[5.6*cm, 0.6*cm, 5.6*cm, 0.6*cm, 5.6*cm])
     
-    info_table.setStyle(TableStyle([
+    cards_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 15),
+        ('BACKGROUND', (0,0), (0,0), card_bg), ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')), ('TOPPADDING', (0,0), (0,0), 6), ('BOTTOMPADDING', (0,0), (0,0), 6), ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
+        ('BACKGROUND', (2,0), (2,0), card_bg), ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')), ('TOPPADDING', (2,0), (2,0), 6), ('BOTTOMPADDING', (2,0), (2,0), 6), ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
+        ('BACKGROUND', (4,0), (4,0), card_bg), ('BOX', (4,0), (4,0), 0.5, HexColor('#e2e8f0')), ('TOPPADDING', (4,0), (4,0), 6), ('BOTTOMPADDING', (4,0), (4,0), 6), ('LEFTPADDING', (4,0), (4,0), 12), ('RIGHTPADDING', (4,0), (4,0), 12),
     ]))
-    story.append(info_table)
+    story.append(cards_table)
+    story.append(Spacer(1, 1*cm))
     
     from apps.inventario.models import Articulo
     import json
@@ -875,7 +923,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             cat = "GENERAL"
             desc = f"Item #{det.articulo_id}"
             unit = "u"
-
+            
         cat = cat.upper()
         if cat not in grupos:
             grupos[cat] = []
@@ -891,8 +939,6 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             custom_items_list = json.loads(custom_items)
         else:
             custom_items_list = custom_items
-            
-        print(f"DEBUG custom_items parsed: {custom_items_list}")
             
         if isinstance(custom_items_list, list):
             if 'SERVICIOS' not in grupos:
@@ -912,11 +958,9 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                     'price': price,
                     'amount': qty * price
                 })
-        print(f"DEBUG grupos after custom items: {grupos}")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"DEBUG ERROR custom_items: {e}")
 
     has_items = sum(len(items) for items in grupos.values()) > 0
     total_general = 0
@@ -924,40 +968,33 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     # --- 3. ITEMS INTRO ---
     if has_items:
         intro_text = txt['intro'] if operacion.tipo_operacion == 'servicios' else txt['intro_products']
-        story.append(Paragraph(intro_text, normal_style))
-        story.append(Spacer(1, 0.4*cm))
-        story.append(Paragraph(f"<b>{txt['items']}</b>", card_title_style))
-        story.append(Spacer(1, 0.2*cm))
-    
-    # --- 4. ITEMS TABLE ---
-    if has_items:
-
-        th_style = ParagraphStyle('TH', parent=bold_style, fontSize=8)
+        intro_style = ParagraphStyle('Intro', parent=normal_style, fontSize=10, textColor=HexColor('#334155'))
+        story.append(Paragraph(intro_text, intro_style))
+        story.append(Spacer(1, 0.5*cm))
+        
+        # --- 4. ITEMS TABLE ---
+        th_style = ParagraphStyle('TH', parent=bold_style, textColor=colors.white, fontSize=9)
         th_right = ParagraphStyle('THR', parent=th_style, alignment=TA_RIGHT)
         th_center = ParagraphStyle('THC', parent=th_style, alignment=TA_CENTER)
-
+        
         table_data = []
         table_data.append([
             Paragraph(txt['no'], th_center),
             Paragraph(txt['desc'], th_style),
             Paragraph(txt['qty'], th_center),
             Paragraph(txt['unit'], th_center),
-            Paragraph(txt['price'], th_right),
-            Paragraph(txt['amount'], th_right)
+            Paragraph(txt['price'] + " (USD)", th_right),
+            Paragraph(txt['amount'] + " (USD)", th_right)
         ])
-
-
-
-        total_general = 0
+        
         idx = 1
-
         tr_style = ParagraphStyle('TR', parent=normal_style)
         tr_right = ParagraphStyle('TRR', parent=tr_style, alignment=TA_RIGHT)
         tr_center = ParagraphStyle('TRC', parent=tr_style, alignment=TA_CENTER)
-
+        
         for cat_name, items in grupos.items():
             trans_cat_title = txt.get(f"cat_{cat_name.lower().strip()}", cat_name).upper()
-            table_data.append([Paragraph(f"<b>{trans_cat_title}</b>", bold_style), "", "", "", "", ""])
+            table_data.append([Paragraph(f"<b>{trans_cat_title}</b>", ParagraphStyle('Cat', parent=bold_style, textColor=HexColor('#003366'))), "", "", "", "", ""])
             subtotal_cat = 0
             for item in items:
                 qty = item['qty']
@@ -965,7 +1002,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                 sub = qty * price
                 subtotal_cat += sub
                 total_general += sub
-
+                
                 table_data.append([
                     Paragraph(str(idx), tr_center),
                     Paragraph(item['desc'], tr_style),
@@ -975,171 +1012,231 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                     Paragraph(f"{sub:,.2f}", tr_right)
                 ])
                 idx += 1
-
+                
             trans_cat_lower = txt.get(f"cat_{cat_name.lower().strip()}", cat_name).lower()
             table_data.append([
-                Paragraph(f"{txt['subtotal']} {trans_cat_lower}", normal_style),
+                Paragraph(f"{txt['subtotal']} {trans_cat_lower}", ParagraphStyle('SubCat', parent=normal_style, textColor=HexColor('#64748b'))),
                 "", "", "", "",
                 Paragraph(f"<b>{subtotal_cat:,.2f}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
             ])
-
-        col_widths = [1*cm, 8.5*cm, 1.5*cm, 1.5*cm, 2.5*cm, 3*cm]
+            
+        col_widths = [1.2*cm, 7.8*cm, 1.5*cm, 1.5*cm, 2.8*cm, 3.2*cm]
         t = Table(table_data, colWidths=col_widths)
-
+        
         ts = TableStyle([
-            ('LINEABOVE', (0,0), (-1,0), 1, HexColor('#87CEEB')), # Top blue line
-            ('LINEBELOW', (0,0), (-1,0), 1, HexColor('#87CEEB')), # Bottom blue line for header
+            ('BACKGROUND', (0,0), (-1,0), HexColor('#003366')),
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 4),
-            ('TOPPADDING', (0,0), (-1,0), 4),
+            ('BOTTOMPADDING', (0,0), (-1,0), 8),
+            ('TOPPADDING', (0,0), (-1,0), 8),
         ])
-
+        
         row_idx = 1
         for cat_name, items in grupos.items():
-            ts.add('BACKGROUND', (0, row_idx), (-1, row_idx), HexColor('#e2e8f0')) # Darker grey category so it is visible!
+            ts.add('BACKGROUND', (0, row_idx), (-1, row_idx), HexColor('#f1f5f9'))
             ts.add('SPAN', (0, row_idx), (-1, row_idx))
+            ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+            ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
             row_idx += 1
-
+            
             for _ in items:
-                ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 4)
-                ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 4)
-                ts.add('LINEBELOW', (0, row_idx), (-1, row_idx), 0.25, colors.lightgrey)
+                ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+                ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
+                ts.add('LINEBELOW', (0, row_idx), (-1, row_idx), 0.5, HexColor('#e2e8f0'))
                 row_idx += 1
-
+                
             ts.add('SPAN', (0, row_idx), (4, row_idx))
+            ts.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+            ts.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
             row_idx += 1
-
-        # Bottom blue line for whole table
-        ts.add('LINEBELOW', (0, row_idx-1), (-1, row_idx-1), 1, HexColor('#87CEEB'))
-
+            
         t.setStyle(ts)
         story.append(t)
-        story.append(Spacer(1, 0.4*cm))
-
-        # --- 5. TOTALS ---
-        tot_label_style = ParagraphStyle('TotL', parent=normal_style, alignment=TA_LEFT)
+        story.append(Spacer(1, 0.8*cm))
+        
+        # --- 5. TOTALS PANEL ---
+        tot_label_style = ParagraphStyle('TotL', parent=normal_style, alignment=TA_RIGHT, textColor=HexColor('#475569'))
         tot_val_style = ParagraphStyle('TotV', parent=normal_style, alignment=TA_RIGHT)
-        tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_LEFT, fontSize=11)
-        tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=11)
-
+        tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_RIGHT, fontSize=12, textColor=HexColor('#003366'))
+        tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=14, textColor=HexColor('#003366'))
+        
         if str(include_vat).lower() == 'true' or include_vat is True:
             tot_data = [
-                [Paragraph(txt['subtotal'], tot_label_style), Paragraph(f"{total_general:,.2f}", tot_val_style)],
-                [Paragraph(txt['vat'], tot_label_style), Paragraph(f"{(float(total_general) * 0.21):,.2f}", tot_val_style)],
-                [Paragraph(f"<b>{txt['total']}</b>", tot_final_label), Paragraph(f"<b>USD<br/>{(float(total_general) * 1.21):,.2f}</b>", tot_final_val)]
+                [Paragraph(f"{txt['subtotal']}:", tot_label_style), Paragraph(f"USD {total_general:,.2f}", tot_val_style)],
+                [Paragraph(f"{txt['vat']} (21%):", tot_label_style), Paragraph(f"USD {(float(total_general) * 0.21):,.2f}", tot_val_style)],
+                [Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {(float(total_general) * 1.21):,.2f}", tot_final_val)]
             ]
         else:
             tot_data = [
-                [Paragraph(f"<b>{txt['total']}</b>", tot_final_label), Paragraph(f"<b>USD<br/>{float(total_general):,.2f}</b>", tot_final_val)]
+                [Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)]
             ]
-
-        t_tot = Table(tot_data, colWidths=[2.5*cm, 3*cm])
-        t_tot.setStyle(TableStyle([
+            
+        t_tot_inner = Table(tot_data, colWidths=[3.5*cm, 4*cm])
+        t_tot_inner.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
-            ('BOTTOMPADDING', (0,0), (-1,-2), 2),
-            ('TOPPADDING', (0,0), (-1,-2), 2),
-            ('LINEABOVE', (0,-1), (-1,-1), 1, HexColor('#87CEEB')), # Blue line before total
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0,0), (-1,-2), 4),
+            ('TOPPADDING', (0,0), (-1,-2), 4),
+            ('BOTTOMPADDING', (0,-1), (-1,-1), 10),
+            ('TOPPADDING', (0,-1), (-1,-1), 10),
+            ('LINEABOVE', (0,-1), (-1,-1), 1, HexColor('#cbd5e1')),
         ]))
-
-        # Wrap to align right
-        t_tot_wrap = Table([
-            ["", t_tot]
-        ], colWidths=[12.5*cm, 5.5*cm])
-        t_tot_wrap.setStyle(TableStyle([('ALIGN', (1,0), (1,0), 'RIGHT')]))
-        story.append(t_tot_wrap)
-        story.append(Spacer(1, 0.6*cm))
-
-
-    # --- 6. PAGE 2 (SCOPE & NOTES) ---
-    story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#87CEEB'), spaceBefore=2, spaceAfter=15))
-    story.append(Paragraph(f"<b>{txt['scope']}</b>", card_title_style))
-    story.append(Spacer(1, 0.2*cm))
-    story.append(Paragraph(f"<b>{txt['includes']}</b> {scope_includes}", normal_style))
-    story.append(Paragraph(f"<b>{txt['excludes']}</b> {scope_excludes}", normal_style))
-    story.append(Spacer(1, 0.6*cm))
+        
+        t_tot_outer = Table([["", t_tot_inner]], colWidths=[10*cm, 8*cm])
+        t_tot_outer.setStyle(TableStyle([
+            ('BACKGROUND', (1,0), (1,0), card_bg),
+            ('BOX', (1,0), (1,0), 1, HexColor('#003366')),
+            ('LINEBEFORE', (1,0), (1,0), 4, HexColor('#003366')),
+            ('LEFTPADDING', (1,0), (1,0), 10), ('RIGHTPADDING', (1,0), (1,0), 10), ('TOPPADDING', (1,0), (1,0), 10), ('BOTTOMPADDING', (1,0), (1,0), 10),
+        ]))
+        
+        story.append(t_tot_outer)
+        
+    story.append(Spacer(1, 1*cm))
     
-    story.append(Paragraph(f"<b>{txt['notes']}</b>", card_title_style))
-    story.append(Spacer(1, 0.2*cm))
-    notes_list = []
-    if notes and str(notes).strip():
+    # --- 6. PAGE 2: TWO COLUMN LAYOUT & DAMAGE ---
+    has_damage_location = damage_location and str(damage_location).strip()
+    has_damage_frames = damage_frames and str(damage_frames).strip()
+    has_damage_area = damage_area and str(damage_area).strip()
+    
+    if operacion.tipo_operacion == 'servicios' and (has_damage_location or has_damage_frames or has_damage_area):
+        story.append(Paragraph(damage_subject if damage_subject else txt['damage_desc'], ParagraphStyle('HStyle', parent=bold_style, fontSize=12, textColor=HexColor('#003366'), spaceAfter=12)))
+        dmg_data = [
+            [Paragraph(f"<b>{damage_location_title if damage_location_title else txt['loc_damage']}</b>", normal_style), Paragraph(f"<b>{damage_frames_title if damage_frames_title else txt['frames']}</b>", normal_style), Paragraph(f"<b>{damage_area_title if damage_area_title else txt['area']}</b>", normal_style)],
+            [Paragraph(damage_location if has_damage_location else "-", normal_style), Paragraph(damage_frames if has_damage_frames else "-", normal_style), Paragraph(damage_area if has_damage_area else "-", normal_style)]
+        ]
+        t_dmg = Table(dmg_data, colWidths=[8.5*cm, 4.5*cm, 5*cm])
+        t_dmg.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), HexColor('#f1f5f9')),
+            ('BOX', (0,0), (-1,-1), 0.5, HexColor('#e2e8f0')),
+            ('INNERGRID', (0,0), (-1,-1), 0.5, HexColor('#e2e8f0')),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ]))
+        story.append(t_dmg)
+        story.append(Spacer(1, 1*cm))
+        
+    h_style = ParagraphStyle('HStyle', parent=bold_style, fontSize=12, textColor=HexColor('#003366'), spaceAfter=12)
+    
+    left_col = []
+    has_includes = scope_includes and str(scope_includes).strip() and not str(scope_includes).startswith('[detail') and not str(scope_includes).startswith('[detallar')
+    has_excludes = scope_excludes and str(scope_excludes).strip() and not str(scope_excludes).startswith('[freight') and not str(scope_excludes).startswith('[fletes')
+    
+    if has_includes or has_excludes:
+        left_col.append(Paragraph(txt['scope'], h_style))
+        if has_includes:
+            left_col.append(Paragraph(f"<b>{txt['includes']}</b>", bold_style))
+            left_col.append(Paragraph(str(scope_includes).replace('\n', '<br/>'), normal_style))
+            left_col.append(Spacer(1, 0.4*cm))
+        if has_excludes:
+            left_col.append(Paragraph(f"<b>{txt['excludes']}</b>", bold_style))
+            left_col.append(Paragraph(str(scope_excludes).replace('\n', '<br/>'), normal_style))
+            left_col.append(Spacer(1, 0.8*cm))
+            
+    has_notes = notes and str(notes).strip() and not str(notes).startswith('[Other') and not str(notes).startswith('[Otra')
+    if has_notes:
+        left_col.append(Paragraph(txt['notes'], h_style))
+        notes_list = []
         for line in str(notes).split('\n'):
             line = line.strip()
             if line:
-                # Remove leading dashes/bullets to avoid duplication
                 if line.startswith('- ') or line.startswith('– ') or line.startswith('• '):
                     line = line[2:].strip()
                 elif line.startswith('-') or line.startswith('–') or line.startswith('•'):
                     line = line[1:].strip()
                 notes_list.append(line)
-    
-    for nl in notes_list:
-        story.append(Paragraph(f"– {nl}", normal_style))
+        for nl in notes_list:
+            left_col.append(Paragraph(f"• {nl}", normal_style))
+            left_col.append(Spacer(1, 0.2*cm))
+            
+    if not left_col:
+        left_col.append(Paragraph("", normal_style))
         
-    story.append(Spacer(1, 1.5*cm))
-    
-    # --- 7. DAMAGE DESCRIPTION (If apply) ---
-    if operacion.tipo_operacion == 'servicios':
-        story.append(Paragraph(f"<b>{damage_subject if damage_subject else txt['damage_desc']}</b>", card_title_style))
-        story.append(Spacer(1, 0.2*cm))
-        dmg_data = [
-            [Paragraph(f"<b>{damage_location_title if damage_location_title else txt['loc_damage']}</b>", normal_style), Paragraph(f"<b>{damage_frames_title if damage_frames_title else txt['frames']}</b>", normal_style), Paragraph(f"<b>{damage_area_title if damage_area_title else txt['area']}</b>", normal_style)],
-            [Paragraph(damage_location if damage_location else "-", normal_style), Paragraph(damage_frames if damage_frames else "-", normal_style), Paragraph(damage_area if damage_area else "-", normal_style)]
-        ]
-        t_dmg = Table(dmg_data, colWidths=[9*cm, 4.5*cm, 4.5*cm])
-        t_dmg.setStyle(TableStyle([
-            ('LINEABOVE', (0,0), (-1,0), 1, HexColor('#87CEEB')),
-            ('LINEBELOW', (0,0), (-1,0), 1, HexColor('#87CEEB')),
-            ('LINEBELOW', (0,-1), (-1,-1), 1, HexColor('#87CEEB')),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-        ]))
-        story.append(KeepTogether(t_dmg))
-        
-    story.append(PageBreak())
-
-    # --- 8. TERMS ---
-
-    story.append(Paragraph(f"<b>{txt['terms']}</b>", card_title_style))
-    story.append(Spacer(1, 0.2*cm))
+    right_col = []
+    right_col.append(Paragraph(txt['terms_title'], h_style))
     terms_data = [
-        [Paragraph(f"<b>{txt['currency']}</b>", normal_style), Paragraph("USD", normal_style)],
-        [Paragraph(f"<b>{txt['offer_val']}</b>", normal_style), Paragraph(offer_validity, normal_style)],
-        [Paragraph(f"<b>{txt['payment']}</b>", normal_style), Paragraph(payment_terms, normal_style)],
-        [Paragraph(f"<b>{txt['delivery']}</b>", normal_style), Paragraph(f"{delivery_time} days", normal_style)],
-        [Paragraph(f"<b>{txt['place']}</b>", normal_style), Paragraph(f"{puerto} / on board {buque}" if puerto and buque else "[port / warehouse]", normal_style)],
-        [Paragraph(f"<b>{txt['taxes']}</b>", normal_style), Paragraph(f"VAT {vat_percentage}%" if (str(include_vat).lower() == 'true' or include_vat is True) else "Not included", normal_style)]
+        [Paragraph(f"<b>{txt['currency']}</b>", normal_style), Paragraph("USD", normal_style)]
     ]
-    t_terms = Table(terms_data, colWidths=[3.5*cm, 14.5*cm])
+    if offer_validity and str(offer_validity).strip():
+        terms_data.append([Paragraph(f"<b>{txt['offer_val']}</b>", normal_style), Paragraph(offer_validity, normal_style)])
+    if payment_terms and str(payment_terms).strip():
+        terms_data.append([Paragraph(f"<b>{txt['payment']}</b>", normal_style), Paragraph(payment_terms, normal_style)])
+    if delivery_time and str(delivery_time).strip():
+        terms_data.append([Paragraph(f"<b>{txt['delivery']}</b>", normal_style), Paragraph(f"{delivery_time} {txt['days']}", normal_style)])
+    if puerto or buque:
+        terms_data.append([Paragraph(f"<b>{txt['place']}</b>", normal_style), Paragraph(f"{puerto} / {txt['on_board']} {buque}" if puerto and buque else f"{puerto or buque}", normal_style)])
+    terms_data.append([Paragraph(f"<b>{txt['taxes']}</b>", normal_style), Paragraph(f"{txt['vat_word']} {vat_percentage}%" if (str(include_vat).lower() == 'true' or include_vat is True) else txt['not_included'], normal_style)])
+    
+    t_terms = Table(terms_data, colWidths=[2.8*cm, 4.8*cm])
     t_terms.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 0.25, HexColor('#e2e8f0')),
     ]))
-    story.append(KeepTogether(t_terms))
-    story.append(Spacer(1, 0.6*cm))
+    right_col.append(t_terms)
     
-    # --- 9. SIGNATURE ---
-    story.append(Paragraph(txt['faithfully'], normal_style))
-    story.append(Spacer(1, 0.8*cm))
+    page2_table = Table([[left_col, "", right_col]], colWidths=[8.5*cm, 1*cm, 8.5*cm])
     
+    table_styles = [
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BACKGROUND', (2,0), (2,0), card_bg),
+        ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')),
+        ('TOPPADDING', (2,0), (2,0), 6), ('BOTTOMPADDING', (2,0), (2,0), 6),
+        ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
+    ]
+    
+    if has_includes or has_excludes or has_notes:
+        table_styles.extend([
+            ('BACKGROUND', (0,0), (0,0), card_bg),
+            ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')),
+            ('TOPPADDING', (0,0), (0,0), 6), ('BOTTOMPADDING', (0,0), (0,0), 6),
+            ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
+        ])
+        
+    page2_table.setStyle(TableStyle(table_styles))
+    story.append(page2_table)
+    story.append(Spacer(1, 0.5*cm))
+    
+    # --- 7. SIGNATURE BLOCK ---
     user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
-    user_role = user.rol if (user and hasattr(user, 'rol')) else "Operations"
+    user_role = user.rol if (user and hasattr(user, 'rol')) else txt.get('operations', 'Operations')
     user_email = "operations@proios.com"
     
-    story.append(Paragraph(f"<b>{user_name}</b>", normal_style))
-    story.append(Paragraph(f"{user_role} – Proios S.A.", normal_style))
-    story.append(Paragraph(f"{user_email}", normal_style))
+    sig_table = Table([
+        [Paragraph(txt['faithfully'], normal_style), ""],
+        [Paragraph(f"<b>{user_name}</b><br/>{user_role} – Proios S.A.<br/><font color='#64748b'>{user_email}</font>", normal_style), ""]
+    ], colWidths=[8.5*cm, 9.5*cm])
+    sig_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (1,0), (1,0), 30),
+        ('LINEABOVE', (0,1), (0,1), 1, HexColor('#cbd5e1')),
+        ('TOPPADDING', (0,1), (0,1), 10),
+    ]))
+    story.append(KeepTogether(sig_table))
     
-    # Footer
+    # --- 8. FOOTER WITH WATERMARK ---
     def add_proios_footer(canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(colors.gray)
-        canvas.setFont(DEFAULT_FONT, 7)
-        footer_text = "Proios S.A. · Comodoro Pedro Zanni 351, 5th Fl. – 503 LN, Buenos Aires (C1104AAH) · info@proios.com · www.proios.com"
-        canvas.drawString(1.5*cm, 1.5*cm, footer_text)
-        canvas.drawRightString(A4[0] - 1.5*cm, 1.5*cm, f"Page {doc.page}")
+        logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
+        if os.path.exists(logo_path):
+            canvas.saveState()
+            canvas.setFillAlpha(0.08)
+            img_width = 12 * cm
+            img_height = 12 * cm
+            x = (A4[0] - img_width) / 2
+            y = (A4[1] - img_height) / 2
+            canvas.drawImage(logo_path, x, y, width=img_width, height=img_height, preserveAspectRatio=True, mask='auto')
+            canvas.restoreState()
+
+        canvas.setFillColor(HexColor('#003366'))
+        canvas.rect(0, 0, A4[0], 1.5*cm, fill=1, stroke=0)
+        
+        canvas.setFillColor(colors.white)
+        canvas.setFont(DEFAULT_FONT, 7.5)
+        footer_text = "Proios S.A. | Comodoro Pedro Zanni 351 floor 5th 503 LN. Buenos Aires (C1104AAH) Argentina | operations@proios.com | WWW.PROIOS.COM"
+        canvas.drawCentredString(A4[0]/2.0, 0.6*cm, footer_text)
         canvas.restoreState()
         
     doc.build(story, onFirstPage=add_proios_footer, onLaterPages=add_proios_footer)
     return buffer.getvalue()
-

@@ -2754,26 +2754,6 @@ export default function OperationDetail() {
                 </div>
               </div>
 
-              {/* Template Selector */}
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
-                <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Diseño de Plantilla</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'eva' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
-                    <input type="radio" name="cotizacionTemplate" value="eva" checked={cotizacionTemplate === 'eva'} onChange={(e) => setCotizacionTemplate(e.target.value)} className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 mr-3" />
-                    <div>
-                      <span className={`block text-sm font-bold ${cotizacionTemplate === 'eva' ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-700 dark:text-slate-300'}`}>Diseño normal</span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Diseño minimalista con tabla agrupada y líneas finas.</span>
-                    </div>
-                  </label>
-                  <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${cotizacionTemplate === 'proios' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
-                    <input type="radio" name="cotizacionTemplate" value="proios" checked={cotizacionTemplate === 'proios'} onChange={(e) => setCotizacionTemplate(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
-                    <div>
-                      <span className={`block text-sm font-bold ${cotizacionTemplate === 'proios' ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>Próximamente (pruebas)</span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Diseño Premium B2B (Clásica).</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 

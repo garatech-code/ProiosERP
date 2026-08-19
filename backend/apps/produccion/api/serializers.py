@@ -143,7 +143,7 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
     def _update_articulo_costo(self, formula):
         try:
             art = Articulo.objects.get(id=formula.articulo_final_id)
-            art.costo = round(self.get_costo_preparacion(formula), 4)
+            art.costo = round(self.get_costo_preparacion(formula), 2)
             art.save()
         except Articulo.DoesNotExist:
             pass
