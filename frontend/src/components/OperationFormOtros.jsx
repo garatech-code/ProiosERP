@@ -419,6 +419,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
 
       const payload = {
         ...formData,
+        agency: formData.agency || null,
         tipo_operacion: 'otros',
         products: validProducts.map(p => ({
           product: Number(p.product),
@@ -620,8 +621,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
                   >
                     <option value="muelle">Muelle</option>
                     <option value="lancha">Lancha</option>
-                    <option value="taller">Taller</option>
-                  </select>
+                    </select>
                 </div>
               </div>
             </div>

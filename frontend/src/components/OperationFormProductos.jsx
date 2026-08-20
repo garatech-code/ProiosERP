@@ -461,6 +461,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
 
       const payload = {
         ...formData,
+        agency: formData.agency || null,
         nombre: formData.nombre,
         products: validProducts.map(p => ({
           product: Number(p.product),
@@ -678,8 +679,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
                   >
                     <option value="muelle">Muelle</option>
                     <option value="lancha">Lancha</option>
-                    <option value="taller">Taller</option>
-                  </select>
+                    </select>
                 </div>
               </div>
             </div>
@@ -899,7 +899,8 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
                 id="dificil_conseguir"
                 name="dificil_conseguir"
                 checked={formData.dificil_conseguir}
-                onChange={(e) => setFormData({ ...formData, dificil_conseguir: e.target.checked })}
+                onChange={(e) => setFormData({ ...formData,
+        agency: formData.agency || null, dificil_conseguir: e.target.checked })}
                 className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 dark:focus:ring-amber-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
               />
               <label htmlFor="dificil_conseguir" className="text-sm font-medium text-amber-900 dark:text-amber-200 cursor-pointer">

@@ -163,6 +163,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
       tipo_operacion: 'servicios',
       delivery_method: 'muelle',
       detalle_servicio: '',
+      valor_servicio: '',
       forma_cotizacion_servicio: 'hora_hombre',
       notes: '',
       texto_pedido: initialEmailData ? (initialEmailData.body_text || '') : '',
@@ -224,6 +225,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
             tipo_operacion: op.tipo_operacion || 'servicios',
             delivery_method: op.delivery_method || 'muelle',
             detalle_servicio: op.detalle_servicio || '',
+            valor_servicio: op.valor_servicio || '',
             forma_cotizacion_servicio: op.forma_cotizacion_servicio || 'hora_hombre',
             notes: op.notes || '',
             texto_pedido: op.texto_pedido || '',
@@ -421,6 +423,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
 
       const payload = {
         ...formData,
+        agency: formData.agency || null,
         nombre: formData.nombre,
         products: validProducts.map(p => ({
           product: Number(p.product), // Asegurar número
@@ -434,6 +437,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
         client_confirmed_date: safeFormatDate(formData.client_confirmed_date),
         texto_pedido: formData.texto_pedido,
         detalle_servicio: formData.detalle_servicio,
+        valor_servicio: formData.valor_servicio ? parseFloat(formData.valor_servicio) : null,
         subtipo_servicio: formData.subtipo_servicio === 'Otros' ? formData.otro_servicio : formData.subtipo_servicio,
         forma_cotizacion_servicio: formData.forma_cotizacion_servicio,
       };
@@ -628,8 +632,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                   >
                     <option value="muelle">Muelle</option>
                     <option value="lancha">Lancha</option>
-                    <option value="taller">Taller</option>
-                  </select>
+                    </select>
                 </div>
               </div>
             </div>
@@ -643,6 +646,13 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                     placeholder="Escriba aquí los detalles del servicio..."
                     className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
                   ></textarea>
+                </div>
+                <div className="sm:col-span-1">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Valor Total del Servicio ($)</label>
+                  <input type="number" name="valor_servicio" value={formData.valor_servicio} onChange={handleChange} step="0.01" min="0" required
+                    placeholder="Ej. 1500.00"
+                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
+                  />
                 </div>
                 <div className="sm:col-span-1">
                   <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Forma de Cotización *</label>

@@ -632,14 +632,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     ], colWidths=[10*cm, 8*cm])
     
     t_tot_outer.setStyle(TableStyle([
-        ('BACKGROUND', (1,0), (1,0), card_bg),
-        ('BOX', (1,0), (1,0), 1, HexColor('#003366')),
-        # Left border extra thick for styling
-        ('LINEBEFORE', (1,0), (1,0), 4, HexColor('#003366')),
-        ('LEFTPADDING', (1,0), (1,0), 10),
-        ('RIGHTPADDING', (1,0), (1,0), 10),
-        ('TOPPADDING', (1,0), (1,0), 10),
-        ('BOTTOMPADDING', (1,0), (1,0), 10),
+        ('VALIGN', (0,0), (-1,-1), 'TOP')
     ]))
     
     story.append(t_tot_outer)
@@ -717,23 +710,11 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         [left_col, "", right_col]
     ], colWidths=[8.5*cm, 1*cm, 8.5*cm])
     
-    table_styles = [
+    page2_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BACKGROUND', (2,0), (2,0), card_bg),
-        ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')),
-        ('TOPPADDING', (2,0), (2,0), 6), ('BOTTOMPADDING', (2,0), (2,0), 6),
-        ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
-    ]
-    
-    if has_includes or has_excludes or has_notes:
-        table_styles.extend([
-            ('BACKGROUND', (0,0), (0,0), card_bg),
-            ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')),
-            ('TOPPADDING', (0,0), (0,0), 6), ('BOTTOMPADDING', (0,0), (0,0), 6),
-            ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
-        ])
-        
-    page2_table.setStyle(TableStyle(table_styles))
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
     story.append(page2_table)
     
     story.append(Spacer(1, 0.5*cm))
@@ -767,17 +748,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     def add_proios_corporate_footer(canvas, doc):
         canvas.saveState()
         
-        # --- Add Watermark ---
-        logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
-        if os.path.exists(logo_path):
-            canvas.saveState()
-            canvas.setFillAlpha(0.08) # light transparency
-            img_width = 12 * cm
-            img_height = 12 * cm
-            x = (A4[0] - img_width) / 2
-            y = (A4[1] - img_height) / 2
-            canvas.drawImage(logo_path, x, y, width=img_width, height=img_height, preserveAspectRatio=True, mask='auto')
-            canvas.restoreState()
+
 
         # Draw a solid blue bar at the absolute bottom
         canvas.setFillColor(HexColor('#003366'))
@@ -1178,23 +1149,11 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     
     page2_table = Table([[left_col, "", right_col]], colWidths=[8.5*cm, 1*cm, 8.5*cm])
     
-    table_styles = [
+    page2_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('BACKGROUND', (2,0), (2,0), card_bg),
-        ('BOX', (2,0), (2,0), 0.5, HexColor('#e2e8f0')),
-        ('TOPPADDING', (2,0), (2,0), 6), ('BOTTOMPADDING', (2,0), (2,0), 6),
-        ('LEFTPADDING', (2,0), (2,0), 12), ('RIGHTPADDING', (2,0), (2,0), 12),
-    ]
-    
-    if has_includes or has_excludes or has_notes:
-        table_styles.extend([
-            ('BACKGROUND', (0,0), (0,0), card_bg),
-            ('BOX', (0,0), (0,0), 0.5, HexColor('#e2e8f0')),
-            ('TOPPADDING', (0,0), (0,0), 6), ('BOTTOMPADDING', (0,0), (0,0), 6),
-            ('LEFTPADDING', (0,0), (0,0), 12), ('RIGHTPADDING', (0,0), (0,0), 12),
-        ])
-        
-    page2_table.setStyle(TableStyle(table_styles))
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
     story.append(page2_table)
     story.append(Spacer(1, 0.5*cm))
     

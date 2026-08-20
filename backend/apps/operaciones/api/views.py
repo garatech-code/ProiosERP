@@ -1115,14 +1115,18 @@ class OperacionViewSet(viewsets.ModelViewSet):
         damage_location_title = data.get('damage_location_title', '')
         damage_frames_title = data.get('damage_frames_title', '')
         damage_area_title = data.get('damage_area_title', '')
+        service_forma_override = data.get('service_forma_override', None)
+        service_value_override = data.get('service_value_override', None)
+        service_qty_override = data.get('service_qty_override', None)
+        service_unit_price_override = data.get('service_unit_price_override', None)
 
         try:
             if template_type == 'eva':
                 from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
                 pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
             else:
-                from apps.operaciones.services_pdf import generar_cotizacion_pdf_nativa
-                pdf_content = generar_cotizacion_pdf_nativa(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
+                from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
+                pdf_content = generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, request.user, service_forma_override=service_forma_override, service_value_override=service_value_override, service_qty_override=service_qty_override, service_unit_price_override=service_unit_price_override)
 
             response = HttpResponse(
                 pdf_content, 
@@ -1163,6 +1167,10 @@ class OperacionViewSet(viewsets.ModelViewSet):
         recipient = data.get('recipient')
         subject = data.get('subject')
         body = data.get('body')
+        service_forma_override = data.get('service_forma_override', None)
+        service_value_override = data.get('service_value_override', None)
+        service_qty_override = data.get('service_qty_override', None)
+        service_unit_price_override = data.get('service_unit_price_override', None)
         
         if not recipient:
             return Response({'error': 'Falta el destinatario'}, status=400)
@@ -1172,8 +1180,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
                 pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
             else:
-                from apps.operaciones.services_pdf import generar_cotizacion_pdf_nativa
-                pdf_content = generar_cotizacion_pdf_nativa(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
+                from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
+                pdf_content = generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, request.user, service_forma_override=service_forma_override, service_value_override=service_value_override, service_qty_override=service_qty_override, service_unit_price_override=service_unit_price_override)
 
             import uuid
             from django.utils import timezone

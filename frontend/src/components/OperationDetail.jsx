@@ -12,20 +12,22 @@ import LogoSpinner from './LogoSpinner';
 import OperationDocuments from './OperationDocuments';
 import AutocompleteCreate from './AutocompleteCreate';
 import ToolsModal from './ToolsModal';
+import OperationFormProductos from './OperationFormProductos';
+import OperationFormServicios from './OperationFormServicios';
 import * as XLSX from 'xlsx';
 
 const getMediaUrl = (url) => {
-    if (!url) return '';
-    try {
-        const parsed = new URL(url);
-        return parsed.pathname;
-    } catch (e) {
-        if (!url.startsWith('/')) {
-            if (url.startsWith('media/')) return '/' + url;
-            return '/media/' + url;
-        }
-        return url;
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname;
+  } catch (e) {
+    if (!url.startsWith('/')) {
+      if (url.startsWith('media/')) return '/' + url;
+      return '/media/' + url;
     }
+    return url;
+  }
 };
 
 export default function OperationDetail() {
@@ -37,6 +39,7 @@ export default function OperationDetail() {
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [isToolsModalOpen, setIsToolsModalOpen] = useState(false);
   const [stockVerification, setStockVerification] = useState(null);
@@ -109,7 +112,7 @@ export default function OperationDetail() {
   const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
   const [deliveryTime, setDeliveryTime] = useState('5');
   const [cotizacionAttn, setCotizacionAttn] = useState('Operations / Technical Department');
-  
+
   const defaultScopeIncEn = '[detail what the supply / service comprises]';
   const defaultScopeIncEs = '[detallar qué comprende el suministro / servicio]';
   const defaultScopeExcEn = '[freight, customs clearance, additional labour, parts not listed, etc.]';
@@ -117,14 +120,14 @@ export default function OperationDetail() {
 
   const [scopeIncludes, setScopeIncludes] = useState(defaultScopeIncEn);
   const [scopeExcludes, setScopeExcludes] = useState(defaultScopeExcEn);
-  
+
   const defaultNotesSrvEn = `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`;
   const defaultNotesSrvEs = `- Esta suma global cubre únicamente los trabajos designados enumerados en esta cotización. Cualquier acero, trabajo o daño adicional encontrado después del corte será recotizado y cobrado por separado.\n- Las reparaciones están sujetas a la aprobación y asistencia de la Sociedad de Clasificación.\n- Los andamios, la movilización/desmovilización, la pintura, las pruebas no destructivas (NDT), y los cargos de dique y puerto NO están incluidos en esta suma global y serán cobrados por separado.`;
   const defaultNotesProdEn = `[Other relevant note]`;
   const defaultNotesProdEs = `[Otra nota relevante]`;
-  
+
   const [cotizacionNotes, setCotizacionNotes] = useState('[Other relevant note]');
-  const [cotizacionTemplate, setCotizacionTemplate] = useState('eva');
+  const [cotizacionTemplate, setCotizacionTemplate] = useState('nativa');
   const [cotizacionLang, setCotizacionLang] = useState('en');
 
   useEffect(() => {
@@ -133,9 +136,9 @@ export default function OperationDetail() {
       const isEs = cotizacionLang === 'es';
       const defEn = isSrv ? defaultNotesSrvEn : defaultNotesProdEn;
       const defEs = isSrv ? defaultNotesSrvEs : defaultNotesProdEs;
-      
+
       if (
-        cotizacionNotes === defaultNotesSrvEn || 
+        cotizacionNotes === defaultNotesSrvEn ||
         cotizacionNotes === defaultNotesSrvEs ||
         cotizacionNotes === defaultNotesProdEn ||
         cotizacionNotes === defaultNotesProdEs ||
@@ -145,11 +148,11 @@ export default function OperationDetail() {
       ) {
         setCotizacionNotes(isEs ? defEs : defEn);
       }
-      
+
       if (scopeIncludes === defaultScopeIncEn || scopeIncludes === defaultScopeIncEs) {
         setScopeIncludes(isEs ? defaultScopeIncEs : defaultScopeIncEn);
       }
-      
+
       if (scopeExcludes === defaultScopeExcEn || scopeExcludes === defaultScopeExcEs) {
         setScopeExcludes(isEs ? defaultScopeExcEs : defaultScopeExcEn);
       }
@@ -163,23 +166,32 @@ export default function OperationDetail() {
           setPaymentTerms(isEs ? '30 días fecha de factura' : '30 days from invoice date');
         }
       }
-
-      setDamageLocationTitle(isEs ? 'Ubicación y daños' : 'Location and damage');
       setDamageFramesTitle(isEs ? 'Cuaderna(s)' : 'Frame(s)');
       setDamageAreaTitle(isEs ? 'Área L x H (mm)' : 'Area L x H (mm)');
       setCotizacionAttn(isEs ? 'Departamento de Operaciones / Técnico' : 'Operations / Technical Department');
+
+      if (operation?.tipo_operacion === 'servicios') {
+        setServiceFormaOverride(operation.forma_cotizacion_servicio || 'lumpsum');
+        setServiceValueOverride(operation.valor_servicio || '');
+      }
+
     }
   }, [showCotizacionWordModal, operation, cotizacionLang]);
 
   // Service specific arbitrary fields
-  const [damageLocation, setDamageLocation] = useState('');
-  const [damageFrames, setDamageFrames] = useState('');
-  const [damageArea, setDamageArea] = useState('');
-  const [damageSubject, setDamageSubject] = useState('DAMAGE DESCRIPTION');
-  const [damageLocationTitle, setDamageLocationTitle] = useState('Location and damage');
   const [damageFramesTitle, setDamageFramesTitle] = useState('Frame(s)');
   const [damageAreaTitle, setDamageAreaTitle] = useState('Area L x H (mm)');
   const [customItems, setCustomItems] = useState([]);
+
+  const [serviceFormaOverride, setServiceFormaOverride] = useState('lumpsum');
+
+  const [serviceQuantityOverride, setServiceQuantityOverride] = useState(1);
+  const [serviceUnitPriceOverride, setServiceUnitPriceOverride] = useState('');
+
+  const [serviceValueOverride, setServiceValueOverride] = useState('');
+
+  const [refText, setRefText] = useState('');
+  const [attentionText, setAttentionText] = useState('');
 
   const emailAttachments = useMemo(() => {
     const list = [];
@@ -352,6 +364,21 @@ export default function OperationDetail() {
       const res = await axios.get(`/operaciones/operations/${id}/`);
       setOperation(res.data);
       setDocumentos(res.data.documentos_adjuntos || []);
+
+      // Auto-populate customItems for services if not already populated
+      if (res.data.tipo_operacion === 'servicios' && res.data.detalle_servicio) {
+        setCustomItems(prev => {
+          if (prev.length === 0) {
+            return [{
+              nombre: res.data.detalle_servicio,
+              cantidad: 1,
+              precio_unitario: res.data.valor_servicio || 0
+            }];
+          }
+          return prev;
+        });
+      }
+
       setError(null);
     } catch (err) {
       console.error(err);
@@ -463,16 +490,13 @@ export default function OperationDetail() {
         template_type: cotizacionTemplate,
         lang: cotizacionLang
       };
-      
+
       if (operation?.tipo_operacion === 'servicios') {
-        payload.damage_location = damageLocation;
-        payload.damage_frames = damageFrames;
-        payload.damage_area = damageArea;
-        payload.damage_subject = damageSubject;
-        payload.damage_location_title = damageLocationTitle;
-        payload.damage_frames_title = damageFramesTitle;
-        payload.damage_area_title = damageAreaTitle;
         payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
+        payload.service_forma_override = serviceFormaOverride;
+        payload.service_value_override = serviceValueOverride;
+        payload.service_qty_override = serviceQuantityOverride;
+        payload.service_unit_price_override = serviceUnitPriceOverride;
       }
 
       const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
@@ -481,7 +505,8 @@ export default function OperationDetail() {
       const fileUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = fileUrl;
-      link.setAttribute('download', `Cotizacion_OP${id}.pdf`);
+      const fileName = cotizacionLang === 'en' ? `Quotation_OP${id}.pdf` : `Cotizacion_OP${id}.pdf`;
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -511,30 +536,28 @@ export default function OperationDetail() {
         template_type: cotizacionTemplate,
         lang: cotizacionLang
       };
-      
+
       if (operation?.tipo_operacion === 'servicios') {
-        payload.damage_location = damageLocation;
-        payload.damage_frames = damageFrames;
-        payload.damage_area = damageArea;
-        payload.damage_subject = damageSubject;
-        payload.damage_location_title = damageLocationTitle;
-        payload.damage_frames_title = damageFramesTitle;
-        payload.damage_area_title = damageAreaTitle;
         payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
+        payload.service_forma_override = serviceFormaOverride;
+        payload.service_value_override = serviceValueOverride;
+        payload.service_qty_override = serviceQuantityOverride;
+        payload.service_unit_price_override = serviceUnitPriceOverride;
       }
 
       // Descargamos el PDF generado temporalmente
       const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
         responseType: 'blob',
       });
-      
-      const file = new File([response.data], `Cotizacion_OP${id}.pdf`, { type: 'application/pdf' });
+
+      const fileName = cotizacionLang === 'en' ? `Quotation_OP${id}.pdf` : `Cotizacion_OP${id}.pdf`;
+      const file = new File([response.data], fileName, { type: 'application/pdf' });
       setCotizacionEmailAttachment(file);
-      
+
       // Ocultar modal de edición y mostrar modal de envío
       setShowCotizacionWordModal(false);
       setShowCotizacionEmailModal(true);
-      
+
     } catch (error) {
       console.error("Error generando cotización para email:", error);
       showToast('Error al preparar la cotización para envío', 'error');
@@ -783,19 +806,19 @@ export default function OperationDetail() {
         const wsName = wb.SheetNames[0];
         const ws = wb.Sheets[wsName];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        
+
         const newItems = [];
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
           if (row.length === 0 || !row[0]) continue;
-          
+
           newItems.push({
             nombre: String(row[0] || ''),
             cantidad: row[1] !== undefined && row[1] !== null ? Number(row[1]) : 1,
             precio_unitario: row[2] !== undefined && row[2] !== null ? Number(row[2]) : ''
           });
         }
-        
+
         if (newItems.length > 0) {
           setCustomItems(prev => [...prev, ...newItems]);
           showToast(`Se agregaron ${newItems.length} ítems masivamente`, 'success');
@@ -1158,7 +1181,7 @@ export default function OperationDetail() {
   const isOperario = user?.role === 'OPERARIO';
   const isOwner = user?.role === 'OWNER';
   const canEdit = isOwner || (isOperador && (
-    operation?.creado_por === user?.id || 
+    operation?.creado_por === user?.id ||
     (operation?.operadores_id && operation.operadores_id.includes(user?.id))
   ));
 
@@ -1261,7 +1284,7 @@ export default function OperationDetail() {
             </div>
           </div>
         )}
-        
+
         {toastMessage && (
           <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 animate-fadeIn ${toastMessage.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-800 border-red-200' :
             toastMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 border-emerald-200' :
@@ -1781,43 +1804,68 @@ export default function OperationDetail() {
               )}
 
               {operation.tipo_operacion === 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-tools text-amber-500"></i> Solicitud Particular PNA (Herramientas a Bordo)
-                    </h3>
-                  </div>
-                  <div className="p-4 sm:p-6 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
-                        {operation.solicitud_particular_file && (
-                          <button
-                            onClick={() => openPreview(operation.solicitud_particular_file, 'Solicitud Particular Externa')}
-                            className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                          >
-                            <i className="bi bi-eye-fill"></i> Ver Documento Subido
-                          </button>
+                <>
+                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-card-text text-indigo-500"></i> Detalles del Trabajo a Realizar
+                      </h3>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="col-span-1 sm:col-span-2">
+                          <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                            {operation.detalle_servicio || <span className="text-slate-400 italic">No se ha detallado el trabajo a realizar.</span>}
+                          </p>
+                        </div>
+                        {operation.valor_servicio && (
+                          <div className="col-span-1">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Valor Total del Servicio</p>
+                            <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">${parseFloat(operation.valor_servicio).toFixed(2)}</p>
+                          </div>
                         )}
-                      </div>
-                      <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                        {canEdit && (
-                          <button
-                            onClick={() => setIsToolsModalOpen(true)}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                          >
-                            <i className="bi bi-card-list"></i> Gestionar Herramientas
-                          </button>
-                        )}
-                        <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                        </label>
                       </div>
                     </div>
                   </div>
-                </div>
+
+                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-tools text-amber-500"></i> Solicitud Particular PNA (Herramientas a Bordo)
+                      </h3>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
+                          {operation.solicitud_particular_file && (
+                            <button
+                              onClick={() => openPreview(operation.solicitud_particular_file, 'Solicitud Particular Externa')}
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                          {canEdit && (
+                            <button
+                              onClick={() => setIsToolsModalOpen(true)}
+                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            >
+                              <i className="bi bi-card-list"></i> Gestionar Herramientas
+                            </button>
+                          )}
+                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
+                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
@@ -1944,7 +1992,7 @@ export default function OperationDetail() {
                         </button>
                       </div>
                     )}
-                    
+
                     {/* Botones Especiales de Seguimiento de Cotización */}
                     {(operation.estado === 'cotizacion_enviada' || operation.estado === 'cotizado') ? (
                       <>
@@ -1980,7 +2028,7 @@ export default function OperationDetail() {
                       </>
                     ) : (
                       canEdit && operation.estado !== 'pausada' && (
-                        <button onClick={() => navigate(`/operations/${id}/edit`)} className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-slate-800/10 hover:bg-white dark:bg-slate-800/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => setShowEditModal(true)} className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-slate-800/10 hover:bg-white dark:bg-slate-800/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
                           <i className="bi bi-pencil-fill"></i> Editar Info
                         </button>
                       )
@@ -2215,10 +2263,55 @@ export default function OperationDetail() {
           user={user}
           defaultOperacionId={id}
           defaultRecipient={operation.client_email || operation.agency_email || ''}
-          initialSubject={`[OP-${id}] Seguimiento y Cotizaciones - Buque: ${operation.ship_name}`}
-          initialBody={cotizacionEmailAttachment 
-            ? `Estimados,\n\nAdjuntamos la cotización correspondiente a lo solicitado para el buque ${operation.ship_name}.\n\n• Cliente: ${operation.client_name}\n• Buque: ${operation.ship_name}\n• Puerto: ${operation.port_name}\n\nQuedamos a su disposición por cualquier consulta y a la espera de su confirmación.\n\nSaludos cordiales.`
-            : `Estimados,\n\nLes escribimos para consultar si han tenido oportunidad de revisar la cotización enviada anteriormente para el buque ${operation.ship_name}.\n\nQuedamos a su disposición para aclarar cualquier duda que pueda surgir o ajustar nuestra propuesta según lo requieran.\n\nAguardamos sus comentarios.\n\nSaludos cordiales.`
+          initialSubject={cotizacionLang === 'en'
+            ? `[OP-${id}] Quotation - Vessel: ${operation.ship_name}`
+            : `[OP-${id}] Seguimiento y Cotizaciones - Buque: ${operation.ship_name}`
+          }
+          initialBody={cotizacionEmailAttachment
+            ? (cotizacionLang === 'en'
+              ? `Dear Sir/Madam,
+
+Please find attached the quotation requested for the vessel ${operation.ship_name}.
+
+• Client: ${operation.client_name}
+• Vessel: ${operation.ship_name}
+• Port: ${operation.port_name}
+
+We remain at your disposal for any queries and look forward to your confirmation.
+
+Best regards.`
+              : `Estimados,
+
+Adjuntamos la cotización correspondiente a lo solicitado para el buque ${operation.ship_name}.
+
+• Cliente: ${operation.client_name}
+• Buque: ${operation.ship_name}
+• Puerto: ${operation.port_name}
+
+Quedamos a su disposición por cualquier consulta y a la espera de su confirmación.
+
+Saludos cordiales.`
+            )
+            : (cotizacionLang === 'en'
+              ? `Dear Sir/Madam,
+
+We are writing to inquire if you have had the opportunity to review the quotation previously sent for the vessel ${operation.ship_name}.
+
+We remain at your disposal to clarify any doubts or adjust our proposal as needed.
+
+We look forward to your comments.
+
+Best regards.`
+              : `Estimados,
+
+Les escribimos para consultar si han tenido oportunidad de revisar la cotización enviada anteriormente para el buque ${operation.ship_name}.
+
+Quedamos a su disposición para aclarar cualquier duda que pueda surgir o ajustar nuestra propuesta según lo requieran.
+
+Aguardamos sus comentarios.
+
+Saludos cordiales.`
+            )
           }
           initialAttachments={cotizacionEmailAttachment ? [cotizacionEmailAttachment] : []}
         />
@@ -2635,43 +2728,23 @@ export default function OperationDetail() {
                 <i className="bi bi-x-lg"></i>
               </button>
             </div>
-            
+
             <div className="p-6 bg-slate-50 dark:bg-slate-900/40 space-y-6 overflow-y-auto flex-1">
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Personaliza las condiciones comerciales que se incluirán en el documento.
               </p>
-              
+
               {operation?.tipo_operacion === 'servicios' && (
                 <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">Campos Arbitrarios de Servicio</h4>
-                  
-                  <div className="mb-2">
-                      <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Título de la sección (Tema)</label>
-                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageSubject} onChange={(e) => setDamageSubject(e.target.value)} />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <div className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{damageLocationTitle}</div>
-                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageLocation} onChange={(e) => setDamageLocation(e.target.value)} placeholder="Ej: Port Side..." />
-                    </div>
-                    <div>
-                      <div className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{damageFramesTitle}</div>
-                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageFrames} onChange={(e) => setDamageFrames(e.target.value)} placeholder="Ej: 45-50" />
-                    </div>
-                    <div>
-                      <div className="w-full text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{damageAreaTitle}</div>
-                      <input type="text" className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500" value={damageArea} onChange={(e) => setDamageArea(e.target.value)} placeholder="Ej: 2000 x 1500" />
-                    </div>
-                  </div>
-                  
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">Detalles del Servicio Técnico</h4>
+
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Ítems Arbitrarios (Aparecen en la tabla principal)</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo</label>
                     {customItems.map((item, index) => (
                       <div key={index} className="flex gap-2 mb-2 items-center">
-                        <input 
-                          type="text" 
-                          placeholder="Descripción" 
+                        <input
+                          type="text"
+                          placeholder="Descripción"
                           className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
                           value={item.nombre}
                           onChange={(e) => {
@@ -2680,29 +2753,7 @@ export default function OperationDetail() {
                             setCustomItems(newItems);
                           }}
                         />
-                        <input 
-                          type="number" 
-                          placeholder="Cant." 
-                          className="w-20 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={item.cantidad}
-                          onChange={(e) => {
-                            const newItems = [...customItems];
-                            newItems[index].cantidad = e.target.value;
-                            setCustomItems(newItems);
-                          }}
-                        />
-                        <input 
-                          type="number" 
-                          placeholder="USD Unit." 
-                          className="w-24 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={item.precio_unitario}
-                          onChange={(e) => {
-                            const newItems = [...customItems];
-                            newItems[index].precio_unitario = e.target.value;
-                            setCustomItems(newItems);
-                          }}
-                        />
-                        <button 
+                        <button
                           onClick={() => {
                             const newItems = customItems.filter((_, i) => i !== index);
                             setCustomItems(newItems);
@@ -2715,26 +2766,80 @@ export default function OperationDetail() {
                       </div>
                     ))}
                     <div className="flex items-center gap-4 mt-2">
-                      <button 
-                        onClick={() => setCustomItems([...customItems, { nombre: '', cantidad: 1, precio_unitario: '' }])}
+                      <button
+                        onClick={() => setCustomItems([...customItems, { nombre: '' }])}
                         className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
                       >
                         <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
                       </button>
-                      <label className="text-sm text-emerald-600 hover:text-emerald-800 font-semibold flex items-center gap-1 cursor-pointer">
-                        <i className="bi bi-file-earmark-excel-fill"></i> Carga Masiva (.xlsx)
-                        <input 
-                          type="file" 
-                          accept=".xlsx, .xls" 
-                          className="hidden" 
-                          onChange={handleCotizacionExcelUpload} 
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Forma de Cotización</label>
+                        <select
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                          value={serviceFormaOverride}
+                          onChange={(e) => setServiceFormaOverride(e.target.value)}
+                        >
+                          <option value="hora_hombre">Por Hora Hombre</option>
+                          <option value="dias">Por Días Trabajados</option>
+                          <option value="lumpsum">Lumpsum (Suma Global)</option>
+                        </select>
+                      </div>
+
+                      {serviceFormaOverride !== 'lumpsum' && (
+                        <>
+                          <div className="sm:col-span-1 lg:col-span-1">
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Cantidad ({serviceFormaOverride === 'dias' ? 'Días' : 'Horas'})</label>
+                            <input
+                              type="number"
+                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                              value={serviceQuantityOverride}
+                              onChange={(e) => {
+                                setServiceQuantityOverride(e.target.value);
+                                if (serviceUnitPriceOverride) {
+                                  setServiceValueOverride((parseFloat(e.target.value || 0) * parseFloat(serviceUnitPriceOverride)).toFixed(2));
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="sm:col-span-1 lg:col-span-1">
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Precio Unitario ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                              value={serviceUnitPriceOverride}
+                              onChange={(e) => {
+                                setServiceUnitPriceOverride(e.target.value);
+                                if (serviceQuantityOverride) {
+                                  setServiceValueOverride((parseFloat(serviceQuantityOverride || 0) * parseFloat(e.target.value)).toFixed(2));
+                                }
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Valor Total ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors bg-gray-50 dark:bg-slate-800"
+                          value={serviceValueOverride}
+                          onChange={(e) => setServiceValueOverride(e.target.value)}
+                          placeholder="Ej. 1500.00"
                         />
-                      </label>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
-              
+
               {/* Language Selector */}
               <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Idioma del Documento / Document Language</label>
@@ -2756,18 +2861,18 @@ export default function OperationDetail() {
 
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                
+
                 {/* Columna Izquierda: Términos Comerciales */}
                 <div className="lg:col-span-4">
                   <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm h-full flex flex-col">
                     <h4 className="text-xs font-black text-slate-900 dark:text-white mb-5 uppercase tracking-wider flex items-center gap-2">
-                      <i className="bi bi-card-checklist text-blue-500 text-base"></i> Términos Comerciales
+                      <i className="bi bi-card-checklist text-blue-500 text-base"></i> {cotizacionLang === 'es' ? 'Términos Comerciales' : 'Commercial Terms'}
                     </h4>
-                    
+
                     <div className="space-y-5 flex-1">
                       {/* Offer Validity */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Offer Validity</label>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Validez' : 'Offer Validity'}</label>
                         {!offerValidityIsManual ? (
                           <select
                             className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
@@ -2803,7 +2908,7 @@ export default function OperationDetail() {
 
                       {/* Payment Terms */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Payment Terms</label>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Forma de Pago' : 'Payment Terms'}</label>
                         {!paymentTermsIsManual ? (
                           <select
                             className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
@@ -2839,7 +2944,7 @@ export default function OperationDetail() {
 
                       {/* Delivery Time */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Delivery Time</label>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Tiempo de Entrega' : 'Delivery Time'}</label>
                         <div className="flex gap-2 items-center bg-slate-50 dark:bg-slate-700/50 p-1 rounded-lg border border-slate-200 dark:border-slate-600 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
                           <input
                             type="number"
@@ -2896,51 +3001,56 @@ export default function OperationDetail() {
                     <h4 className="text-xs font-black text-slate-900 dark:text-white mb-5 uppercase tracking-wider flex items-center gap-2">
                       <i className="bi bi-text-paragraph text-purple-500 text-base"></i> Contenido del Documento
                     </h4>
-                    
+
                     <div className="space-y-5 flex-1">
-                      {/* Attention To */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Attention To (Attn:)</label>
-                        <input
-                          type="text"
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors"
-                          value={cotizacionAttn}
-                          onChange={(e) => setCotizacionAttn(e.target.value)}
-                          placeholder="e.g. Operations / Technical Department"
-                        />
-                      </div>
+                      {operation?.tipo_operacion !== 'servicios' && (
+                        <>
+                          {/* Attention To */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Attention To (Attn:)</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors"
+                              value={cotizacionAttn}
+                              onChange={(e) => setCotizacionAttn(e.target.value)}
+                              placeholder="e.g. Operations / Technical Department"
+                            />
+                          </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {/* Scope Includes */}
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Includes</label>
-                          <textarea
-                            rows={3}
-                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
-                            value={scopeIncludes}
-                            onChange={(e) => setScopeIncludes(e.target.value)}
-                            placeholder="[detail what the supply / service comprises]"
-                          />
-                        </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {/* Scope Includes */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Includes</label>
+                              <textarea
+                                rows={3}
+                                className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
+                                value={scopeIncludes}
+                                onChange={(e) => setScopeIncludes(e.target.value)}
+                                placeholder="[detail what the supply / service comprises]"
+                              />
+                            </div>
 
-                        {/* Scope Excludes */}
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Excludes</label>
-                          <textarea
-                            rows={3}
-                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
-                            value={scopeExcludes}
-                            onChange={(e) => setScopeExcludes(e.target.value)}
-                            placeholder="[freight, customs clearance, additional labour, parts not listed, etc.]"
-                          />
-                        </div>
-                      </div>
+                            {/* Scope Excludes */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Excludes</label>
+                              <textarea
+                                rows={3}
+                                className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
+                                value={scopeExcludes}
+                                onChange={(e) => setScopeExcludes(e.target.value)}
+                                placeholder="[freight, customs clearance, additional labour, parts not listed, etc.]"
+                              />
+                            </div>
+                          </div>
 
+
+                        </>
+                      )}
                       {/* Notes */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Notes <span className="normal-case font-normal">(Optional)</span></label>
                         <textarea
-                          rows={2}
+                          rows={8}
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
                           value={cotizacionNotes}
                           onChange={(e) => setCotizacionNotes(e.target.value)}
@@ -2950,10 +3060,10 @@ export default function OperationDetail() {
                     </div>
                   </div>
                 </div>
-                
+
               </div>
             </div>
-            
+
             <div className="px-6 py-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
               <button
                 onClick={() => setShowCotizacionWordModal(false)}
@@ -3052,6 +3162,22 @@ export default function OperationDetail() {
           </div>
         </div>
       )}
+
+      {showEditModal && operation?.tipo_operacion === 'servicios' && (
+        <OperationFormServicios
+          id={id}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => { fetchOperation(); setShowEditModal(false); }}
+        />
+      )}
+      {showEditModal && operation?.tipo_operacion !== 'servicios' && (
+        <OperationFormProductos
+          id={id}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => { fetchOperation(); setShowEditModal(false); }}
+        />
+      )}
+
     </div>
   );
 }

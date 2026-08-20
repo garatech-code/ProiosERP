@@ -396,6 +396,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
 
       const payload = {
         ...formData,
+        agency: formData.agency || null,
         nombre: formData.nombre,
         products: validProducts.map(p => ({
           product: Number(p.product),
@@ -588,8 +589,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
                   >
                     <option value="muelle">Muelle</option>
                     <option value="lancha">Lancha</option>
-                    <option value="taller">Taller</option>
-                  </select>
+                    </select>
                 </div>
               </div>
             </div>
