@@ -6,16 +6,24 @@ import json
 from django.conf import settings
 from docxtpl import DocxTemplate
 
-def get_template_path(lang):
+def get_template_path(lang, tipo_operacion):
     # Base folder for templates
     templates_dir = os.path.join(settings.BASE_DIR, 'apps', 'operaciones', 'templates')
+    
+    # Capitalize the first letter (servicios -> Servicios, productos -> Productos, etc.)
+    tipo = tipo_operacion.capitalize() if tipo_operacion else "Productos"
+    
+    # Mapeo de tipos, si es 'Otros' usamos Productos por defecto
+    if tipo not in ["Servicios", "Productos", "Quimicos"]:
+        tipo = "Productos"
+        
     if lang == 'es':
-        return os.path.join(templates_dir, 'Proios_Cotizacion_TEMPLATE_ES.docx')
+        return os.path.join(templates_dir, f'Proios_Cotizacion_{tipo}_TEMPLATE_ES.docx')
     else:
-        return os.path.join(templates_dir, 'Proios_Quotation_TEMPLATE_EN.docx')
+        return os.path.join(templates_dir, f'Proios_Quotation_{tipo}_TEMPLATE_EN.docx')
 
 def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None):
-    template_path = get_template_path(lang)
+    template_path = get_template_path(lang, op.tipo_operacion)
     if not os.path.exists(template_path):
         raise FileNotFoundError(f"No se encontró la plantilla Word en {template_path}")
 
@@ -96,15 +104,24 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
     else:
         scope_lines = []
         importe_total = 0.0
-        for item in items_list:
-            desc = item.get('nombre', '')
-            cant = float(item.get('cantidad') or 1)
-            precio = float(item.get('precio_unitario') or 0)
+        from apps.inventario.models import Articulo
+        
+        for detalle in op.detalles.all():
+            try:
+                articulo = Articulo.objects.get(id=detalle.articulo_id)
+                desc = articulo.nombre
+            except Articulo.DoesNotExist:
+                desc = f"Item {detalle.articulo_id}"
+                
+            cant = float(detalle.cantidad or 1)
+            precio = float(detalle.precio_unitario or 0)
             subtotal = cant * precio
             scope_lines.append(f"{desc} (x{cant})")
             importe_total += subtotal
+            
             items_context.append({
                 'descripcion': desc,
+                'scope_of_work': desc,
                 'categoria': 'Product' if lang == 'en' else 'Producto',
                 'cantidad': cant,
                 'unidad': 'u',
@@ -116,8 +133,10 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
 
     if include_vat:
         iva = importe_total * (float(vat_percentage) / 100.0)
+        impuestos_label = "VAT" if lang == 'en' else "IVA"
     else:
         iva = 0.0
+        impuestos_label = "N/A"
         
     total = importe_total + iva
     
@@ -133,9 +152,9 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'lugar_entrega': "N/A", 
         'medida': "",
         'atencion': (op.cliente.contact_person if (op.cliente and hasattr(op.cliente, 'contact_person') and op.cliente.contact_person) else (op.cliente.name if op.cliente else "")),
-        'ref': "", 
-        'iva': f"{iva:,.2f}",
-        'impuestos': "VAT" if lang == 'en' else "IVA",
+        'ref': f"OP-{op.id:04d}", 
+        'iva': f"{iva:,.2f}" if include_vat else "0.00",
+        'impuestos': impuestos_label,
         'moneda': "USD",
         'fecha': datetime.now().strftime('%d/%m/%Y'),
         'cargo': "Operations" if lang == 'en' else "Operaciones",
