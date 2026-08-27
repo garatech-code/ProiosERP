@@ -521,7 +521,7 @@ export default function InventoryManagement() {
     const [sendingEmail, setSendingEmail] = useState(false);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-', costo: 0, precio_venta: 0 });
+    const [formData, setFormData] = useState({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', unidad: 'u', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-', costo: 0, precio_venta: 0 });
     const [submitting, setSubmitting] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1015,8 +1015,8 @@ export default function InventoryManagement() {
         let defaultCategoria = activeTab === 'quimicos' ? 'quimicos' : 'otros';
         const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
         if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0 }); }
-        catch(e) { setFormData({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria, costo: 0, precio_venta: 0 }); }
-        else setFormData({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
+        catch(e) { setFormData({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', unidad: 'u', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria, costo: 0, precio_venta: 0 }); }
+        else setFormData({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', unidad: 'u', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
         setValidationError('');
         setShowProductModal(true);
     };
@@ -1028,6 +1028,7 @@ export default function InventoryManagement() {
             descripcion: product.descripcion || '',
             presentacion: product.presentacion,
             peso_kg: product.peso_kg !== null ? Number(product.peso_kg).toFixed(2) : '',
+            unidad: product.unidad || 'u',
             stock_actual: product.stock_actual !== null ? Number(product.stock_actual).toFixed(2) : 0,
             stock_minimo: product.stock_minimo !== null ? Number(product.stock_minimo).toFixed(2) : 0,
             stock_maximo: product.stock_maximo !== null ? Number(product.stock_maximo).toFixed(2) : 0,
@@ -1059,6 +1060,7 @@ export default function InventoryManagement() {
                 presentacion: formData.presentacion.trim(),
                 categoria: formData.categoria,
                 peso_kg: peso,
+                unidad: formData.unidad || 'u',
                 stock_actual: Number(formData.stock_actual) || 0,
                 stock_minimo: stockMinimo,
                 stock_maximo: stockMaximo,
@@ -1774,8 +1776,9 @@ export default function InventoryManagement() {
                                 <div><label className="block text-sm font-bold mb-1">Presentación *</label><input type="text" value={formData.presentacion} onChange={e => setFormData({...formData, presentacion: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required placeholder="Ej: Tambor 200L" /></div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><label className="block text-sm font-bold mb-1">Peso Base (kg) *</label><input type="number" step="0.01" value={formData.peso_kg} onChange={e => setFormData({...formData, peso_kg: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required /></div>
-                                    <div><label className="block text-sm font-bold mb-1">Stock Físico</label><input type="number" step="0.01" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
+                                    <div><label className="block text-sm font-bold mb-1">Unidad de Medida *</label><select value={formData.unidad} onChange={e => setFormData({...formData, unidad: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white"><option value="u">Unidades (u)</option><option value="L">Litros (L)</option><option value="kg">Kilogramos (kg)</option><option value="m">Metros (m)</option><option value="par">Pares (par)</option></select></div>
                                 </div>
+                                <div><label className="block text-sm font-bold mb-1">Stock Físico</label><input type="number" step="0.01" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><label className="block text-sm font-bold mb-1">Stock Mínimo</label><input type="number" step="0.01" min="0" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Alerta amarilla" /></div>
                                     <div><label className="block text-sm font-bold mb-1">Stock Máximo</label><input type="number" step="0.01" min="0" value={formData.stock_maximo} onChange={e => setFormData({...formData, stock_maximo: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Alerta naranja" /></div>

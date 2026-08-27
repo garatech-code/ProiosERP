@@ -40,6 +40,14 @@ def get_logo():
         return logo_path
     return None
 
+def format_unit(u_val, lang):
+    u_val = str(u_val).strip() if u_val else 'u'
+    if u_val == 'u':
+        return 'Unit' if lang == 'en' else 'Ud.'
+    if u_val == 'par':
+        return 'Pair' if lang == 'en' else 'Par'
+    return u_val
+
 def build_pdf_headers(doc, story, operacion, title):
     styles = getSampleStyleSheet()
     title_style = styles['Title']
@@ -428,11 +436,11 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
             articulo = Articulo.objects.get(id=det.articulo_id)
             cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
             desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
-            unit = str(articulo.unidad) if articulo.unidad else "u"
+            unit = format_unit(articulo.unidad, lang)
         except Articulo.DoesNotExist:
             cat = "GENERAL"
             desc = f"Item #{det.articulo_id}"
-            unit = "u"
+            unit = format_unit("u", lang)
 
         cat = cat.upper()
         if cat not in grupos:
@@ -512,11 +520,11 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
             articulo = Articulo.objects.get(id=det.articulo_id)
             cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
             desc = articulo.nombre
-            unit = str(articulo.unidad) if articulo.unidad else "u"
+            unit = format_unit(articulo.unidad, lang)
         except Articulo.DoesNotExist:
             cat = "GENERAL"
             desc = f"Item #{det.articulo_id}"
-            unit = "u"
+            unit = format_unit("u", lang)
             
         cat = cat.upper()
         if cat not in grupos:
@@ -893,11 +901,11 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             articulo = Articulo.objects.get(id=det.articulo_id)
             cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
             desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
-            unit = str(articulo.unidad) if articulo.unidad else "u"
+            unit = format_unit(articulo.unidad, lang)
         except Articulo.DoesNotExist:
             cat = "GENERAL"
             desc = f"Item #{det.articulo_id}"
-            unit = "u"
+            unit = format_unit("u", lang)
             
         cat = cat.upper()
         if cat not in grupos:

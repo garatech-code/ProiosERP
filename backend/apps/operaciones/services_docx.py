@@ -6,6 +6,14 @@ import json
 from django.conf import settings
 from docxtpl import DocxTemplate
 
+def format_unit(u_val, lang):
+    u_val = str(u_val).strip() if u_val else 'u'
+    if u_val == 'u':
+        return 'Unit' if lang == 'en' else 'Ud.'
+    if u_val == 'par':
+        return 'Pair' if lang == 'en' else 'Par'
+    return u_val
+
 def get_template_path(lang, tipo_operacion):
     # Base folder for templates
     templates_dir = os.path.join(settings.BASE_DIR, 'apps', 'operaciones', 'templates')
@@ -113,8 +121,10 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
                 desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
+                item_unidad = format_unit(articulo.unidad, lang)
             except Articulo.DoesNotExist:
                 desc = f"Item {detalle.articulo_id}"
+                item_unidad = format_unit("u", lang)
                 
             cant = float(detalle.cantidad or 1)
             precio = float(detalle.precio_unitario or 0)
@@ -127,7 +137,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 'scope_of_work': desc,
                 'categoria': 'Product' if lang == 'en' else 'Producto',
                 'cantidad': cant,
-                'unidad': 'u',
+                'unidad': item_unidad,
                 'precio': f"{precio:,.2f}",
                 'importe': f"{subtotal:,.2f}"
             })
