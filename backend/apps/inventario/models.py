@@ -30,6 +30,7 @@ class Proveedor(models.Model):
 
 class Articulo(models.Model):
     nombre = models.CharField(max_length=200)
+    nombre_en = models.CharField(max_length=200, blank=True, null=True, help_text="Nombre en inglés")
     descripcion = models.TextField(blank=True, help_text="Observaciones o descripción del producto")
     presentacion = models.CharField(max_length=100)
     peso_kg = models.DecimalField(max_digits=10, decimal_places=2)

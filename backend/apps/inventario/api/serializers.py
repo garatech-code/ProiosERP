@@ -15,7 +15,7 @@ class ArticuloSerializer(serializers.ModelSerializer):
     class Meta:
         model = Articulo
         fields = [
-            'id', 'nombre', 'descripcion', 'presentacion', 'peso_kg', 'costo', 'precio_venta', 'stock_actual',
+            'id', 'nombre', 'nombre_en', 'descripcion', 'presentacion', 'peso_kg', 'costo', 'precio_venta', 'stock_actual',
             'stock_minimo', 'stock_maximo', 'categoria', 'proveedor', 'proveedor_nombre',
             'unidad', 'ubicacion', 'estado', 'serie_lote'
         ]

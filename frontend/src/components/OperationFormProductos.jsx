@@ -23,6 +23,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
     onUpdate(index, 'weight_kg', item?.peso_kg || item?.weight_kg || null);
     onUpdate(index, 'presentation', item?.presentacion || item?.presentation || '');
     onUpdate(index, 'stock_actual', item?.stock_actual || 0);
+    onUpdate(index, 'unit_price', parseFloat(item?.precio_venta) || 0);
   };
 
   const cantidad = product.quantity || 0;
@@ -38,8 +39,15 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           value={selectedProduct?.id || ''}
           onSelect={handleProductSelect}
           createFields={[
+            { name: 'nombre_en', label: 'Nombre (Inglés)', required: false },
+            { name: 'descripcion', label: 'Descripción', required: false },
             { name: 'presentacion', label: 'Presentación', required: true },
             { name: 'peso_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
+            { name: 'stock_actual', label: 'Stock Físico', type: 'number', required: false },
+            { name: 'stock_minimo', label: 'Stock Mínimo', type: 'number', required: false },
+            { name: 'stock_maximo', label: 'Stock Máximo', type: 'number', required: false },
+            { name: 'costo', label: 'Costo ($)', type: 'number', required: false },
+            { name: 'precio_venta', label: 'Precio Unit. ($)', type: 'number', required: false },
           ]}
           extraCreateData={{ categoria: 'otros' }}
           nameField="nombre"
@@ -48,23 +56,23 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       </div>
 
       <div className="sm:col-span-1">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Peso (kg)</label>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Peso (kg)</label>
         <input
           type="number"
-          value={product.weight_kg || ''}
+          value={product.weight_kg !== null ? Number(product.weight_kg).toFixed(2) : ''}
           disabled
           className="block w-full py-2 px-2 border border-gray-200 rounded-lg bg-gray-100 dark:bg-slate-800/50 text-gray-500 sm:text-sm text-center"
         />
       </div>
 
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Cantidad *</label>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cantidad *</label>
         <input
           type="number"
           min="1"
           value={cantidad}
           onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors ${isStockInsufficient ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-300'}`}
+          className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors dark:bg-slate-700 dark:text-white ${isStockInsufficient ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-slate-600'}`}
         />
         {isStockInsufficient && (
           <p className="text-xs text-red-600 mt-1">
@@ -74,19 +82,19 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       </div>
 
       <div className="sm:col-span-1">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Stock</label>
-        <div className="text-sm font-semibold text-gray-800 dark:text-slate-200 text-center py-2">{stockActual}</div>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Stock</label>
+        <div className="text-sm font-semibold text-gray-800 dark:text-slate-200 text-center py-2">{Number(stockActual || 0).toFixed(2)}</div>
       </div>
 
       <div className="sm:col-span-3">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. ($)</label>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Unit. ($)</label>
         <input
           type="number"
           min="0"
           step="0.01"
           value={product.unit_price || 0}
           onChange={(e) => onUpdate(index, 'unit_price', parseFloat(e.target.value) || 0)}
-          className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         />
       </div>
 
@@ -851,6 +859,13 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    onClick={addProduct}
+                    className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    + Fila Manual
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowMultiSelectModal(true)}
                     className="text-sm font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
                   >
@@ -992,6 +1007,10 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
           isOpen={showMultiSelectModal}
           onClose={() => setShowMultiSelectModal(false)}
           onAddProducts={handleAddMultipleProducts}
+          onCreateNew={() => {
+            setShowMultiSelectModal(false);
+            addProduct();
+          }}
           existingProductIds={formData.products.map(p => p.product).filter(id => id)}
         />
       )}

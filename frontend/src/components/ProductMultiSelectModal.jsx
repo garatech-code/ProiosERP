@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import axios from '../api/axios';
 import LogoSpinner from './LogoSpinner';
 
-export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts, existingProductIds = [], categoryFilter }) {
+export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts, existingProductIds = [], categoryFilter, onCreateNew }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -69,7 +69,7 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
         product: product.id,
         product_name: product.nombre,
         quantity: data.quantity,
-        unit_price: 0,
+        unit_price: parseFloat(product.precio_venta) || 0,
         stock_actual: product.stock_actual || 0,
         weight_kg: product.peso_kg || 0,
         presentation: product.presentacion || '',
@@ -151,7 +151,22 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
                   );
                 })}
                 {products.length === 0 && (
-                  <tr><td colSpan="5" className="text-center py-10 text-gray-500">No se encontraron productos.</td></tr>
+                  <tr>
+                    <td colSpan="5" className="text-center py-10 text-gray-500">
+                      No se encontraron productos. 
+                      {onCreateNew && (
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            onClick={onCreateNew}
+                            className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 px-4 py-2 rounded-lg transition-colors"
+                          >
+                            + Crear producto nuevo
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

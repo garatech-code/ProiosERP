@@ -14,7 +14,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
     
     // Quick create state
     const [showCreate, setShowCreate] = useState(false);
-    const [newProduct, setNewProduct] = useState({ nombre: '', presentacion: '', costo: 0 });
+    const [newProduct, setNewProduct] = useState({ nombre: '', nombre_en: '', presentacion: '', costo: 0 });
     const [creating, setCreating] = useState(false);
 
     const fetchChemicals = async () => {
@@ -44,6 +44,7 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
         try {
             const payload = {
                 nombre: newProduct.nombre,
+                nombre_en: newProduct.nombre_en,
                 presentacion: newProduct.presentacion,
                 costo: parseFloat(newProduct.costo) || 0,
                 categoria: categoria,
@@ -110,8 +111,12 @@ const ProductSelectionModal = ({ isOpen, onClose, onSelect, categoria = 'quimico
                         <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300">Crear Nuevo Producto</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre del {categoria === 'Empaque' ? 'Envase' : 'Químico'} *</label>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre (Español) *</label>
                                 <input type="text" placeholder="Ej: Bidón 20L" className="w-full border p-2 rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={newProduct.nombre} onChange={e => setNewProduct({...newProduct, nombre: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre (Inglés)</label>
+                                <input type="text" placeholder="Opcional" className="w-full border p-2 rounded-lg text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={newProduct.nombre_en || ''} onChange={e => setNewProduct({...newProduct, nombre_en: e.target.value})} />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Presentación *</label>
@@ -387,12 +392,12 @@ const StockTableView = ({ products, loading, error, filters, onFilterChange, onS
                                 <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.presentacion}</td>
                                 <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                     <div className="flex items-center space-x-2">
-                                        <span>{product.stock_actual}</span>
+                                        <span>{Number(product.stock_actual || 0).toFixed(2)}</span>
                                         {getStockBadge(product.stock_actual, product.stock_minimo, product.stock_maximo)}
                                     </div>
                                 </td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.stock_minimo}</td>
-                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.stock_maximo}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{Number(product.stock_minimo || 0).toFixed(2)}</td>
+                                <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{Number(product.stock_maximo || 0).toFixed(2)}</td>
                                 <td onClick={() => onRowClick(product)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                                     {allCategorias.find(c => c.value === product.categoria)?.label || product.categoria}
                                 </td>
@@ -516,7 +521,7 @@ export default function InventoryManagement() {
     const [sendingEmail, setSendingEmail] = useState(false);
     const [showProductModal, setShowProductModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-', costo: 0, precio_venta: 0 });
+    const [formData, setFormData] = useState({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: '-', costo: 0, precio_venta: 0 });
     const [submitting, setSubmitting] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1010,8 +1015,8 @@ export default function InventoryManagement() {
         let defaultCategoria = activeTab === 'quimicos' ? 'quimicos' : 'otros';
         const saved = localStorage.getItem(PRODUCT_DRAFT_KEY);
         if (saved) try { const draft = JSON.parse(saved); setFormData({ ...draft, categoria: draft.categoria || defaultCategoria, stock_maximo: draft.stock_maximo || 0 }); }
-        catch(e) { setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria, costo: 0, precio_venta: 0 }); }
-        else setFormData({ nombre: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
+        catch(e) { setFormData({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria, costo: 0, precio_venta: 0 }); }
+        else setFormData({ nombre: '', nombre_en: '', descripcion: '', presentacion: '', peso_kg: '', stock_actual: 0, stock_minimo: 0, stock_maximo: 0, proveedor: '', categoria: defaultCategoria });
         setValidationError('');
         setShowProductModal(true);
     };
@@ -1019,16 +1024,17 @@ export default function InventoryManagement() {
         setEditingProduct(product);
         setFormData({
             nombre: product.nombre,
+            nombre_en: product.nombre_en || '',
             descripcion: product.descripcion || '',
             presentacion: product.presentacion,
-            peso_kg: product.peso_kg,
-            stock_actual: product.stock_actual,
-            stock_minimo: product.stock_minimo || 0,
-            stock_maximo: product.stock_maximo || 0,
+            peso_kg: product.peso_kg !== null ? Number(product.peso_kg).toFixed(2) : '',
+            stock_actual: product.stock_actual !== null ? Number(product.stock_actual).toFixed(2) : 0,
+            stock_minimo: product.stock_minimo !== null ? Number(product.stock_minimo).toFixed(2) : 0,
+            stock_maximo: product.stock_maximo !== null ? Number(product.stock_maximo).toFixed(2) : 0,
             proveedor: product.proveedor || '',
             categoria: product.categoria || 'otros',
-            costo: product.costo || 0,
-            precio_venta: product.precio_venta || 0
+            costo: product.costo !== null ? Number(product.costo).toFixed(2) : 0,
+            precio_venta: product.precio_venta !== null ? Number(product.precio_venta).toFixed(2) : 0
         });
         setValidationError('');
         setShowProductModal(true);
@@ -1048,6 +1054,7 @@ export default function InventoryManagement() {
         try {
             const payload = {
                 nombre: formData.nombre.trim(),
+                nombre_en: formData.nombre_en ? formData.nombre_en.trim() : '',
                 descripcion: formData.descripcion || '',
                 presentacion: formData.presentacion.trim(),
                 categoria: formData.categoria,
@@ -1761,7 +1768,8 @@ export default function InventoryManagement() {
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
                             {validationError && <div className="mb-4 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">{validationError}</div>}
                             <form onSubmit={handleProductSubmit} className="space-y-4">
-                                <div><label className="block text-sm font-bold mb-1">Nombre *</label><input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required /></div>
+                                <div><label className="block text-sm font-bold mb-1">Nombre (Español) *</label><input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required /></div>
+                                <div><label className="block text-sm font-bold mb-1">Nombre (Inglés)</label><input type="text" value={formData.nombre_en || ''} onChange={e => setFormData({...formData, nombre_en: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Opcional" /></div>
                                 <div><label className="block text-sm font-bold mb-1">Descripción</label><input type="text" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
                                 <div><label className="block text-sm font-bold mb-1">Presentación *</label><input type="text" value={formData.presentacion} onChange={e => setFormData({...formData, presentacion: e.target.value})} className="w-full border rounded-lg px-3 py-2 dark:bg-slate-800 dark:border-slate-700 dark:text-white" required placeholder="Ej: Tambor 200L" /></div>
                                 <div className="grid grid-cols-2 gap-4">

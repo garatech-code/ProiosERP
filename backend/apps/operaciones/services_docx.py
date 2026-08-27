@@ -23,6 +23,9 @@ def get_template_path(lang, tipo_operacion):
         return os.path.join(templates_dir, f'Proios_Quotation_{tipo}_TEMPLATE_EN.docx')
 
 def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None):
+    if isinstance(notes, str) and '{{notas}}' in notes:
+        notes = notes.replace('{{notas}}', op.texto_cotizacion_adicional or 'N/A')
+    
     template_path = get_template_path(lang, op.tipo_operacion)
     if not os.path.exists(template_path):
         raise FileNotFoundError(f"No se encontró la plantilla Word en {template_path}")
@@ -109,7 +112,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         for detalle in op.detalles.all():
             try:
                 articulo = Articulo.objects.get(id=detalle.articulo_id)
-                desc = articulo.nombre
+                desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
             except Articulo.DoesNotExist:
                 desc = f"Item {detalle.articulo_id}"
                 
@@ -149,7 +152,9 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'garantia': "N/A",  # No tenemos campo garantía explícito aún
         'scope_includes': scope_includes,
         'scope_excludes': scope_excludes,
-        'lugar_entrega': "N/A", 
+        'notes': notes,
+        'notas': notes,
+        'lugar_entrega': "N/A",  
         'medida': "",
         'atencion': (op.cliente.contact_person if (op.cliente and hasattr(op.cliente, 'contact_person') and op.cliente.contact_person) else (op.cliente.name if op.cliente else "")),
         'ref': f"OP-{op.id:04d}", 

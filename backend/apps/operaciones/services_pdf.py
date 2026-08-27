@@ -120,7 +120,7 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
         letra = alphabet[i] if i < len(alphabet) else str(i+1)
         try:
             articulo = Articulo.objects.get(id=det.articulo_id)
-            nombre_item = articulo.nombre
+            nombre_item = getattr(articulo, 'nombre_en', None) or articulo.nombre
         except Articulo.DoesNotExist:
             nombre_item = f"Item #{det.articulo_id}"
         precio_item = det.precio_unitario * det.cantidad
@@ -326,6 +326,9 @@ import io
 from datetime import datetime
 
 def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None):
+    if isinstance(notes, str) and '{{notas}}' in notes:
+        notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
+        
     import os
     import io
     from datetime import datetime
@@ -382,7 +385,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     current_date = datetime.now().strftime('%d %b %Y')
     
     from_html = "<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>Email:</font> operations@proios.com"
-    to_html = f"<b>{cliente_nombre}</b><br/><br/><br/><font color='#64748b'>Attn:</font><br/>{attn}"
+    to_html = f"<b>{cliente_nombre}</b>" + (f"<br/><br/><br/><font color='#64748b'>Attn:</font><br/>{attn}" if attn else "")
     details_html = f"<b>No. PS-COT-{operacion.id:04d}</b><br/>Date: {current_date}<br/>Valid: {offer_validity}<br/><br/>Vessel: <b>{buque}</b><br/>Port: {puerto}<br/>ETA: {eta_str}"
     
     card_from = [Paragraph("FROM", card_title_style), Paragraph(from_html, normal_style)]
@@ -424,7 +427,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         try:
             articulo = Articulo.objects.get(id=det.articulo_id)
             cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
-            desc = articulo.nombre
+            desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
             unit = str(articulo.unidad) if articulo.unidad else "u"
         except Articulo.DoesNotExist:
             cat = "GENERAL"
@@ -748,8 +751,6 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     def add_proios_corporate_footer(canvas, doc):
         canvas.saveState()
         
-
-
         # Draw a solid blue bar at the absolute bottom
         canvas.setFillColor(HexColor('#003366'))
         canvas.rect(0, 0, A4[0], 1.5*cm, fill=1, stroke=0)
@@ -766,6 +767,9 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
 
 
 def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None):
+    if isinstance(notes, str) and '{{notas}}' in notes:
+        notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
+        
     import os
     import io
     from datetime import datetime
@@ -856,8 +860,8 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     cliente_nombre = operacion.cliente.name if operacion.cliente else "[Client Name]"
     current_date = datetime.now().strftime('%d %b %Y')
     
-    from_html = f"<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>Email:</font> operations@proios.com"
-    to_html = f"<b>{cliente_nombre}</b><br/><br/><br/><font color='#64748b'>{txt['attn']}</font><br/>{attn}"
+    from_html = f"<b>Proios S.A.</b><br/>Comodoro Pedro Zanni<br/>351 floor 5th 503 LN.<br/>Buenos Aires (C1104AAH)<br/>Argentina<br/><br/><font color='#64748b'>{txt['email']}</font> operations@proios.com"
+    to_html = f"<b>{cliente_nombre}</b>" + (f"<br/><br/><br/><font color='#64748b'>{txt['attn']}</font><br/>{attn}" if attn else "")
     
     loc_lbl = txt['location'] if operacion.tipo_operacion == 'servicios' else txt['port']
     details_html = f"<b>{txt['no']} PS-COT-{operacion.id:04d}</b><br/>{txt['date']}: {current_date}<br/>{txt['valid']}: {offer_validity}<br/><br/>{txt['vessel']}: <b>{buque}</b><br/>{loc_lbl}: {puerto}<br/>{txt['eta']}: {eta_str}"
@@ -888,7 +892,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         try:
             articulo = Articulo.objects.get(id=det.articulo_id)
             cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
-            desc = articulo.nombre
+            desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
             unit = str(articulo.unidad) if articulo.unidad else "u"
         except Articulo.DoesNotExist:
             cat = "GENERAL"

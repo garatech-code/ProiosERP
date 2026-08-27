@@ -123,10 +123,8 @@ export default function OperationDetail() {
 
   const defaultNotesSrvEn = `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`;
   const defaultNotesSrvEs = `- Esta suma global cubre únicamente los trabajos designados enumerados en esta cotización. Cualquier acero, trabajo o daño adicional encontrado después del corte será recotizado y cobrado por separado.\n- Las reparaciones están sujetas a la aprobación y asistencia de la Sociedad de Clasificación.\n- Los andamios, la movilización/desmovilización, la pintura, las pruebas no destructivas (NDT), y los cargos de dique y puerto NO están incluidos en esta suma global y serán cobrados por separado.`;
-  const defaultNotesProdEn = `[Other relevant note]`;
-  const defaultNotesProdEs = `[Otra nota relevante]`;
 
-  const [cotizacionNotes, setCotizacionNotes] = useState('[Other relevant note]');
+  const [cotizacionNotes, setCotizacionNotes] = useState('');
   const [cotizacionTemplate, setCotizacionTemplate] = useState('nativa');
   const [cotizacionLang, setCotizacionLang] = useState('en');
 
@@ -134,14 +132,14 @@ export default function OperationDetail() {
     if (showCotizacionWordModal) {
       const isSrv = operation?.tipo_operacion === 'servicios';
       const isEs = cotizacionLang === 'es';
-      const defEn = isSrv ? defaultNotesSrvEn : defaultNotesProdEn;
-      const defEs = isSrv ? defaultNotesSrvEs : defaultNotesProdEs;
+      const defEn = isSrv ? defaultNotesSrvEn : (operation?.notas || '');
+      const defEs = isSrv ? defaultNotesSrvEs : (operation?.notas || '');
 
       if (
+        cotizacionNotes === '' ||
         cotizacionNotes === defaultNotesSrvEn ||
         cotizacionNotes === defaultNotesSrvEs ||
-        cotizacionNotes === defaultNotesProdEn ||
-        cotizacionNotes === defaultNotesProdEs ||
+        cotizacionNotes === '{{notas}}' ||
         cotizacionNotes === '[Other relevant note]' ||
         cotizacionNotes === '[Otra nota relevante]' ||
         cotizacionNotes === `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`
@@ -3003,49 +3001,7 @@ Saludos cordiales.`
                     </h4>
 
                     <div className="space-y-5 flex-1">
-                      {operation?.tipo_operacion !== 'servicios' && (
-                        <>
-                          {/* Attention To */}
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Attention To (Attn:)</label>
-                            <input
-                              type="text"
-                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors"
-                              value={cotizacionAttn}
-                              onChange={(e) => setCotizacionAttn(e.target.value)}
-                              placeholder="e.g. Operations / Technical Department"
-                            />
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {/* Scope Includes */}
-                            <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Includes</label>
-                              <textarea
-                                rows={3}
-                                className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
-                                value={scopeIncludes}
-                                onChange={(e) => setScopeIncludes(e.target.value)}
-                                placeholder="[detail what the supply / service comprises]"
-                              />
-                            </div>
-
-                            {/* Scope Excludes */}
-                            <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Scope Excludes</label>
-                              <textarea
-                                rows={3}
-                                className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
-                                value={scopeExcludes}
-                                onChange={(e) => setScopeExcludes(e.target.value)}
-                                placeholder="[freight, customs clearance, additional labour, parts not listed, etc.]"
-                              />
-                            </div>
-                          </div>
-
-
-                        </>
-                      )}
                       {/* Notes */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Notes <span className="normal-case font-normal">(Optional)</span></label>
@@ -3054,7 +3010,7 @@ Saludos cordiales.`
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
                           value={cotizacionNotes}
                           onChange={(e) => setCotizacionNotes(e.target.value)}
-                          placeholder="[Other relevant note]"
+                          placeholder="[Optional additional notes]"
                         />
                       </div>
                     </div>
