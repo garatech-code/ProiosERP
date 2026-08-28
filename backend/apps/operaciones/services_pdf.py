@@ -43,10 +43,14 @@ def get_logo():
 def format_unit(u_val, lang):
     u_val = str(u_val).strip() if u_val else 'u'
     if u_val == 'u':
-        return 'Unit' if lang == 'en' else 'Ud.'
     if u_val == 'par':
         return 'Pair' if lang == 'en' else 'Par'
     return u_val
+
+def format_num(val):
+    if val is None or val == "":
+        return "0,00"
+    return f"{float(val):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def build_pdf_headers(doc, story, operacion, title):
     styles = getSampleStyleSheet()
@@ -133,7 +137,7 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
             nombre_item = f"Item #{det.articulo_id}"
         precio_item = det.precio_unitario * det.cantidad
         total += precio_item
-        texto_item = f"<b>{letra}.</b> {nombre_item} ({det.cantidad} un): <b>USD {precio_item:,.2f}</b> + taxes."
+        texto_item = f"<b>{letra}.</b> {nombre_item} ({det.cantidad} un): <b>USD {format_num(precio_item)}</b> + taxes."
         story.append(Paragraph(texto_item, bullet_style))
     
     story.append(Spacer(1, 0.5*cm))
@@ -183,7 +187,7 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
     story.append(Spacer(1, 0.5*cm))
     
     user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
-    user_email = "operations@proios.com"
+    user_email = "eva@proios.com" if user_name.lower() == "eva proios" else "operations@proios.com"
     
     firma_data = [
         [Paragraph(f"<b>{user_name}</b><br/>Comercial / Operations<br/>{user_email}", normal_style)]
@@ -558,15 +562,15 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
                 Paragraph(item['desc'], tr_style),
                 Paragraph(str(int(qty) if qty.is_integer() else qty), tr_center),
                 Paragraph(item['unit'], tr_center),
-                Paragraph(f"{price:,.2f}", tr_right),
-                Paragraph(f"{sub:,.2f}", tr_right)
+                Paragraph(format_num(price), tr_right),
+                Paragraph(format_num(sub), tr_right)
             ])
             idx += 1
             
         table_data.append([
             Paragraph(f"Subtotal {cat_name.lower()}", ParagraphStyle('SubCat', parent=normal_style, textColor=HexColor('#64748b'))),
             "", "", "", "",
-            Paragraph(f"<b>{subtotal_cat:,.2f}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
+            Paragraph(f"<b>{format_num(subtotal_cat)}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
         ])
 
     import re
@@ -638,7 +642,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     
     # Agregar subtotal sin expensas
     subtotal_base = total_general - (val_exp1 + val_exp2 + val_exp3)
-    tot_data.append([Paragraph("Subtotal:", tot_label_style), Paragraph(f"USD {subtotal_base:,.2f}", tot_val_style)])
+    tot_data.append([Paragraph("Subtotal:", tot_label_style), Paragraph(f"USD {format_num(subtotal_base)}", tot_val_style)])
     
     # Agregar expensas si existen
     if exp1:
@@ -650,11 +654,11 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         
     if str(include_vat).lower() == 'true' or include_vat is True:
         tot_data.extend([
-            [Paragraph("VAT (21%):", tot_label_style), Paragraph(f"USD {(float(total_general) * 0.21):,.2f}", tot_val_style)],
-            [Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {(float(total_general) * 1.21):,.2f}", tot_final_val)]
+            [Paragraph("VAT (21%):", tot_label_style), Paragraph(f"USD {format_num(float(total_general) * 0.21)}", tot_val_style)],
+            [Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {format_num(float(total_general) * 1.21)}", tot_final_val)]
         ])
     else:
-        tot_data.append([Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)])
+        tot_data.append([Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {format_num(float(total_general))}", tot_final_val)])
 
     # Create an inner table for the numbers, then put it in a master table to align it right.
     t_tot_inner = Table(tot_data, colWidths=[3.5*cm, 4*cm])
@@ -764,7 +768,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     # --- 7. SIGNATURE BLOCK ---
     user_name = f"{user.first_name} {user.last_name}".strip() if user and (user.first_name or user.last_name) else (user.username if user else "Proios Representative")
     user_role = user.rol if (user and hasattr(user, 'rol')) else "Operations"
-    user_email = "operations@proios.com"
+    user_email = "eva@proios.com" if user_name.lower() == "eva proios" else "operations@proios.com"
     
     sig_table = Table([
         [

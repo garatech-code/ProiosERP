@@ -14,6 +14,11 @@ def format_unit(u_val, lang):
         return 'Pair' if lang == 'en' else 'Par'
     return u_val
 
+def format_num(val):
+    if val is None or val == "":
+        return "0,00"
+    return f"{float(val):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
 def get_template_path(lang, tipo_operacion):
     # Base folder for templates
     templates_dir = os.path.join(settings.BASE_DIR, 'apps', 'operaciones', 'templates')
@@ -65,18 +70,18 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         forma = service_forma_override if service_forma_override else op.forma_cotizacion_servicio
         
         cantidad_str = '1'
-        precio_unit_str = f"{importe_total:,.2f}"
+        precio_unit_str = format_num(importe_total)
         
         if forma == 'hora_hombre':
             unidad = 'Hr'
             if service_qty_override and service_unit_price_override:
                 cantidad_str = str(service_qty_override)
-                precio_unit_str = f"{float(service_unit_price_override):,.2f}"
+                precio_unit_str = format_num(service_unit_price_override)
         elif forma == 'dias':
             unidad = 'Day' if lang == 'en' else 'Día'
             if service_qty_override and service_unit_price_override:
                 cantidad_str = str(service_qty_override)
-                precio_unit_str = f"{float(service_unit_price_override):,.2f}"
+                precio_unit_str = format_num(service_unit_price_override)
         else:
             unidad = 'LS'
             
@@ -90,7 +95,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                         'cantidad': cantidad_str,
                         'unidad': unidad,
                         'precio': precio_unit_str,
-                        'importe': f"{importe_total:,.2f}"
+                        'importe': format_num(importe_total)
                     })
                 else:
                     items_context.append({
@@ -110,7 +115,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 'cantidad': cantidad_str,
                 'unidad': unidad,
                 'precio': precio_unit_str,
-                'importe': f"{importe_total:,.2f}"
+                'importe': format_num(importe_total)
             })
     else:
         scope_lines = []
@@ -138,8 +143,8 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 'categoria': 'Product' if lang == 'en' else 'Producto',
                 'cantidad': cant,
                 'unidad': item_unidad,
-                'precio': f"{precio:,.2f}",
-                'importe': f"{subtotal:,.2f}"
+                'precio': format_num(precio),
+                'importe': format_num(subtotal)
             })
             
         scope_of_work = "\n".join(scope_lines) if scope_lines else "Provisión de repuestos/productos"
@@ -192,8 +197,8 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
             'descripcion': desc,
             'cantidad': str(int(cant_val) if cant_val.is_integer() else cant_val),
             'unidad': exp.get('unidad', ''),
-            'precio': f"{precio_val:,.2f}" if precio_val else "",
-            'importe': f"{importe_exp:,.2f}" if importe_exp else ""
+            'precio': format_num(precio_val) if precio_val else "",
+            'importe': format_num(importe_exp) if importe_exp else ""
         })
         total_expensas += importe_exp
 
@@ -219,14 +224,14 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'medida': "",
         'atencion': (op.cliente.contact_person if (op.cliente and hasattr(op.cliente, 'contact_person') and op.cliente.contact_person) else (op.cliente.name if op.cliente else "")),
         'ref': f"OP-{op.id:04d}", 
-        'iva': f"{iva:,.2f}" if include_vat else "0.00",
+        'iva': format_num(iva) if include_vat else "0,00",
         'impuestos': impuestos_label,
         'moneda': "USD",
         'fecha': datetime.now().strftime('%d/%m/%Y'),
         'cargo': "Operations" if lang == 'en' else "Operaciones",
         'scope_of_work': scope_of_work,
-        'importe': f"{importe_total:,.2f}",
-        'total': f"{total:,.2f}",
+        'importe': format_num(importe_total),
+        'total': format_num(total),
         'buque': op.ship.name if op.ship else "",
         'cliente': op.cliente.name if op.cliente else "",
         'eta': op.eta.strftime('%d/%m/%Y') if op.eta else "",
@@ -234,7 +239,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'otros_gastos': otros_gastos,
         'exp2': otros_gastos,  # Alias por compatibilidad
         'expensas': expensas_context,
-        'firmante_email': user.email if user else "operations@proios.com",
+        'firmante_email': "eva@proios.com" if user and user.get_full_name().lower() == "eva proios" else "operations@proios.com",
         'firmante': user.get_full_name() if user else "Proios Team",
         'danos': [],  # Lista vacía para que docxtpl elimine la tabla de daños
     }
