@@ -1097,6 +1097,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         offer_validity = data.get('offer_validity', '15 days')
         payment_terms = data.get('payment_terms', '30 days from invoice date')
         delivery_time = data.get('delivery_time', '5')
+        lugar_entrega = data.get('lugar_entrega', 'FOB')
         include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
         vat_percentage = data.get('vat_percentage', '21')
         scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
@@ -1119,6 +1120,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         service_value_override = data.get('service_value_override', None)
         service_qty_override = data.get('service_qty_override', None)
         service_unit_price_override = data.get('service_unit_price_override', None)
+        ubicacion = data.get('ubicacion', '')
+        otros_gastos = data.get('otros_gastos', '')
+        expensas_json = data.get('expensas', '[]')
 
         try:
             if template_type == 'eva':
@@ -1126,7 +1130,17 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
             else:
                 from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
-                pdf_content = generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, request.user, service_forma_override=service_forma_override, service_value_override=service_value_override, service_qty_override=service_qty_override, service_unit_price_override=service_unit_price_override)
+                pdf_content = generar_cotizacion_docx_pdf(
+                    op, offer_validity, payment_terms, delivery_time, include_vat, 
+                    scope_includes, scope_excludes, notes, attn, lang, custom_items, 
+                    vat_percentage, request.user, 
+                    service_forma_override=service_forma_override, 
+                    service_value_override=service_value_override, 
+                    service_qty_override=service_qty_override, 
+                    service_unit_price_override=service_unit_price_override, 
+                    ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json,
+                    lugar_entrega=lugar_entrega
+                )
 
             response = HttpResponse(
                 pdf_content, 
@@ -1163,7 +1177,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         damage_location_title = data.get('damage_location_title', '')
         damage_frames_title = data.get('damage_frames_title', '')
         damage_area_title = data.get('damage_area_title', '')
-        
+
         recipient = data.get('recipient')
         subject = data.get('subject')
         body = data.get('body')
@@ -1171,6 +1185,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         service_value_override = data.get('service_value_override', None)
         service_qty_override = data.get('service_qty_override', None)
         service_unit_price_override = data.get('service_unit_price_override', None)
+        ubicacion = data.get('ubicacion', '')
+        otros_gastos = data.get('otros_gastos', '')
+        expensas_json = data.get('expensas', '[]')
         
         if not recipient:
             return Response({'error': 'Falta el destinatario'}, status=400)
@@ -1181,7 +1198,16 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
             else:
                 from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
-                pdf_content = generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, request.user, service_forma_override=service_forma_override, service_value_override=service_value_override, service_qty_override=service_qty_override, service_unit_price_override=service_unit_price_override)
+                pdf_content = generar_cotizacion_docx_pdf(
+                    op, offer_validity, payment_terms, delivery_time, include_vat, 
+                    scope_includes, scope_excludes, notes, attn, lang, custom_items, 
+                    vat_percentage, request.user, 
+                    service_forma_override=service_forma_override, 
+                    service_value_override=service_value_override, 
+                    service_qty_override=service_qty_override, 
+                    service_unit_price_override=service_unit_price_override, 
+                    ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json
+                )
 
             import uuid
             from django.utils import timezone

@@ -30,7 +30,7 @@ def get_template_path(lang, tipo_operacion):
     else:
         return os.path.join(templates_dir, f'Proios_Quotation_{tipo}_TEMPLATE_EN.docx')
 
-def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None):
+def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None, ubicacion='', otros_gastos='', expensas='[]', lugar_entrega='FOB'):
     if isinstance(notes, str) and '{{notas}}' in notes:
         notes = notes.replace('{{notas}}', op.texto_cotizacion_adicional or 'N/A')
     
@@ -151,8 +151,59 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         iva = 0.0
         impuestos_label = "N/A"
         
-    total = importe_total + iva
-    
+    import re
+    def parse_exp(val):
+        if not val:
+            return 0.0
+        val_str = str(val).strip()
+        try:
+            return float(val_str)
+        except ValueError:
+            clean_str = val_str.replace(',', '')
+            match = re.search(r'[-+]?\d*\.\d+|\d+', clean_str)
+            if match:
+                return float(match.group())
+            return 0.0
+
+    # Procesar arreglo dinámico de expensas
+    import json
+    try:
+        expensas_list = json.loads(expensas) if isinstance(expensas, str) else expensas
+    except:
+        expensas_list = []
+
+    expensas_context = []
+    total_expensas = 0.0
+
+    for exp in expensas_list:
+        desc = exp.get('descripcion', '')
+        # Reemplazar ubicacion
+        if '{{ubicacion}}' in desc:
+            desc = desc.replace('{{ubicacion}}', ubicacion)
+        
+        precio_val = parse_exp(exp.get('precio', '0'))
+        cant_val = parse_exp(exp.get('cantidad', '1'))
+        if cant_val == 0.0:
+            cant_val = 1.0
+            
+        importe_exp = precio_val * cant_val
+        
+        expensas_context.append({
+            'descripcion': desc,
+            'cantidad': str(int(cant_val) if cant_val.is_integer() else cant_val),
+            'unidad': exp.get('unidad', ''),
+            'precio': f"{precio_val:,.2f}" if precio_val else "",
+            'importe': f"{importe_exp:,.2f}" if importe_exp else ""
+        })
+        total_expensas += importe_exp
+
+    val_otros_gastos = parse_exp(otros_gastos)
+    total_expensas += val_otros_gastos
+
+    total = importe_total + iva + total_expensas
+
+    clean_notes = notes if notes and notes.strip() not in ['[Other relevant note]', '[Otra nota relevante]', 'N/A'] else ''
+
     # Preparar el contexto
     context = {
         'items': items_context,
@@ -162,9 +213,9 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'garantia': "N/A",  # No tenemos campo garantía explícito aún
         'scope_includes': scope_includes,
         'scope_excludes': scope_excludes,
-        'notes': notes,
-        'notas': notes,
-        'lugar_entrega': "N/A",  
+        'notes': clean_notes,
+        'notas': clean_notes,
+        'lugar_entrega': lugar_entrega,  
         'medida': "",
         'atencion': (op.cliente.contact_person if (op.cliente and hasattr(op.cliente, 'contact_person') and op.cliente.contact_person) else (op.cliente.name if op.cliente else "")),
         'ref': f"OP-{op.id:04d}", 
@@ -179,7 +230,10 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'buque': op.ship.name if op.ship else "",
         'cliente': op.cliente.name if op.cliente else "",
         'eta': op.eta.strftime('%d/%m/%Y') if op.eta else "",
-        'ubicacion': "",
+        'ubicacion': ubicacion,
+        'otros_gastos': otros_gastos,
+        'exp2': otros_gastos,  # Alias por compatibilidad
+        'expensas': expensas_context,
         'firmante_email': user.email if user else "operations@proios.com",
         'firmante': user.get_full_name() if user else "Proios Team",
         'danos': [],  # Lista vacía para que docxtpl elimine la tabla de daños

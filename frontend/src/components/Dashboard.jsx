@@ -114,9 +114,12 @@ export default function Dashboard() {
     );
   };
 
-  const calculateTotal = (products) => {
-    if (!products) return 0;
-    return products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
+  const calculateTotal = (op) => {
+    if (op.tipo_operacion === 'servicios') {
+      return parseFloat(op.valor_servicio) || 0;
+    }
+    if (!op.products) return 0;
+    return op.products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
   };
 
   const isOwner = user?.role === 'OWNER';
@@ -291,7 +294,7 @@ export default function Dashboard() {
                         {!isOperario ? (
                           <>
                             <span className="text-xs text-gray-400 font-medium">Valor Total</span>
-                            <span className="text-sm font-bold text-gray-900 dark:text-white">${calculateTotal(op.products).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">${calculateTotal(op).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </>
                         ) : (
                           <>

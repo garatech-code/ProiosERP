@@ -333,7 +333,7 @@ from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
 import io
 from datetime import datetime
 
-def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None):
+def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0):
     if isinstance(notes, str) and '{{notas}}' in notes:
         notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
         
@@ -569,6 +569,26 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
             Paragraph(f"<b>{subtotal_cat:,.2f}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
         ])
 
+    import re
+    def parse_exp(val):
+        if not val:
+            return 0.0
+        val_str = str(val).strip()
+        try:
+            return float(val_str)
+        except ValueError:
+            clean_str = val_str.replace(',', '')
+            match = re.search(r'[-+]?\d*\.\d+|\d+', clean_str)
+            if match:
+                return float(match.group())
+            return 0.0
+
+    val_exp1 = parse_exp(exp1)
+    val_exp2 = parse_exp(exp2)
+    val_exp3 = parse_exp(exp3)
+        
+    total_general += (val_exp1 + val_exp2 + val_exp3)
+
     # 18cm total width
     col_widths = [1.2*cm, 7.8*cm, 1.5*cm, 1.5*cm, 2.8*cm, 3.2*cm]
     t = Table(table_data, colWidths=col_widths)
@@ -614,16 +634,27 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_RIGHT, fontSize=12, textColor=HexColor('#003366'))
     tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=14, textColor=HexColor('#003366'))
     
+    tot_data = []
+    
+    # Agregar subtotal sin expensas
+    subtotal_base = total_general - (val_exp1 + val_exp2 + val_exp3)
+    tot_data.append([Paragraph("Subtotal:", tot_label_style), Paragraph(f"USD {subtotal_base:,.2f}", tot_val_style)])
+    
+    # Agregar expensas si existen
+    if exp1:
+        tot_data.append([Paragraph("Aduana y transporte:", tot_label_style), Paragraph(str(exp1), tot_val_style)])
+    if exp2:
+        tot_data.append([Paragraph("Otros gastos:", tot_label_style), Paragraph(str(exp2), tot_val_style)])
+    if exp3:
+        tot_data.append([Paragraph("Hs extra Aduana:", tot_label_style), Paragraph(str(exp3), tot_val_style)])
+        
     if str(include_vat).lower() == 'true' or include_vat is True:
-        tot_data = [
-            [Paragraph("Subtotal:", tot_label_style), Paragraph(f"USD {total_general:,.2f}", tot_val_style)],
+        tot_data.extend([
             [Paragraph("VAT (21%):", tot_label_style), Paragraph(f"USD {(float(total_general) * 0.21):,.2f}", tot_val_style)],
             [Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {(float(total_general) * 1.21):,.2f}", tot_final_val)]
-        ]
+        ])
     else:
-        tot_data = [
-            [Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)]
-        ]
+        tot_data.append([Paragraph("TOTAL USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)])
 
     # Create an inner table for the numbers, then put it in a master table to align it right.
     t_tot_inner = Table(tot_data, colWidths=[3.5*cm, 4*cm])
@@ -774,7 +805,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     return buffer.getvalue()
 
 
-def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None):
+def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0):
     if isinstance(notes, str) and '{{notas}}' in notes:
         notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
         
@@ -1003,6 +1034,17 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                 Paragraph(f"<b>{subtotal_cat:,.2f}</b>", ParagraphStyle('SubCatR', parent=bold_style, alignment=TA_RIGHT))
             ])
             
+        try:
+            val_exp1 = float(exp1) if exp1 else 0.0
+            val_exp2 = float(exp2) if exp2 else 0.0
+            val_exp3 = float(exp3) if exp3 else 0.0
+        except ValueError:
+            val_exp1 = 0.0
+            val_exp2 = 0.0
+            val_exp3 = 0.0
+            
+        total_general += (val_exp1 + val_exp2 + val_exp3)
+            
         col_widths = [1.2*cm, 7.8*cm, 1.5*cm, 1.5*cm, 2.8*cm, 3.2*cm]
         t = Table(table_data, colWidths=col_widths)
         
@@ -1043,16 +1085,25 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_RIGHT, fontSize=12, textColor=HexColor('#003366'))
         tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=14, textColor=HexColor('#003366'))
         
+        tot_data = []
+        
+        subtotal_base = total_general - (val_exp1 + val_exp2 + val_exp3)
+        tot_data.append([Paragraph(f"{txt['subtotal']}:", tot_label_style), Paragraph(f"USD {subtotal_base:,.2f}", tot_val_style)])
+        
+        if exp1:
+            tot_data.append([Paragraph("Aduana y transporte:", tot_label_style), Paragraph(str(exp1), tot_val_style)])
+        if exp2:
+            tot_data.append([Paragraph("Otros gastos:", tot_label_style), Paragraph(str(exp2), tot_val_style)])
+        if exp3:
+            tot_data.append([Paragraph("Hs extra Aduana:", tot_label_style), Paragraph(str(exp3), tot_val_style)])
+            
         if str(include_vat).lower() == 'true' or include_vat is True:
-            tot_data = [
-                [Paragraph(f"{txt['subtotal']}:", tot_label_style), Paragraph(f"USD {total_general:,.2f}", tot_val_style)],
+            tot_data.extend([
                 [Paragraph(f"{txt['vat']} (21%):", tot_label_style), Paragraph(f"USD {(float(total_general) * 0.21):,.2f}", tot_val_style)],
                 [Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {(float(total_general) * 1.21):,.2f}", tot_final_val)]
-            ]
+            ])
         else:
-            tot_data = [
-                [Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)]
-            ]
+            tot_data.append([Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)])
             
         t_tot_inner = Table(tot_data, colWidths=[3.5*cm, 4*cm])
         t_tot_inner.setStyle(TableStyle([

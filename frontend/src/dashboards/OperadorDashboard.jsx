@@ -203,9 +203,12 @@ export default function OperadorDashboard() {
         }
     };
 
-    const calculateTotal = (products) => {
-        if (!products) return 0;
-        return products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
+    const calculateTotal = (op) => {
+        if (op.tipo_operacion === 'servicios') {
+            return parseFloat(op.valor_servicio) || 0;
+        }
+        if (!op.products) return 0;
+        return op.products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
     };
 
     const getStatusBadge = (status) => {
@@ -448,7 +451,7 @@ export default function OperadorDashboard() {
 
                                 <div className="mt-auto pt-3 flex justify-between items-center border-t border-gray-100 dark:border-slate-700">
                                     <div className="font-black text-slate-800 dark:text-white text-sm truncate max-w-[50%]">
-                                        $<span className="text-lg">{calculateTotal(op.products).toLocaleString()}</span>
+                                        $<span className="text-lg">{calculateTotal(op).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                     <div className="flex gap-2">
                                         <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">Ver Detalles <i className="bi bi-chevron-right"></i></span>

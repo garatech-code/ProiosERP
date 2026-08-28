@@ -111,6 +111,7 @@ export default function OperationDetail() {
   const [vatPercentage, setVatPercentage] = useState('21');
   const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
   const [deliveryTime, setDeliveryTime] = useState('5');
+  const [lugarEntrega, setLugarEntrega] = useState('FOB');
   const [cotizacionAttn, setCotizacionAttn] = useState('Operations / Technical Department');
 
   const defaultScopeIncEn = '[detail what the supply / service comprises]';
@@ -127,6 +128,10 @@ export default function OperationDetail() {
   const [cotizacionNotes, setCotizacionNotes] = useState('');
   const [cotizacionTemplate, setCotizacionTemplate] = useState('nativa');
   const [cotizacionLang, setCotizacionLang] = useState('en');
+
+  const [ubicacion, setUbicacion] = useState('');
+  const [expensas, setExpensas] = useState([]);
+  const [otrosGastos, setOtrosGastos] = useState('');
 
   useEffect(() => {
     if (showCotizacionWordModal) {
@@ -173,6 +178,26 @@ export default function OperationDetail() {
         setServiceValueOverride(operation.valor_servicio || '');
       }
 
+      // Preload expensas if empty
+      if (expensas.length === 0) {
+        setExpensas([
+          { descripcion: isEs ? 'Aduana y transporte hasta: {{ubicacion}}' : 'Customs and transport to: {{ubicacion}}', cantidad: '', unidad: '', precio: '', importe: '' },
+          { descripcion: isEs ? 'Hs extra de Aduana' : 'Customs Overtime', cantidad: '', unidad: '', precio: '', importe: '' }
+        ]);
+      } else {
+        // Translate placeholders if they haven't been edited heavily
+        const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
+        const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
+        const defaultHsEn = 'Customs Overtime';
+        const defaultHsEs = 'Hs extra de Aduana';
+        
+        setExpensas(prev => prev.map(exp => {
+          let newDesc = exp.descripcion;
+          if (newDesc === defaultAduanaEn || newDesc === defaultAduanaEs) newDesc = isEs ? defaultAduanaEs : defaultAduanaEn;
+          if (newDesc === defaultHsEn || newDesc === defaultHsEs) newDesc = isEs ? defaultHsEs : defaultHsEn;
+          return { ...exp, descripcion: newDesc };
+        }));
+      }
     }
   }, [showCotizacionWordModal, operation, cotizacionLang]);
 
@@ -187,6 +212,21 @@ export default function OperationDetail() {
   const [serviceUnitPriceOverride, setServiceUnitPriceOverride] = useState('');
 
   const [serviceValueOverride, setServiceValueOverride] = useState('');
+
+  useEffect(() => {
+    if (operation?.tipo_operacion === 'servicios') {
+      setServiceFormaOverride(operation.forma_cotizacion_servicio || 'lumpsum');
+      setServiceValueOverride(operation.valor_servicio || '');
+      if (operation.detalle_servicio) {
+        const lines = operation.detalle_servicio.split('\n').filter(l => l.trim());
+        if (lines.length > 0) {
+          setCustomItems(lines.map(l => ({ nombre: l })));
+        } else {
+          setCustomItems([]);
+        }
+      }
+    }
+  }, [operation]);
 
   const [refText, setRefText] = useState('');
   const [attentionText, setAttentionText] = useState('');
@@ -479,6 +519,7 @@ export default function OperationDetail() {
         offer_validity: offerValidity,
         payment_terms: paymentTerms,
         delivery_time: deliveryTime,
+        lugar_entrega: lugarEntrega,
         include_vat: includeVat,
         vat_percentage: vatPercentage,
         scope_includes: scopeIncludes,
@@ -486,7 +527,10 @@ export default function OperationDetail() {
         notes: cotizacionNotes,
         attn: cotizacionAttn,
         template_type: cotizacionTemplate,
-        lang: cotizacionLang
+        lang: cotizacionLang,
+        ubicacion: ubicacion,
+        otros_gastos: otrosGastos,
+        expensas: JSON.stringify(expensas.filter(e => e.descripcion.trim() !== ''))
       };
 
       if (operation?.tipo_operacion === 'servicios') {
@@ -525,6 +569,7 @@ export default function OperationDetail() {
         offer_validity: offerValidity,
         payment_terms: paymentTerms,
         delivery_time: deliveryTime,
+        lugar_entrega: lugarEntrega,
         include_vat: includeVat,
         vat_percentage: vatPercentage,
         scope_includes: scopeIncludes,
@@ -532,7 +577,10 @@ export default function OperationDetail() {
         notes: cotizacionNotes,
         attn: cotizacionAttn,
         template_type: cotizacionTemplate,
-        lang: cotizacionLang
+        lang: cotizacionLang,
+        exp1: expensaAduana,
+        exp2: expensaOtros,
+        exp3: expensaHsExtra
       };
 
       if (operation?.tipo_operacion === 'servicios') {
@@ -978,6 +1026,22 @@ export default function OperationDetail() {
       showToast(errMsg, 'error');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleSaveServiceDetails = async () => {
+    try {
+      const payload = {
+        forma_cotizacion_servicio: serviceFormaOverride,
+        valor_servicio: serviceFormaOverride === 'lumpsum' ? (parseFloat(serviceValueOverride) || null) : (parseFloat(serviceValueOverride) || null),
+        detalle_servicio: customItems.map(i => i.nombre).join('\n')
+      };
+      await axios.patch(`/operaciones/operations/${id}/`, payload);
+      showToast('Detalles del servicio guardados con éxito', 'success');
+      fetchOperation();
+    } catch (err) {
+      console.error("Error saving service details", err);
+      showToast('Error al guardar los detalles del servicio', 'error');
     }
   };
 
@@ -1459,6 +1523,125 @@ export default function OperationDetail() {
                   )}
                 </div>
               </div>
+
+              {operation?.tipo_operacion === 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-3">
+                    <h4 className="text-lg font-black text-slate-800 dark:text-slate-200">
+                      <i className="bi bi-tools text-indigo-500 mr-2"></i> Detalles del Servicio Técnico
+                    </h4>
+                    {canEdit && (
+                      <button 
+                        onClick={handleSaveServiceDetails}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2"
+                      >
+                        <i className="bi bi-save"></i> Guardar Detalles
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo (aparecerá en la cotización)</label>
+                    {customItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 mb-2 items-center">
+                        <input
+                          type="text"
+                          placeholder="Descripción"
+                          className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={item.nombre}
+                          onChange={(e) => {
+                            const newItems = [...customItems];
+                            newItems[index].nombre = e.target.value;
+                            setCustomItems(newItems);
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            const newItems = customItems.filter((_, i) => i !== index);
+                            setCustomItems(newItems);
+                          }}
+                          className="text-red-500 hover:text-red-700 p-2 shrink-0"
+                          title="Eliminar ítem"
+                        >
+                          <i className="bi bi-trash-fill"></i>
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-4 mt-2">
+                      <button
+                        onClick={() => setCustomItems([...customItems, { nombre: '' }])}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                      >
+                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Forma de Cotización</label>
+                        <select
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                          value={serviceFormaOverride}
+                          onChange={(e) => setServiceFormaOverride(e.target.value)}
+                        >
+                          <option value="hora_hombre">Por Hora Hombre</option>
+                          <option value="dias">Por Días Trabajados</option>
+                          <option value="lumpsum">Lumpsum (Suma Global)</option>
+                        </select>
+                      </div>
+
+                      {serviceFormaOverride !== 'lumpsum' && (
+                        <>
+                          <div className="sm:col-span-1 lg:col-span-1">
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Cantidad ({serviceFormaOverride === 'dias' ? 'Días' : 'Horas'})</label>
+                            <input
+                              type="number"
+                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                              value={serviceQuantityOverride}
+                              onChange={(e) => {
+                                setServiceQuantityOverride(e.target.value);
+                                if (serviceUnitPriceOverride) {
+                                  setServiceValueOverride((parseFloat(e.target.value || 0) * parseFloat(serviceUnitPriceOverride)).toFixed(2));
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="sm:col-span-1 lg:col-span-1">
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Precio Unitario ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                              value={serviceUnitPriceOverride}
+                              onChange={(e) => {
+                                setServiceUnitPriceOverride(e.target.value);
+                                if (serviceQuantityOverride) {
+                                  setServiceValueOverride((parseFloat(serviceQuantityOverride || 0) * parseFloat(e.target.value)).toFixed(2));
+                                }
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Valor Total ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors bg-gray-50 dark:bg-slate-800"
+                          value={serviceValueOverride}
+                          onChange={(e) => setServiceValueOverride(e.target.value)}
+                          placeholder="Ej. 1500.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
                   {!isOperario ? (
@@ -2732,112 +2915,6 @@ Saludos cordiales.`
                 Personaliza las condiciones comerciales que se incluirán en el documento.
               </p>
 
-              {operation?.tipo_operacion === 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">Detalles del Servicio Técnico</h4>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo</label>
-                    {customItems.map((item, index) => (
-                      <div key={index} className="flex gap-2 mb-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="Descripción"
-                          className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={item.nombre}
-                          onChange={(e) => {
-                            const newItems = [...customItems];
-                            newItems[index].nombre = e.target.value;
-                            setCustomItems(newItems);
-                          }}
-                        />
-                        <button
-                          onClick={() => {
-                            const newItems = customItems.filter((_, i) => i !== index);
-                            setCustomItems(newItems);
-                          }}
-                          className="text-red-500 hover:text-red-700 p-2 shrink-0"
-                          title="Eliminar ítem"
-                        >
-                          <i className="bi bi-trash-fill"></i>
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-4 mt-2">
-                      <button
-                        onClick={() => setCustomItems([...customItems, { nombre: '' }])}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
-                      >
-                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem manual
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="sm:col-span-2 lg:col-span-1">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Forma de Cotización</label>
-                        <select
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                          value={serviceFormaOverride}
-                          onChange={(e) => setServiceFormaOverride(e.target.value)}
-                        >
-                          <option value="hora_hombre">Por Hora Hombre</option>
-                          <option value="dias">Por Días Trabajados</option>
-                          <option value="lumpsum">Lumpsum (Suma Global)</option>
-                        </select>
-                      </div>
-
-                      {serviceFormaOverride !== 'lumpsum' && (
-                        <>
-                          <div className="sm:col-span-1 lg:col-span-1">
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Cantidad ({serviceFormaOverride === 'dias' ? 'Días' : 'Horas'})</label>
-                            <input
-                              type="number"
-                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                              value={serviceQuantityOverride}
-                              onChange={(e) => {
-                                setServiceQuantityOverride(e.target.value);
-                                if (serviceUnitPriceOverride) {
-                                  setServiceValueOverride((parseFloat(e.target.value || 0) * parseFloat(serviceUnitPriceOverride)).toFixed(2));
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="sm:col-span-1 lg:col-span-1">
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Precio Unitario ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                              value={serviceUnitPriceOverride}
-                              onChange={(e) => {
-                                setServiceUnitPriceOverride(e.target.value);
-                                if (serviceQuantityOverride) {
-                                  setServiceValueOverride((parseFloat(serviceQuantityOverride || 0) * parseFloat(e.target.value)).toFixed(2));
-                                }
-                              }}
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      <div className="sm:col-span-2 lg:col-span-1">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Valor Total ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors bg-gray-50 dark:bg-slate-800"
-                          value={serviceValueOverride}
-                          onChange={(e) => setServiceValueOverride(e.target.value)}
-                          placeholder="Ej. 1500.00"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Language Selector */}
               <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Idioma del Documento / Document Language</label>
@@ -2956,8 +3033,20 @@ Saludos cordiales.`
                         </div>
                       </div>
 
+                      {/* Lugar de Entrega */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Lugar de Entrega' : 'Delivery Place'}</label>
+                        <input
+                          type="text"
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                          value={lugarEntrega}
+                          onChange={(e) => setLugarEntrega(e.target.value)}
+                          placeholder="Ej. FOB / DAP / Ex-works..."
+                        />
+                      </div>
+
                       {/* VAT Toggle */}
-                      <div className="pt-2 mt-auto">
+                      <div className="pt-2">
                         <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3006,13 +3095,154 @@ Saludos cordiales.`
                       <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Notes <span className="normal-case font-normal">(Optional)</span></label>
                         <textarea
-                          rows={8}
+                          rows={4}
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
                           value={cotizacionNotes}
                           onChange={(e) => setCotizacionNotes(e.target.value)}
                           placeholder="[Optional additional notes]"
                         />
                       </div>
+
+                      {/* Ubicación y Expensas */}
+                      <div className="pt-4 border-t border-slate-200 dark:border-slate-700 mt-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              {cotizacionLang === 'es' ? 'Ubicación (Location)' : 'Location'}
+                            </label>
+                            <input
+                              type="text"
+                              className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500"
+                              value={ubicacion}
+                              onChange={(e) => setUbicacion(e.target.value)}
+                              placeholder="Ej. Buenos Aires"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Reemplaza {"{{ubicacion}}"} dinámicamente.</p>
+                          </div>
+                        </div>
+
+                        <h4 className="text-xs font-black text-slate-900 dark:text-white mb-3 uppercase tracking-wider flex items-center gap-2">
+                          <i className="bi bi-wallet2 text-green-500 text-base"></i> Expensas
+                        </h4>
+                        
+                        <div className="space-y-2">
+                          {expensas.map((exp, idx) => (
+                            <div key={idx} className="flex gap-2 items-center bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                              <div className="flex-1 grid grid-cols-12 gap-2">
+                                <div className="col-span-5">
+                                  <input
+                                    type="text"
+                                    placeholder="Descripción"
+                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
+                                    value={exp.descripcion}
+                                    onChange={(e) => {
+                                      const newExps = [...expensas];
+                                      newExps[idx].descripcion = e.target.value;
+                                      setExpensas(newExps);
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-1">
+                                  <input
+                                    type="text"
+                                    placeholder="Cant."
+                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
+                                    value={exp.cantidad || ''}
+                                    onChange={(e) => {
+                                      const newExps = [...expensas];
+                                      newExps[idx].cantidad = e.target.value;
+                                      
+                                      // Auto-calculate importe if both cant and precio are numbers
+                                      const cantVal = parseFloat(newExps[idx].cantidad);
+                                      const priceVal = parseFloat(newExps[idx].precio);
+                                      if (!isNaN(cantVal) && !isNaN(priceVal)) {
+                                          newExps[idx].importe = (cantVal * priceVal).toFixed(2);
+                                      }
+                                      setExpensas(newExps);
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Und."
+                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
+                                    value={exp.unidad}
+                                    onChange={(e) => {
+                                      const newExps = [...expensas];
+                                      newExps[idx].unidad = e.target.value;
+                                      setExpensas(newExps);
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Precio"
+                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
+                                    value={exp.precio}
+                                    onChange={(e) => {
+                                      const newExps = [...expensas];
+                                      newExps[idx].precio = e.target.value;
+                                      
+                                      const cantVal = parseFloat(newExps[idx].cantidad || '1');
+                                      const priceVal = parseFloat(newExps[idx].precio);
+                                      if (!isNaN(cantVal) && !isNaN(priceVal)) {
+                                          newExps[idx].importe = (cantVal * priceVal).toFixed(2);
+                                      }
+                                      setExpensas(newExps);
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Importe"
+                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
+                                    value={exp.importe}
+                                    onChange={(e) => {
+                                      const newExps = [...expensas];
+                                      newExps[idx].importe = e.target.value;
+                                      setExpensas(newExps);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newExps = expensas.filter((_, i) => i !== idx);
+                                  setExpensas(newExps);
+                                }}
+                                className="text-slate-400 hover:text-red-500 shrink-0"
+                                title="Eliminar expensa"
+                              >
+                                <i className="bi bi-trash-fill"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-2 mb-4"
+                        >
+                          <i className="bi bi-plus-circle-fill"></i> Agregar Expensa
+                        </button>
+
+                        {/* Otros gastos */}
+                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            {cotizacionLang === 'es' ? 'Otros gastos:' : 'Other expenses:'}
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500"
+                            value={otrosGastos}
+                            onChange={(e) => setOtrosGastos(e.target.value)}
+                            placeholder="Texto o valor numérico (ej. 'TBD' o '150.50')"
+                          />
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>

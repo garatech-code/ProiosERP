@@ -141,7 +141,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
-            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio',
+            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
             'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional',
             'creado_por'
