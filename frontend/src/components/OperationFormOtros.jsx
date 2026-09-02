@@ -188,16 +188,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
     const loadData = async () => {
       try {
         if (currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR' || currentUser?.role === 'OPERADOR_JR') {
-          const [usersRes, staffRes] = await Promise.all([
-            axios.get('/usuarios/users/'),
-            axios.get('/usuarios/plantel/?activo=true')
-          ]);
-          
-          const fetchedUsers = usersRes.data?.results || usersRes.data;
-          if (Array.isArray(fetchedUsers)) setAvailableUsers(fetchedUsers);
-          
-          const fetchedStaff = staffRes.data?.results || staffRes.data;
-          if (Array.isArray(fetchedStaff)) setAvailableStaff(fetchedStaff);
+          // Personnel assignment moved to OperationDetails
         }
 
         if (id) {
@@ -232,15 +223,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
             delivery_date: formatToDatetimeLocal(op.delivery_date),
             closed_date: formatToDatetimeLocal(op.closed_date),
             order_received_date: formatToDatetimeLocal(op.order_received_date),
-            client_confirmed_date: formatToDatetimeLocal(op.client_confirmed_date),
-            operadores_id: op.operadores_id || [],
-            operarios_id: op.operarios_id || [],
-            operarios_usuarios_id: op.operarios_usuarios_id || [],
           });
-
-          if (op.operarios_id && op.operarios_id.length > 0) {
-            setShowStaffAssignment(true);
-          }
 
           setExistingFiles({
             packing_list_file: op.packing_list_file,
@@ -626,166 +609,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
               </div>
             </div>
 
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
-              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Pegue aquí el contenido del correo o pedido original del cliente.</p>
-              <textarea
-                name="texto_pedido"
-                value={formData.texto_pedido}
-                onChange={handleChange}
-                rows={6}
-                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs transition-colors"
-                placeholder="Ejemplo: Dear Shipping Dept, Please supply the following items for MV Test..."
-              />
-            </div>
 
-            {(currentUser?.role === 'OWNER' || currentUser?.role === 'OPERADOR' || currentUser?.role === 'OPERADOR_JR') && (
-              <div>
-                <div className="flex justify-between items-center border-b dark:border-slate-600 pb-2 mb-4">
-                  <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Equipo Asignado</h3>
-                  <button 
-                    type="button"
-                    onClick={() => setShowStaffAssignment(!showStaffAssignment)}
-                    className={`text-[10px] font-black px-3 py-1 rounded-full transition-all border ${showStaffAssignment ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 dark:bg-slate-900/30 text-slate-500 border-slate-200 hover:bg-slate-200'}`}
-                  >
-                    <i className={`bi ${showStaffAssignment ? 'bi-person-x-fill' : 'bi-person-plus-fill'} mr-1`}></i>
-                    {showStaffAssignment ? 'Ocultar Staff (Plantel)' : 'Involucrar Staff (Plantel)'}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">Seleccione quiénes tendrán acceso y participación en esta orden.</p>
-                
-                <div className={`grid grid-cols-1 ${showStaffAssignment ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 transition-all duration-300`}>
-                  {/* COLUMNA 1: OPERADORES (LOGÍSTICA) */}
-                  <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col h-[300px]">
-                    <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
-                      <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">1. Logística (Operadores)</span>
-                    </div>
-                    <div className="p-2 border-b border-gray-100 dark:border-slate-600">
-                      <input 
-                        type="text" 
-                        placeholder="Buscar operador..." 
-                        className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg"
-                        onChange={(e) => setFilterOp(e.target.value)}
-                      />
-                    </div>
-                    <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
-                      {availableUsers.filter(u => (u.role === 'OPERADOR' || u.role === 'OPERADOR_JR') && (!filterOp || formatUserName(u).toLowerCase().includes(filterOp.toLowerCase()))).map(u => (
-                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={formData.operadores_id.includes(u.id)}
-                            onChange={(e) => {
-                              const ids = e.target.checked ? [...formData.operadores_id, u.id] : formData.operadores_id.filter(id => id !== u.id);
-                              setFormData(p => ({ ...p, operadores_id: ids }));
-                            }}
-                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{formatUserName(u)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* COLUMNA 2: OPERARIOS DEL SISTEMA (APP) */}
-                  <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col h-[300px]">
-                    <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
-                      <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">2. Operarios (Usuarios App)</span>
-                    </div>
-                    <div className="p-2 border-b border-gray-100 dark:border-slate-600">
-                      <input 
-                        type="text" 
-                        placeholder="Buscar usuario..." 
-                        className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg"
-                        onChange={(e) => setFilterUserOp(e.target.value)}
-                      />
-                    </div>
-                    <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
-                      {availableUsers.filter(u => u.role === 'OPERARIO' && (!filterUserOp || formatUserName(u).toLowerCase().includes(filterUserOp.toLowerCase()))).map(u => (
-                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={formData.operarios_usuarios_id.includes(u.id)}
-                            onChange={(e) => {
-                              const ids = e.target.checked ? [...formData.operarios_usuarios_id, u.id] : formData.operarios_usuarios_id.filter(id => id !== u.id);
-                              setFormData(p => ({ ...p, operarios_usuarios_id: ids }));
-                            }}
-                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{formatUserName(u)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* COLUMNA 3: PLANTEL DE OPERARIOS (STAFF) - CONDICIONAL */}
-                  {showStaffAssignment && (
-                    <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col h-[300px] animate-fadeIn">
-                      <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
-                        <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">3. Plantel (Staff Legajo)</span>
-                      </div>
-                      <div className="p-2 border-b border-gray-100 dark:border-slate-600 space-y-2">
-                        <input 
-                          type="text" 
-                          placeholder="Buscar por nombre, DNI o Rol..." 
-                          className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg"
-                          onChange={(e) => setFilterStaffSearch(e.target.value)}
-                        />
-                        <div className="flex flex-wrap gap-1">
-                          {['Mecanica', 'Electricidad', 'Refrigeracion', 'Pintura', 'Calderería'].map(r => (
-                            <button
-                              key={r}
-                              type="button"
-                              onClick={() => {
-                                setFilterStaffRole(prev => prev === r ? '' : r);
-                              }}
-                              className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${filterStaffRole === r ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 dark:bg-slate-900/30 text-slate-600 border-slate-200'}`}
-                            >
-                              {r}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
-                        {availableStaff.filter(s => {
-                          const search = normalize(filterStaffSearch);
-                          const roleFilter = normalize(filterStaffRole);
-                          
-                          const matchesSearch = !search || 
-                            normalize(s.nombres).includes(search) || 
-                            normalize(s.apellidos).includes(search) ||
-                            s.dni?.includes(search) ||
-                            normalize(s.rol).includes(search);
-                          
-                          const matchesRole = !roleFilter || normalize(s.rol).includes(roleFilter);
-                          
-                          return matchesSearch && matchesRole;
-                        }).map(s => (
-                          <label key={s.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors border-b border-gray-50 dark:border-slate-600 last:border-0">
-                            <input
-                              type="checkbox"
-                              checked={formData.operarios_id.includes(s.id)}
-                              onChange={(e) => {
-                                const ids = e.target.checked ? [...formData.operarios_id, s.id] : formData.operarios_id.filter(id => id !== s.id);
-                                setFormData(p => ({ ...p, operarios_id: ids }));
-                              }}
-                              className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <div>
-                              <p className="text-[11px] text-gray-700 dark:text-slate-200 font-bold leading-tight">{s.apellidos}, {s.nombres}</p>
-                              <div className="flex gap-2 mt-0.5">
-                                <span className="text-[9px] text-gray-400 uppercase font-black">{s.rol}</span>
-                                {s.dni && <span className="text-[9px] text-gray-300">DNI: {s.dni}</span>}
-                              </div>
-                            </div>
-                          </label>
-                        ))}
-                        {availableStaff.length === 0 && <p className="text-xs text-gray-400 p-2">No hay personal disponible.</p>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             <div>
               <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">

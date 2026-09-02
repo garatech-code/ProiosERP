@@ -1,8 +1,7 @@
-version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: proios_db
     restart: always
     environment:
@@ -15,7 +14,7 @@ services:
       - "5432:5432"
 
   redis:
-    image: redis:7-alpine
+    image: redis:7
     container_name: proios_redis
     restart: always
     ports:
@@ -24,7 +23,7 @@ services:
       - redis_data:/data
 
   backend:
-    image: garatecharg/stock-backend:v1.3
+    image: garatecharg/stock-backend:v1.15.7
     container_name: proios_backend
     restart: always
     command: gunicorn proios.wsgi:application --bind 0.0.0.0:8000
@@ -46,7 +45,7 @@ services:
       - redis
 
   celery_worker:
-    image: garatecharg/stock-backend:v1.3
+    image: garatecharg/stock-backend:v1.15.7
     container_name: proios_celery_worker
     restart: always
     command: celery -A proios worker -l info
@@ -64,7 +63,7 @@ services:
       - redis
 
   celery_beat:
-    image: garatecharg/stock-backend:v1.3
+    image: garatecharg/stock-backend:v1.15.7
     container_name: proios_celery_beat
     restart: always
     command: celery -A proios beat -l info
@@ -101,7 +100,7 @@ services:
       - backend
 
   nginx:
-    image: nginx:1.25-alpine
+    image: nginx:1.25
     container_name: proios_nginx
     restart: always
     ports:

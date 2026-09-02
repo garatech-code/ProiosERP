@@ -1097,7 +1097,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         offer_validity = data.get('offer_validity', '15 days')
         payment_terms = data.get('payment_terms', '30 days from invoice date')
         delivery_time = data.get('delivery_time', '5')
-        lugar_entrega = data.get('lugar_entrega', 'FOB')
+        lugar_entrega = ''
         include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
         vat_percentage = data.get('vat_percentage', '21')
         scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
@@ -1120,9 +1120,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         service_value_override = data.get('service_value_override', None)
         service_qty_override = data.get('service_qty_override', None)
         service_unit_price_override = data.get('service_unit_price_override', None)
-        ubicacion = data.get('ubicacion', '')
-        otros_gastos = data.get('otros_gastos', '')
-        expensas_json = data.get('expensas', '[]')
+        ubicacion = op.puerto.nombre if op.puerto else ''
+        otros_gastos = ''
+        expensas_json = '[]'
 
         try:
             if template_type == 'eva':

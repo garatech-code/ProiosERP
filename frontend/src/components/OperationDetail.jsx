@@ -15,19 +15,36 @@ import ToolsModal from './ToolsModal';
 import OperationFormProductos from './OperationFormProductos';
 import OperationFormServicios from './OperationFormServicios';
 import * as XLSX from 'xlsx';
+import mammoth from 'mammoth';
 
 const getMediaUrl = (url) => {
   if (!url) return '';
+  
+  let path = url;
   try {
     const parsed = new URL(url);
-    return parsed.pathname;
-  } catch (e) {
-    if (!url.startsWith('/')) {
-      if (url.startsWith('media/')) return '/' + url;
-      return '/media/' + url;
+    if (parsed.hostname === 'backend' || parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      path = parsed.pathname;
+    } else {
+      return url;
     }
-    return url;
+  } catch (e) {
   }
+
+  if (!path.startsWith('/')) {
+    if (path.startsWith('media/')) return '/' + path;
+    return '/media/' + path;
+  }
+  
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl && apiUrl.startsWith('http')) {
+      try {
+          const apiParsed = new URL(apiUrl);
+          return `${apiParsed.origin}${path}`;
+      } catch (err) {}
+  }
+
+  return path;
 };
 
 export default function OperationDetail() {
@@ -96,6 +113,16 @@ export default function OperationDetail() {
 
   const [showCotizacionEmailModal, setShowCotizacionEmailModal] = useState(false);
   const [cotizacionEmailAttachment, setCotizacionEmailAttachment] = useState(null);
+
+  const [showStaffAssignmentModal, setShowStaffAssignmentModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableStaff, setAvailableStaff] = useState([]);
+  const [filterOp, setFilterOp] = useState('');
+  const [filterUserOp, setFilterUserOp] = useState('');
+  const [filterStaffSearch, setFilterStaffSearch] = useState('');
+  const [filterStaffRole, setFilterStaffRole] = useState('');
+  const [tempStaff, setTempStaff] = useState({ operadores_id: [], operarios_id: [], operarios_usuarios_id: [] });
+  const [updatingStaff, setUpdatingStaff] = useState(false);
 
   const [showRechazoModal, setShowRechazoModal] = useState(false);
   const [rechazoMotivo, setRechazoMotivo] = useState('');
@@ -426,6 +453,43 @@ export default function OperationDetail() {
     }
   };
 
+  const handleOpenStaffModal = async () => {
+    setShowStaffAssignmentModal(true);
+    setTempStaff({
+      operadores_id: operation?.operadores_id || [],
+      operarios_id: operation?.operarios_id || [],
+      operarios_usuarios_id: operation?.operarios_usuarios_id || [],
+    });
+    
+    if (availableUsers.length === 0 || availableStaff.length === 0) {
+      try {
+        const [usersRes, staffRes] = await Promise.all([
+          axios.get('/usuarios/users/'),
+          axios.get('/usuarios/plantel/?activo=true')
+        ]);
+        setAvailableUsers(usersRes.data?.results || usersRes.data || []);
+        setAvailableStaff(staffRes.data?.results || staffRes.data || []);
+      } catch (err) {
+        console.error("Error fetching staff:", err);
+      }
+    }
+  };
+
+  const handleSaveStaff = async () => {
+    setUpdatingStaff(true);
+    try {
+      await axios.patch(`/operaciones/operations/${id}/`, tempStaff);
+      showToast('Personal asignado actualizado correctamente', 'success');
+      setShowStaffAssignmentModal(false);
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al actualizar personal asignado', 'error');
+    } finally {
+      setUpdatingStaff(false);
+    }
+  };
+
   const checkStock = async () => {
     setCheckingStock(true);
     try {
@@ -578,9 +642,9 @@ export default function OperationDetail() {
         attn: cotizacionAttn,
         template_type: cotizacionTemplate,
         lang: cotizacionLang,
-        exp1: expensaAduana,
-        exp2: expensaOtros,
-        exp3: expensaHsExtra
+        ubicacion: ubicacion,
+        otros_gastos: otrosGastos,
+        expensas: JSON.stringify(expensas.filter(e => e.descripcion.trim() !== ''))
       };
 
       if (operation?.tipo_operacion === 'servicios') {
@@ -769,6 +833,23 @@ export default function OperationDetail() {
     }
   };
 
+  const previewWordFile = async (url, filename) => {
+    try {
+      showToast('Generando vista previa del documento...', 'info');
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      const result = await mammoth.convertToHtml({ arrayBuffer: response.data });
+      setPreviewFile({
+        url: null,
+        type: 'word',
+        content: result.value || '<p>El documento está vacío o no pudo ser procesado correctamente.</p>',
+        filename: filename,
+      });
+    } catch (error) {
+      console.error("Error al cargar archivo Word:", error);
+      showToast('No se pudo generar la vista previa del documento Word', 'error');
+    }
+  };
+
   const openPreview = (url, filename = 'documento') => {
     if (!url) return;
     const friendlyName = filename || url.split('/').pop();
@@ -776,6 +857,10 @@ export default function OperationDetail() {
 
     if (ext === 'xlsx' || ext === 'xls') {
       previewExcelFile(url);
+      return;
+    }
+    if (ext === 'docx' || ext === 'doc') {
+      previewWordFile(url, friendlyName);
       return;
     }
     if (ext === 'pdf') {
@@ -1496,12 +1581,20 @@ export default function OperationDetail() {
                     </div>
                   </dl>
 
-                  {isOwner && (
+                  {(isOwner || isOperador) && (
                     <>
                       <div className="bg-slate-800 px-4 py-4 sm:px-6 text-white">
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2">
-                          <i className="bi bi-people-fill"></i> Personal de Misión Asignado
-                        </p>
+                        <div className="flex justify-between items-center mb-3">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 m-0">
+                            <i className="bi bi-people-fill"></i> Personal de Misión Asignado
+                          </p>
+                          <button 
+                            onClick={handleOpenStaffModal}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <i className="bi bi-pencil-fill"></i> Editar Personal
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-4 text-xs">
                           <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
                             Operadores (Oficina): {operation.operadores_id?.length || 0}
@@ -2078,11 +2171,13 @@ export default function OperationDetail() {
                       const isImage = adj.content_type?.startsWith('image/') || adj.filename?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
                       const isPdf = adj.content_type === 'application/pdf' || adj.filename?.match(/\.pdf$/i);
                       const isExcel = adj.content_type?.includes('spreadsheet') || adj.content_type?.includes('excel') || adj.filename?.match(/\.xlsx?$/i);
+                      const isWord = adj.content_type?.includes('wordprocessingml') || adj.content_type?.includes('msword') || adj.filename?.match(/\.docx?$/i);
 
                       let iconClass = "bi-file-earmark-fill text-slate-400";
                       if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
                       else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
                       else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
+                      else if (isWord) iconClass = "bi-file-earmark-word text-blue-500";
 
                       return (
                         <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
@@ -2209,7 +2304,7 @@ export default function OperationDetail() {
                       </>
                     ) : (
                       canEdit && operation.estado !== 'pausada' && (
-                        <button onClick={() => setShowEditModal(true)} className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-slate-800/10 hover:bg-white dark:bg-slate-800/20 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => setShowEditModal(true)} className="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
                           <i className="bi bi-pencil-fill"></i> Editar Info
                         </button>
                       )
@@ -2299,12 +2394,6 @@ export default function OperationDetail() {
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizacion_enviada' && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button
-                              onClick={handleVerCotizacion}
-                              className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                            >
-                              <i className="bi bi-file-earmark-pdf"></i> Ver Cotización
-                            </button>
-                            <button
                               onClick={() => handleAction('cliente_confirma_producto', '¿El cliente ha confirmado la cotización?')}
                               disabled={actionLoading}
                               className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
@@ -2315,12 +2404,6 @@ export default function OperationDetail() {
                         )}
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <button
-                              onClick={handleVerCotizacion}
-                              className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                            >
-                              <i className="bi bi-file-earmark-pdf"></i> Ver Cotización
-                            </button>
                             <button
                               onClick={openPnaModal}
                               disabled={actionLoading}
@@ -2771,6 +2854,12 @@ Saludos cordiales.`
                   {previewFile.content}
                 </pre>
               )}
+              {previewFile.type === 'word' && (
+                <div 
+                  className="w-full h-full min-h-[80vh] p-8 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg overflow-auto text-sm word-preview"
+                  dangerouslySetInnerHTML={{ __html: previewFile.content }} 
+                />
+              )}
               {previewFile.type === 'unknown' && (
                 <div className="text-center p-8 bg-white dark:bg-slate-850 rounded-xl shadow-md">
                   <i className="bi bi-file-earmark-excel text-5xl text-amber-500 mb-3 block"></i>
@@ -2853,6 +2942,26 @@ Saludos cordiales.`
         .excel-preview th { background-color: #f2f2f2; font-weight: bold; }
         
         /* Dark Mode overrides for Excel previews */
+        .dark .excel-preview th * {
+          color: #f1f5f9 !important;
+        }
+
+        /* Word Preview Styles */
+        .word-preview p {
+          margin-bottom: 1em;
+        }
+        .word-preview table {
+          border-collapse: collapse;
+          width: 100%;
+          margin-bottom: 1em;
+        }
+        .word-preview th, .word-preview td {
+          border: 1px solid #ccc;
+          padding: 8px;
+        }
+        .dark .word-preview th, .dark .word-preview td {
+          border-color: #475569;
+        }
         .dark .excel-preview th {
           background: #1e293b !important;
           background-color: #1e293b !important;
@@ -3033,17 +3142,7 @@ Saludos cordiales.`
                         </div>
                       </div>
 
-                      {/* Lugar de Entrega */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Lugar de Entrega' : 'Delivery Place'}</label>
-                        <input
-                          type="text"
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                          value={lugarEntrega}
-                          onChange={(e) => setLugarEntrega(e.target.value)}
-                          placeholder="Ej. FOB / DAP / Ex-works..."
-                        />
-                      </div>
+
 
                       {/* VAT Toggle */}
                       <div className="pt-2">
@@ -3103,145 +3202,7 @@ Saludos cordiales.`
                         />
                       </div>
 
-                      {/* Ubicación y Expensas */}
-                      <div className="pt-4 border-t border-slate-200 dark:border-slate-700 mt-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                              {cotizacionLang === 'es' ? 'Ubicación (Location)' : 'Location'}
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500"
-                              value={ubicacion}
-                              onChange={(e) => setUbicacion(e.target.value)}
-                              placeholder="Ej. Buenos Aires"
-                            />
-                            <p className="text-[10px] text-slate-400 mt-1">Reemplaza {"{{ubicacion}}"} dinámicamente.</p>
-                          </div>
-                        </div>
 
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white mb-3 uppercase tracking-wider flex items-center gap-2">
-                          <i className="bi bi-wallet2 text-green-500 text-base"></i> Expensas
-                        </h4>
-                        
-                        <div className="space-y-2">
-                          {expensas.map((exp, idx) => (
-                            <div key={idx} className="flex gap-2 items-center bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                              <div className="flex-1 grid grid-cols-12 gap-2">
-                                <div className="col-span-5">
-                                  <input
-                                    type="text"
-                                    placeholder="Descripción"
-                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
-                                    value={exp.descripcion}
-                                    onChange={(e) => {
-                                      const newExps = [...expensas];
-                                      newExps[idx].descripcion = e.target.value;
-                                      setExpensas(newExps);
-                                    }}
-                                  />
-                                </div>
-                                <div className="col-span-1">
-                                  <input
-                                    type="text"
-                                    placeholder="Cant."
-                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
-                                    value={exp.cantidad || ''}
-                                    onChange={(e) => {
-                                      const newExps = [...expensas];
-                                      newExps[idx].cantidad = e.target.value;
-                                      
-                                      // Auto-calculate importe if both cant and precio are numbers
-                                      const cantVal = parseFloat(newExps[idx].cantidad);
-                                      const priceVal = parseFloat(newExps[idx].precio);
-                                      if (!isNaN(cantVal) && !isNaN(priceVal)) {
-                                          newExps[idx].importe = (cantVal * priceVal).toFixed(2);
-                                      }
-                                      setExpensas(newExps);
-                                    }}
-                                  />
-                                </div>
-                                <div className="col-span-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Und."
-                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
-                                    value={exp.unidad}
-                                    onChange={(e) => {
-                                      const newExps = [...expensas];
-                                      newExps[idx].unidad = e.target.value;
-                                      setExpensas(newExps);
-                                    }}
-                                  />
-                                </div>
-                                <div className="col-span-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Precio"
-                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
-                                    value={exp.precio}
-                                    onChange={(e) => {
-                                      const newExps = [...expensas];
-                                      newExps[idx].precio = e.target.value;
-                                      
-                                      const cantVal = parseFloat(newExps[idx].cantidad || '1');
-                                      const priceVal = parseFloat(newExps[idx].precio);
-                                      if (!isNaN(cantVal) && !isNaN(priceVal)) {
-                                          newExps[idx].importe = (cantVal * priceVal).toFixed(2);
-                                      }
-                                      setExpensas(newExps);
-                                    }}
-                                  />
-                                </div>
-                                <div className="col-span-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Importe"
-                                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5"
-                                    value={exp.importe}
-                                    onChange={(e) => {
-                                      const newExps = [...expensas];
-                                      newExps[idx].importe = e.target.value;
-                                      setExpensas(newExps);
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  const newExps = expensas.filter((_, i) => i !== idx);
-                                  setExpensas(newExps);
-                                }}
-                                className="text-slate-400 hover:text-red-500 shrink-0"
-                                title="Eliminar expensa"
-                              >
-                                <i className="bi bi-trash-fill"></i>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                        <button
-                          onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-2 mb-4"
-                        >
-                          <i className="bi bi-plus-circle-fill"></i> Agregar Expensa
-                        </button>
-
-                        {/* Otros gastos */}
-                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                            {cotizacionLang === 'es' ? 'Otros gastos:' : 'Other expenses:'}
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1.5 px-3 focus:ring-blue-500 focus:border-blue-500"
-                            value={otrosGastos}
-                            onChange={(e) => setOtrosGastos(e.target.value)}
-                            placeholder="Texto o valor numérico (ej. 'TBD' o '150.50')"
-                          />
-                        </div>
-                      </div>
 
                     </div>
                   </div>
@@ -3344,6 +3305,119 @@ Saludos cordiales.`
                   {actionLoading ? 'Procesando...' : <><i className="bi bi-exclamation-triangle-fill"></i> Confirmar Rechazo</>}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showStaffAssignmentModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm sm:p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-full">
+            <div className="bg-indigo-600 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <i className="bi bi-people-fill"></i> Editar Personal Asignado
+              </h3>
+              <button onClick={() => setShowStaffAssignmentModal(false)} className="text-white hover:text-indigo-200 transition-colors">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto bg-slate-50 dark:bg-slate-900 flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+                {/* COLUMNA 1: OPERADORES */}
+                <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col min-h-[400px]">
+                  <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
+                    <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">1. Logística (Operadores)</span>
+                  </div>
+                  <div className="p-2 border-b border-gray-100 dark:border-slate-600">
+                    <input type="text" placeholder="Buscar operador..." className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg dark:text-white" onChange={(e) => setFilterOp(e.target.value)} />
+                  </div>
+                  <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
+                    {availableUsers.filter(u => (u.role === 'OPERADOR' || u.role === 'OPERADOR_JR') && (!filterOp || (u.first_name ? u.first_name + ' ' + u.last_name : u.username).toLowerCase().includes(filterOp.toLowerCase()))).map(u => (
+                      <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
+                        <input type="checkbox" checked={tempStaff.operadores_id.includes(u.id)} onChange={(e) => {
+                          const ids = e.target.checked ? [...tempStaff.operadores_id, u.id] : tempStaff.operadores_id.filter(id => id !== u.id);
+                          setTempStaff(p => ({ ...p, operadores_id: ids }));
+                        }} className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                        <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{u.first_name ? u.first_name + ' ' + u.last_name : u.username}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* COLUMNA 2: OPERARIOS APP */}
+                <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col min-h-[400px]">
+                  <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
+                    <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">2. Operarios (Usuarios App)</span>
+                  </div>
+                  <div className="p-2 border-b border-gray-100 dark:border-slate-600">
+                    <input type="text" placeholder="Buscar usuario..." className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg dark:text-white" onChange={(e) => setFilterUserOp(e.target.value)} />
+                  </div>
+                  <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
+                    {availableUsers.filter(u => u.role === 'OPERARIO' && (!filterUserOp || (u.first_name ? u.first_name + ' ' + u.last_name : u.username).toLowerCase().includes(filterUserOp.toLowerCase()))).map(u => (
+                      <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors">
+                        <input type="checkbox" checked={tempStaff.operarios_usuarios_id.includes(u.id)} onChange={(e) => {
+                          const ids = e.target.checked ? [...tempStaff.operarios_usuarios_id, u.id] : tempStaff.operarios_usuarios_id.filter(id => id !== u.id);
+                          setTempStaff(p => ({ ...p, operarios_usuarios_id: ids }));
+                        }} className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                        <span className="text-xs text-gray-700 dark:text-slate-200 font-bold">{u.first_name ? u.first_name + ' ' + u.last_name : u.username}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* COLUMNA 3: PLANTEL */}
+                <div className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden flex flex-col min-h-[400px]">
+                  <div className="bg-gray-50 dark:bg-slate-600 px-4 py-2 border-b border-gray-200 dark:border-slate-500">
+                    <span className="text-xs font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest">3. Plantel (Staff Legajo)</span>
+                  </div>
+                  <div className="p-2 border-b border-gray-100 dark:border-slate-600 space-y-2">
+                    <input type="text" placeholder="Buscar por nombre, DNI o Rol..." className="w-full text-xs p-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 rounded-lg dark:text-white" onChange={(e) => setFilterStaffSearch(e.target.value)} />
+                    <div className="flex flex-wrap gap-1">
+                      {['Mecanica', 'Electricidad', 'Refrigeracion', 'Pintura', 'Calderería'].map(r => (
+                        <button key={r} type="button" onClick={() => setFilterStaffRole(prev => prev === r ? '' : r)} className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${filterStaffRole === r ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 dark:bg-slate-900/30 text-slate-600 border-slate-200'}`}>
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="p-2 overflow-y-auto flex-1 custom-scrollbar">
+                    {availableStaff.filter(s => {
+                      const normalize = (str) => {
+                        let ns = str?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() || "";
+                        ns = ns.replace(/mecanic[oa]s?/g, "mecanica").replace(/pintor(es)?/g, "pintura").replace(/electricist(a|as)?/g, "electricidad").replace(/calderer[oa]s?/g, "caldereria");
+                        return ns;
+                      };
+                      const search = normalize(filterStaffSearch);
+                      const roleFilter = normalize(filterStaffRole);
+                      const matchesSearch = !search || normalize(s.nombres).includes(search) || normalize(s.apellidos).includes(search) || s.dni?.includes(search) || normalize(s.rol).includes(search);
+                      const matchesRole = !roleFilter || normalize(s.rol).includes(roleFilter);
+                      return matchesSearch && matchesRole;
+                    }).map(s => (
+                      <label key={s.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:bg-slate-900/50 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors border-b border-gray-50 dark:border-slate-600 last:border-0">
+                        <input type="checkbox" checked={tempStaff.operarios_id.includes(s.id)} onChange={(e) => {
+                          const ids = e.target.checked ? [...tempStaff.operarios_id, s.id] : tempStaff.operarios_id.filter(id => id !== s.id);
+                          setTempStaff(p => ({ ...p, operarios_id: ids }));
+                        }} className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                        <div>
+                          <p className="text-[11px] text-gray-700 dark:text-slate-200 font-bold leading-tight">{s.apellidos}, {s.nombres}</p>
+                          <div className="flex gap-2 mt-0.5">
+                            <span className="text-[9px] text-gray-400 uppercase font-black">{s.rol}</span>
+                            {s.dni && <span className="text-[9px] text-gray-300">DNI: {s.dni}</span>}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 rounded-b-2xl">
+              <button onClick={() => setShowStaffAssignmentModal(false)} className="px-5 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-600 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleSaveStaff} disabled={updatingStaff} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2">
+                {updatingStaff ? 'Guardando...' : <><i className="bi bi-save"></i> Guardar Personal</>}
+              </button>
             </div>
           </div>
         </div>
