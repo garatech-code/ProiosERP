@@ -15,13 +15,12 @@ const getMediaUrl = (url) => {
     }
 };
 
-export default function ReadEmailModal({ email, onClose, onReply, openPreview }) {
+export default function ReadEmailModal({ email, onClose, onReply, openPreview, inline = false }) {
   if (!email) return null;
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700">
-        
+  const content = (
+    <>
+
         {/* Header */}
         <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
           <h2 className="text-lg font-black text-slate-800 dark:text-white truncate pr-4">
@@ -127,7 +126,22 @@ export default function ReadEmailModal({ email, onClose, onReply, openPreview })
             </button>
         </div>
 
+      </>
+    );
+
+    if (inline) {
+      return (
+        <div className="bg-white dark:bg-slate-800 flex flex-col h-full rounded-xl overflow-hidden">
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col overflow-hidden my-auto border border-slate-200 dark:border-slate-700">
+          {content}
+        </div>
       </div>
-    </div>
-  );
+    );
 }

@@ -1266,3 +1266,69 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         
     doc.build(story, onFirstPage=add_proios_footer, onLaterPages=add_proios_footer)
     return buffer.getvalue()
+
+def generar_remito_pdf(operacion):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    story = build_pdf_headers(doc, story, operacion, "REMITO DE ENTREGA / DELIVERY NOTE")
+    
+    texto = "A continuación se detalla el listado de materiales/productos entregados para la operación referenciada:"
+    story.append(Paragraph(texto, styles['Normal']))
+    story.append(Spacer(1, 1*cm))
+    
+    from apps.inventario.models import Articulo
+    
+    data = [['Ítem', 'Descripción de Material', 'Cantidad', 'Unidad']]
+    
+    for i, detalle in enumerate(operacion.detalles.all(), 1):
+        try:
+            articulo = Articulo.objects.get(id=detalle.articulo_id)
+            desc = articulo.nombre
+            unidad = articulo.presentacion or 'U'
+        except Articulo.DoesNotExist:
+            desc = f"Artículo no encontrado (ID: {detalle.articulo_id})"
+            unidad = '-'
+        
+        cant = str(detalle.cantidad)
+        story_desc = Paragraph(desc, styles['Normal'])
+        data.append([str(i), story_desc, cant, unidad])
+        
+    t = Table(data, colWidths=[1.5*cm, 10.5*cm, 2.5*cm, 2.5*cm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#002b5e')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), DEFAULT_FONT_BOLD),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
+        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
+        ('BOX', (0,0), (-1,-1), 0.25, colors.black),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 10),
+    ]))
+    story.append(t)
+    
+    story.append(Spacer(1, 2.5*cm))
+    
+    # Firmas
+    signature_data = [
+        [Paragraph("<b>Entregado por (PROIOS SA):</b>", styles['Normal']), Paragraph("<b>Recibido por (Firma y Sello):</b>", styles['Normal'])],
+        ['', ''],
+        ['_________________________', '_________________________']
+    ]
+    sig_table = Table(signature_data, colWidths=[8.5*cm, 8.5*cm])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 20),
+    ]))
+    story.append(sig_table)
+    
+    doc.build(story)
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf

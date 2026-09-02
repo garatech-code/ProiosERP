@@ -279,9 +279,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def finalize_production(self, request, pk=None):
         op = self.get_object()
-        if not op.rancho_file:
-            return Response({'error': 'Debe subir el Documento Rancho antes de aprobar aduanas'}, status=400)
-            
         with transaction.atomic():
             try:
                 op.finalize_customs()
@@ -308,6 +305,15 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if request.user.role != User.Role.OWNER:
             return Response({'error': 'Solo el Owner puede cerrar operaciones.'}, status=403)
         op = self.get_object()
+        
+        # Validación de Rancho antes de cerrar
+        if not op.rancho_file:
+            return Response({'error': 'Debe subir el Documento Rancho para poder cerrar la operación.'}, status=400)
+            
+        # Validación de Factura antes de cerrar
+        if not op.factura_file:
+            return Response({'error': 'Debe subir la Factura para poder cerrar la operación.'}, status=400)
+
         try:
             op.close()
             op.closed_by = request.user
@@ -353,6 +359,15 @@ class OperacionViewSet(viewsets.ModelViewSet):
         op.save()
         return Response({'status': 'ok'})
 
+    @action(detail=True, methods=['post'], url_path='upload_factura')
+    def upload_factura(self, request, pk=None):
+        op = self.get_object()
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=400)
+        op.factura_file = request.FILES['file']
+        op.save()
+        return Response({'status': 'ok'})
+
     @action(detail=True, methods=['get'])
     def generate_solicitud_particular_pdf(self, request, pk=None):
         op = self.get_object()
@@ -370,7 +385,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='generate_remito_pdf')
     def generate_remito_pdf(self, request, pk=None):
         op = self.get_object()
-        from apps.operaciones.services_docx import generar_remito_pdf
+        from apps.operaciones.services_pdf import generar_remito_pdf
         try:
             pdf_bytes = generar_remito_pdf(op)
             from django.http import HttpResponse
@@ -1120,9 +1135,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         service_value_override = data.get('service_value_override', None)
         service_qty_override = data.get('service_qty_override', None)
         service_unit_price_override = data.get('service_unit_price_override', None)
-        ubicacion = op.puerto.nombre if op.puerto else ''
-        otros_gastos = ''
-        expensas_json = '[]'
+        ubicacion = data.get('ubicacion', op.port.name if hasattr(op, 'port') and op.port else '')
+        otros_gastos = data.get('otros_gastos', '')
+        expensas_json = data.get('expensas', '[]')
 
         try:
             if template_type == 'eva':

@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
 import ProductMultiSelectModal from './ProductMultiSelectModal';
 import LogoSpinner from './LogoSpinner';
-
+import OperationEmails from './OperationEmails';
 /* =========================
    PRODUCT ROW (con verificación de stock)
 ========================= */
@@ -118,6 +118,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 export default function OperationFormProductos({ id: propId, onClose, onSuccess, initialEmailData }) {
   const { user: currentUser } = useAuth();
   const { id: routeId } = useParams();
+  const [showEmails, setShowEmails] = useState(false);
   const navigate = useNavigate();
   const id = propId || routeId;
 
@@ -519,12 +520,21 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
       onClick={handleCloseModal}
     >
       <div
-        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto"
+        className={`bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full ${showEmails ? 'max-w-[95vw]' : 'max-w-4xl'} max-h-[95vh] flex flex-col overflow-hidden my-auto transition-all duration-300`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-slate-700/50 shrink-0">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
             {id ? `Editar Operación #${id}` : 'Nueva Operación'}
+            {(id || initialEmailData) && (
+              <button
+                type="button"
+                onClick={() => setShowEmails(!showEmails)}
+                className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 transition-colors ${showEmails ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50'}`}
+              >
+                <i className="bi bi-envelope"></i> {showEmails ? 'Ocultar Correos' : 'Ver Correos'}
+              </button>
+            )}
           </h2>
           <div className="flex gap-3 items-center">
             {id && (
@@ -542,7 +552,8 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
           </div>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="flex flex-1 overflow-hidden">
+          <div className={`p-6 overflow-y-auto flex-1 custom-scrollbar ${showEmails ? 'border-r border-slate-200 dark:border-slate-700' : ''}`}>
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
               <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
@@ -800,6 +811,20 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
               </div>
             )}
           </form>
+        </div>
+        
+        {showEmails && (
+          <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-envelope-paper text-indigo-500"></i> Historial de Correos
+              </h3>
+            </div>
+            <div className="p-4 flex-1">
+              <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
+            </div>
+          </div>
+        )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl shrink-0">

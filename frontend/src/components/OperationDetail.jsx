@@ -114,6 +114,9 @@ export default function OperationDetail() {
   const [showCotizacionEmailModal, setShowCotizacionEmailModal] = useState(false);
   const [cotizacionEmailAttachment, setCotizacionEmailAttachment] = useState(null);
 
+  const [showLogisticaEmailModal, setShowLogisticaEmailModal] = useState(false);
+  const [logisticaEmailAttachments, setLogisticaEmailAttachments] = useState([]);
+
   const [showStaffAssignmentModal, setShowStaffAssignmentModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [availableStaff, setAvailableStaff] = useState([]);
@@ -160,6 +163,29 @@ export default function OperationDetail() {
   const [expensas, setExpensas] = useState([]);
   const [otrosGastos, setOtrosGastos] = useState('');
 
+  // Preload expensas if empty, and translate defaults when language changes
+  useEffect(() => {
+    const isEs = cotizacionLang === 'es';
+    if (expensas.length === 0) {
+      setExpensas([
+        { descripcion: isEs ? 'Aduana y transporte hasta: {{ubicacion}}' : 'Customs and transport to: {{ubicacion}}', cantidad: '', unidad: '', precio: '', importe: '' },
+        { descripcion: isEs ? 'Hs extra de Aduana' : 'Customs Overtime', cantidad: '', unidad: '', precio: '', importe: '' }
+      ]);
+    } else {
+      const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
+      const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
+      const defaultHsEn = 'Customs Overtime';
+      const defaultHsEs = 'Hs extra de Aduana';
+      
+      setExpensas(prev => prev.map(exp => {
+        let newDesc = exp.descripcion;
+        if (newDesc === defaultAduanaEn || newDesc === defaultAduanaEs) newDesc = isEs ? defaultAduanaEs : defaultAduanaEn;
+        if (newDesc === defaultHsEn || newDesc === defaultHsEs) newDesc = isEs ? defaultHsEs : defaultHsEn;
+        return { ...exp, descripcion: newDesc };
+      }));
+    }
+  }, [cotizacionLang, expensas.length]);
+
   useEffect(() => {
     if (showCotizacionWordModal) {
       const isSrv = operation?.tipo_operacion === 'servicios';
@@ -205,26 +231,6 @@ export default function OperationDetail() {
         setServiceValueOverride(operation.valor_servicio || '');
       }
 
-      // Preload expensas if empty
-      if (expensas.length === 0) {
-        setExpensas([
-          { descripcion: isEs ? 'Aduana y transporte hasta: {{ubicacion}}' : 'Customs and transport to: {{ubicacion}}', cantidad: '', unidad: '', precio: '', importe: '' },
-          { descripcion: isEs ? 'Hs extra de Aduana' : 'Customs Overtime', cantidad: '', unidad: '', precio: '', importe: '' }
-        ]);
-      } else {
-        // Translate placeholders if they haven't been edited heavily
-        const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
-        const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
-        const defaultHsEn = 'Customs Overtime';
-        const defaultHsEs = 'Hs extra de Aduana';
-        
-        setExpensas(prev => prev.map(exp => {
-          let newDesc = exp.descripcion;
-          if (newDesc === defaultAduanaEn || newDesc === defaultAduanaEs) newDesc = isEs ? defaultAduanaEs : defaultAduanaEn;
-          if (newDesc === defaultHsEn || newDesc === defaultHsEs) newDesc = isEs ? defaultHsEs : defaultHsEn;
-          return { ...exp, descripcion: newDesc };
-        }));
-      }
     }
   }, [showCotizacionWordModal, operation, cotizacionLang]);
 
@@ -509,6 +515,9 @@ export default function OperationDetail() {
         return;
       }
       if (confirmMessage && !window.confirm(confirmMessage)) return;
+    } else if (action === 'finalize_production' && !operation.rancho_file) {
+      const warningMsg = "ATENCIÓN: Vas a continuar sin cargar el Documento Rancho.\n\nÉste DEBE ser cargado posteriormente para poder cerrar la operación, de lo contrario la operación no podrá cerrarse.\n\n¿Deseas continuar de todas formas?";
+      if (!window.confirm(warningMsg)) return;
     } else {
       if (confirmMessage && !window.confirm(confirmMessage)) return;
     }
@@ -704,6 +713,59 @@ export default function OperationDetail() {
     }
   };
 
+  const handleStartLogisticaEmail = async () => {
+    if (!window.confirm('¿Preparar correo de logística con Remito y Rancho?')) return;
+
+    setActionLoading(true);
+    try {
+      const attachments = [];
+
+      // 1. Fetch Remito
+      try {
+        const remitoResponse = await axios.get(`/operaciones/operations/${id}/generate_remito_pdf/`, {
+          responseType: 'blob',
+        });
+        const remitoFile = new File([remitoResponse.data], `Remito_OP${id}.pdf`, {
+          type: 'application/pdf'
+        });
+        attachments.push(remitoFile);
+      } catch (err) {
+        console.error("Error generando remito:", err);
+        showToast("No se pudo adjuntar el remito, el correo se abrirá sin él", "error");
+      }
+
+      // 2. Fetch Rancho
+      if (operation.rancho_file) {
+        try {
+          const ranchoResponse = await axios.get(operation.rancho_file, {
+            responseType: 'blob',
+          });
+          const ranchoName = operation.rancho_file.split('/').pop() || `Rancho_OP${id}.pdf`;
+          const ranchoFile = new File([ranchoResponse.data], ranchoName, {
+            type: ranchoResponse.data.type || 'application/pdf'
+          });
+          attachments.push(ranchoFile);
+        } catch (err) {
+          console.error("Error descargando rancho:", err);
+          showToast("No se pudo adjuntar el rancho, el correo se abrirá sin él", "error");
+        }
+      }
+
+      setLogisticaEmailAttachments(attachments);
+      setShowLogisticaEmailModal(true);
+    } catch (err) {
+      console.error(err);
+      showToast('Error preparando el correo de logística', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleLogisticaEmailSuccess = async () => {
+    setShowLogisticaEmailModal(false);
+    showToast('Correo de Logística enviado exitosamente', 'success');
+  };
+
   const handleGenerateRemito = async () => {
     try {
       const response = await axios.get(`/operaciones/operations/${id}/generate_remito_pdf/`, {
@@ -805,6 +867,7 @@ export default function OperationDetail() {
     try {
       const response = await axios.get(url, {
         responseType: 'blob',
+        baseURL: '',
       });
       const data = await response.data.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
@@ -820,7 +883,7 @@ export default function OperationDetail() {
 
   const previewTextFile = async (url, filename) => {
     try {
-      const response = await axios.get(url, { responseType: 'text' });
+      const response = await axios.get(url, { responseType: 'text', baseURL: '' });
       setPreviewFile({
         url: null,
         type: 'text',
@@ -836,7 +899,7 @@ export default function OperationDetail() {
   const previewWordFile = async (url, filename) => {
     try {
       showToast('Generando vista previa del documento...', 'info');
-      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      const response = await axios.get(url, { responseType: 'arraybuffer', baseURL: '' });
       const result = await mammoth.convertToHtml({ arrayBuffer: response.data });
       setPreviewFile({
         url: null,
@@ -1526,13 +1589,22 @@ export default function OperationDetail() {
                       Descarga el remito autogenerado con los datos de esta operación.
                     </p>
                   </div>
-                  <button
-                    onClick={handleGenerateRemito}
-                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                    title="Descargar Remito"
-                  >
-                    <i className="bi bi-download"></i> Generar Remito
-                  </button>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={handleStartLogisticaEmail}
+                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      title="Enviar Remito a Logística"
+                    >
+                      <i className="bi bi-envelope"></i> Enviar Logística
+                    </button>
+                    <button
+                      onClick={handleGenerateRemito}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      title="Descargar Remito"
+                    >
+                      <i className="bi bi-download"></i> Generar Remito
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -2002,7 +2074,7 @@ export default function OperationDetail() {
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                           {operation.packing_list_file && (
                             <button
-                              onClick={() => openPreview(operation.packing_list_file, 'Packing List')}
+                              onClick={() => openPreview(getMediaUrl(operation.packing_list_file), 'Packing List')}
                               className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento
@@ -2041,7 +2113,7 @@ export default function OperationDetail() {
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
                           {operation.remito_file && (
                             <button
-                              onClick={() => openPreview(operation.remito_file, 'Remito Firmado')}
+                              onClick={() => openPreview(getMediaUrl(operation.remito_file), 'Remito Firmado')}
                               className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento
@@ -2060,7 +2132,7 @@ export default function OperationDetail() {
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
                           {operation.rancho_file && (
                             <button
-                              onClick={() => openPreview(operation.rancho_file)}
+                              onClick={() => openPreview(getMediaUrl(operation.rancho_file), 'Rancho / Permiso Aduanero')}
                               className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento
@@ -2070,6 +2142,26 @@ export default function OperationDetail() {
                         <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
                           <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
                           <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                        </label>
+                      </div>
+
+                      {/* Factura */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Factura de Operación</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Documento de facturación obligatoria.</p>
+                          {operation.factura_file && (
+                            <button
+                              onClick={() => openPreview(getMediaUrl(operation.factura_file), 'Factura')}
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver Documento
+                            </button>
+                          )}
+                        </div>
+                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
+                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
                         </label>
                       </div>
                     </div>
@@ -2115,7 +2207,7 @@ export default function OperationDetail() {
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
                           {operation.solicitud_particular_file && (
                             <button
-                              onClick={() => openPreview(operation.solicitud_particular_file, 'Solicitud Particular Externa')}
+                              onClick={() => openPreview(getMediaUrl(operation.solicitud_particular_file), 'Solicitud Particular Externa')}
                               className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                             >
                               <i className="bi bi-eye-fill"></i> Ver Documento Subido
@@ -2141,6 +2233,120 @@ export default function OperationDetail() {
                   </div>
                 </>
               )}
+
+              {/* EXPENSAS DETALLADAS (NUEVO) */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <i className="bi bi-cash-stack text-emerald-500"></i> Expensas (Gastos Detallados)
+                  </h3>
+                  <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                    <button 
+                      onClick={() => setCotizacionLang('es')}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'es' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+                    >
+                      ES
+                    </button>
+                    <button 
+                      onClick={() => setCotizacionLang('en')}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'en' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+                    >
+                      EN
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  {expensas.map((exp, index) => (
+                    <div key={index} className="flex gap-2 items-start">
+                      <input 
+                        type="text" 
+                        placeholder="Descripción"
+                        className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.descripcion}
+                        onChange={(e) => {
+                          const newExp = [...expensas];
+                          newExp[index].descripcion = e.target.value;
+                          setExpensas(newExp);
+                        }}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Cant."
+                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.cantidad}
+                        onChange={(e) => {
+                          const newExp = [...expensas];
+                          newExp[index].cantidad = e.target.value;
+                          const cant = parseFloat(e.target.value);
+                          const prec = parseFloat(newExp[index].precio);
+                          if (!isNaN(cant) && !isNaN(prec)) {
+                            newExp[index].importe = (cant * prec).toFixed(2).toString();
+                          }
+                          setExpensas(newExp);
+                        }}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Unid."
+                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.unidad}
+                        onChange={(e) => {
+                          const newExp = [...expensas];
+                          newExp[index].unidad = e.target.value;
+                          setExpensas(newExp);
+                        }}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Precio"
+                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.precio}
+                        onChange={(e) => {
+                          const newExp = [...expensas];
+                          newExp[index].precio = e.target.value;
+                          const cant = parseFloat(newExp[index].cantidad);
+                          const prec = parseFloat(e.target.value);
+                          if (!isNaN(cant) && !isNaN(prec)) {
+                            newExp[index].importe = (cant * prec).toFixed(2).toString();
+                          }
+                          setExpensas(newExp);
+                        }}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Importe"
+                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.importe}
+                        onChange={(e) => {
+                          const newExp = [...expensas];
+                          newExp[index].importe = e.target.value;
+                          setExpensas(newExp);
+                        }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newExp = [...expensas];
+                          newExp.splice(index, 1);
+                          setExpensas(newExp);
+                        }}
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
+                        title="Eliminar fila"
+                      >
+                        <i className="bi bi-trash-fill"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
+                  className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
+                </button>
+              </div>
 
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
               <OperationDocuments
@@ -2515,6 +2721,21 @@ export default function OperationDetail() {
           initialSubject={`Packing List - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
           initialBody={`Estimados,\n\nAdjuntamos el Packing List correspondiente a la operación en curso:\n\n• Cliente: ${operation.client_name}\n• Buque: ${operation.ship_name}\n• Puerto: ${operation.port_name}\n\nQuedamos a la espera de su confirmación para proceder.\n\nSaludos cordiales.`}
           initialAttachments={[aduanasEmailAttachment]}
+        />
+      )}
+
+      {/* Modal de Correo de Logística */}
+      {showLogisticaEmailModal && (
+        <ComposeEmailModal
+          onClose={() => setShowLogisticaEmailModal(false)}
+          onSuccess={handleLogisticaEmailSuccess}
+          replyTo={emails.find(e => e.message_id && !e.message_id.startsWith('OUT-')) || null}
+          user={user}
+          defaultOperacionId={id}
+          defaultRecipient={""}
+          initialSubject={`Logística de Despacho - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
+          initialBody={`Estimados,\n\nAdjunto remitimos la documentación para la logística de entrega de la siguiente operación:\n\nCliente: ${operation.client_name}\nBuque: ${operation.ship_name}\nPuerto: ${operation.port_name}\nETA: ${operation.eta ? new Date(operation.eta).toLocaleString() : 'No especificado'}\nLugar de Entrega: ${operation.delivery_method || 'No especificado'}\n\nFavor coordinar la entrega.\n\nSaludos.`}
+          initialAttachments={logisticaEmailAttachments}
         />
       )}
 

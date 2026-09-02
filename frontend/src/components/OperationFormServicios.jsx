@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { formatUserName } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import AutocompleteCreate from './AutocompleteCreate';
-
+import OperationEmails from './OperationEmails';
 /* =========================
    PRODUCT ROW (con verificación de stock)
 ========================= */
@@ -111,6 +111,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
 export default function OperationFormServicios({ id: propId, onClose, onSuccess, initialEmailData }) {
   const navigate = useNavigate();
   const id = propId;
+  const [showEmails, setShowEmails] = useState(false);
   const { user: currentUser } = useAuth();
 
   const normalize = (str) => {
@@ -472,17 +473,27 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+      <div className={`bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full ${showEmails ? 'max-w-[95vw]' : 'max-w-4xl'} max-h-[95vh] flex flex-col overflow-hidden my-auto transition-all duration-300`}>
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 shrink-0">
-          <h2 className="text-xl font-bold text-amber-800 dark:text-amber-300">
+          <h2 className="text-xl font-bold text-amber-800 dark:text-amber-300 flex items-center gap-3">
             {id ? `Editar Operación Servicio #${id}` : 'Nueva Operación: Servicio'}
+            {(id || initialEmailData) && (
+              <button
+                type="button"
+                onClick={() => setShowEmails(!showEmails)}
+                className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 transition-colors ${showEmails ? 'bg-amber-600 text-white shadow-md' : 'bg-white text-amber-600 border border-amber-200 hover:bg-amber-50'}`}
+              >
+                <i className="bi bi-envelope"></i> {showEmails ? 'Ocultar Correos' : 'Ver Correos'}
+              </button>
+            )}
           </h2>
           <button onClick={() => { localStorage.removeItem(DRAFT_KEY); onClose && onClose(); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-amber-100 dark:bg-slate-600 hover:bg-amber-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="flex flex-1 overflow-hidden">
+          <div className={`p-6 overflow-y-auto flex-1 custom-scrollbar ${showEmails ? 'border-r border-slate-200 dark:border-slate-700' : ''}`}>
 
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
@@ -724,7 +735,21 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
           </form>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl">
+        {showEmails && (
+          <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-envelope-paper text-amber-500"></i> Historial de Correos
+              </h3>
+            </div>
+            <div className="p-4 flex-1">
+              <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
+            </div>
+          </div>
+        )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl shrink-0">
           <button type="button" onClick={onClose}
             className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-600 shadow-sm transition-colors">
             Cancelar

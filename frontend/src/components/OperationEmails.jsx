@@ -6,13 +6,18 @@ import ReadEmailModal from './ReadEmailModal'; // Nuevo modal de lectura
 
 const getEmailPreview = (htmlOrText) => {
     if (!htmlOrText) return '(Sin contenido)';
+    // Pre-clean to prevent browser from fetching images (like cid: URLs)
+    const cleanHtml = htmlOrText
+        .replace(/<img[^>]*>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     const temp = document.createElement("div");
-    temp.innerHTML = htmlOrText;
+    temp.innerHTML = cleanHtml;
     const text = (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
     return text.length > 120 ? text.slice(0, 120) + '...' : text;
 };
 
-export default function OperationEmails({ operacionId, defaultRecipient, openPreview }) {
+export default function OperationEmails({ operacionId, defaultRecipient, openPreview, initialEmailData }) {
     const { user } = useAuth(); // Obtenemos el usuario para el modal
     const [emails, setEmails] = useState([]);
     const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -20,10 +25,14 @@ export default function OperationEmails({ operacionId, defaultRecipient, openPre
     const [readEmail, setReadEmail] = useState(null); // Estado para el modal de lectura
 
     const fetchEmails = useCallback(() => {
-        axios.get(`/correos/inbox/?operacion_id=${operacionId}`)
-            .then(res => setEmails(res.data.results || res.data || []))
-            .catch(console.error);
-    }, [operacionId]);
+        if (operacionId) {
+            axios.get(`/correos/inbox/?operacion_id=${operacionId}`)
+                .then(res => setEmails(res.data.results || res.data || []))
+                .catch(console.error);
+        } else if (initialEmailData) {
+            setEmails([initialEmailData]);
+        }
+    }, [operacionId, initialEmailData]);
 
     useEffect(() => {
         fetchEmails();
@@ -48,9 +57,15 @@ export default function OperationEmails({ operacionId, defaultRecipient, openPre
     };
 
     return (
-        <div className="mt-6 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 dark:bg-slate-800">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-md font-bold text-gray-900 dark:text-white">Historial de Comunicación</h3>
+        <div className="mt-6 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 dark:bg-slate-800 flex flex-col h-full">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+                <h3 className="text-md font-bold text-gray-900 dark:text-white">
+                    {readEmail ? (
+                        <button onClick={() => setReadEmail(null)} className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-1 transition-colors">
+                            <i className="bi bi-arrow-left"></i> Volver a la lista
+                        </button>
+                    ) : 'Historial de Comunicación'}
+                </h3>
                 {/* Botón para enviar un correo nuevo desde la operación */}
                 <button
                     onClick={handleNewEmail}
@@ -61,12 +76,22 @@ export default function OperationEmails({ operacionId, defaultRecipient, openPre
                 </button>
             </div>
 
-            {emails.length === 0 ? (
+            {readEmail ? (
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <ReadEmailModal
+                        email={readEmail}
+                        onClose={() => setReadEmail(null)}
+                        onReply={(email) => handleReply(email)}
+                        openPreview={openPreview}
+                        inline={true}
+                    />
+                </div>
+            ) : emails.length === 0 ? (
                 <p className="text-sm text-gray-500 dark:text-slate-400 p-4 text-center border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-lg">
                     No hay correos vinculados a esta operación.
                 </p>
             ) : (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                     {emails.map(email => (
                         <div 
                             key={email.id} 
@@ -107,15 +132,6 @@ export default function OperationEmails({ operacionId, defaultRecipient, openPre
             )}
 
             {/* Renderizado de Modales */}
-            {readEmail && (
-                <ReadEmailModal
-                    email={readEmail}
-                    onClose={() => setReadEmail(null)}
-                    onReply={(email) => handleReply(email)}
-                    openPreview={openPreview}
-                />
-            )}
-
             {isComposeOpen && (
                 <ComposeEmailModal
                     onClose={() => setIsComposeOpen(false)}
