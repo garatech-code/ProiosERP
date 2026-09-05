@@ -15,12 +15,13 @@ import AutocompleteCreate from './AutocompleteCreate';
 import ToolsModal from './ToolsModal';
 import OperationFormProductos from './OperationFormProductos';
 import OperationFormServicios from './OperationFormServicios';
+import FormattedNumberInput from './FormattedNumberInput';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 
 const getMediaUrl = (url) => {
   if (!url) return '';
-  
+
   let path = url;
   try {
     const parsed = new URL(url);
@@ -36,13 +37,13 @@ const getMediaUrl = (url) => {
     if (path.startsWith('media/')) return '/' + path;
     return '/media/' + path;
   }
-  
+
   const apiUrl = import.meta.env.VITE_API_URL;
   if (apiUrl && apiUrl.startsWith('http')) {
-      try {
-          const apiParsed = new URL(apiUrl);
-          return `${apiParsed.origin}${path}`;
-      } catch (err) {}
+    try {
+      const apiParsed = new URL(apiUrl);
+      return `${apiParsed.origin}${path}`;
+    } catch (err) { }
   }
 
   return path;
@@ -165,20 +166,59 @@ export default function OperationDetail() {
   const [expensas, setExpensas] = useState([]);
   const [otrosGastos, setOtrosGastos] = useState('');
 
-  // Preload expensas if empty, and translate defaults when language changes
+  // -------------------------------------------------------------
+  // Lógica de Expensas: Persistencia (localStorage/DB) y cálculo
+  // -------------------------------------------------------------
   useEffect(() => {
-    const isEs = cotizacionLang === 'es';
-    if (expensas.length === 0) {
-      setExpensas([
-        { descripcion: isEs ? 'Aduana y transporte hasta: {{ubicacion}}' : 'Customs and transport to: {{ubicacion}}', cantidad: '', unidad: '', precio: '', importe: '' },
-        { descripcion: isEs ? 'Hs extra de Aduana' : 'Customs Overtime', cantidad: '', unidad: '', precio: '', importe: '' }
-      ]);
-    } else {
+    if (operation && id) {
+      const isEs = cotizacionLang === 'es';
       const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
       const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
       const defaultHsEn = 'Customs Overtime';
       const defaultHsEs = 'Hs extra de Aduana';
-      
+
+      // 1. Intentar cargar desde localStorage (borrador local sin guardar)
+      const draft = localStorage.getItem(`expensas_draft_${id}`);
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed && parsed.length > 0) {
+            setExpensas(parsed);
+            return; // Cargado desde localStorage
+          }
+        } catch (e) {}
+      }
+
+      // 2. Intentar cargar desde el backend (operation.expensas)
+      if (operation.expensas) {
+        try {
+          const parsed = JSON.parse(operation.expensas);
+          if (parsed && parsed.length > 0) {
+            setExpensas(parsed);
+            return; // Cargado exitosamente desde DB
+          }
+        } catch(e) {}
+      }
+
+      // 3. Fallback: cargar los defaults vacíos si no hay nada
+      if (expensas.length === 0) {
+        setExpensas([
+          { descripcion: isEs ? defaultAduanaEs : defaultAduanaEn, cantidad: '', unidad: '', precio: '', importe: '' },
+          { descripcion: isEs ? defaultHsEs : defaultHsEn, cantidad: '', unidad: '', precio: '', importe: '' }
+        ]);
+      }
+    }
+  }, [operation, id]);
+
+  // Manejar el cambio de idioma para traducir los campos por defecto (si no fueron modificados)
+  useEffect(() => {
+    const isEs = cotizacionLang === 'es';
+    const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
+    const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
+    const defaultHsEn = 'Customs Overtime';
+    const defaultHsEs = 'Hs extra de Aduana';
+    
+    if (expensas.length > 0) {
       setExpensas(prev => prev.map(exp => {
         let newDesc = exp.descripcion;
         if (newDesc === defaultAduanaEn || newDesc === defaultAduanaEs) newDesc = isEs ? defaultAduanaEs : defaultAduanaEn;
@@ -186,7 +226,32 @@ export default function OperationDetail() {
         return { ...exp, descripcion: newDesc };
       }));
     }
-  }, [cotizacionLang, expensas.length]);
+  }, [cotizacionLang]);
+
+  // Auto-guardar en localStorage ante cada cambio
+  useEffect(() => {
+    if (id && expensas.length > 0) {
+      localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(expensas));
+    }
+  }, [expensas, id]);
+
+  // Handler centralizado para cambios en expensas (con auto-cálculo)
+  const handleExpensaChange = (index, field, value) => {
+    const newExp = [...expensas];
+    newExp[index][field] = value;
+    
+    if (field === 'cantidad' || field === 'precio') {
+      const parseVal = (v) => parseFloat(String(v).replace(',', '.'));
+      const cant = parseVal(newExp[index].cantidad);
+      const prec = parseVal(newExp[index].precio);
+      if (!isNaN(cant) && !isNaN(prec)) {
+        newExp[index].importe = (cant * prec).toFixed(2).toString();
+      } else {
+        newExp[index].importe = '';
+      }
+    }
+    setExpensas(newExp);
+  };
 
   useEffect(() => {
     if (showCotizacionWordModal) {
@@ -468,7 +533,7 @@ export default function OperationDetail() {
       operarios_id: operation?.operarios_id || [],
       operarios_usuarios_id: operation?.operarios_usuarios_id || [],
     });
-    
+
     if (availableUsers.length === 0 || availableStaff.length === 0) {
       try {
         const [usersRes, staffRes] = await Promise.all([
@@ -783,6 +848,57 @@ export default function OperationDetail() {
     } catch (error) {
       console.error("Error generando remito:", error);
       showToast('Error al generar el remito. Verifique que exista la plantilla.', 'error');
+    }
+  };
+
+  const downloadListaIngredientesExcel = async () => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/lista_ingredientes_excel/`, {
+        responseType: 'blob',
+      });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `lista_ingredientes_${id}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Error descargando lista de ingredientes", error);
+      showToast('Error al descargar la Lista de Ingredientes', 'error');
+    }
+  };
+
+  const previewListaIngredientesExcel = async () => {
+    try {
+      const response = await axios.get(`/operaciones/operations/${id}/lista_ingredientes_excel/`, {
+        responseType: 'blob',
+      });
+      const data = await response.data.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const html = XLSX.utils.sheet_to_html(firstSheet, { editable: false });
+      setExcelPreviewHtml(html);
+      setShowExcelModal(true);
+    } catch (error) {
+      console.error("Error previsualizando lista de ingredientes", error);
+      showToast('Error al generar la vista previa de la Lista de Ingredientes', 'error');
+    }
+  };
+
+  const downloadAduanasFile = async () => {
+    try {
+      await axios.post(`/operaciones/operations/${id}/request_review/`, {
+        mensaje_revision: mensajeRevision
+      });
+      showToast('Revisión solicitada exitosamente', 'success');
+      setMensajeRevision('');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al solicitar revisión', 'error');
+    } finally {
+      setRevisionActionLoading(false);
     }
   };
 
@@ -1559,9 +1675,9 @@ export default function OperationDetail() {
 
             <div className="lg:col-span-2 space-y-6">
 
-              
 
-              
+
+
 
 
               <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
@@ -1615,7 +1731,7 @@ export default function OperationDetail() {
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 m-0">
                             <i className="bi bi-people-fill"></i> Personal de Misión Asignado
                           </p>
-                          <button 
+                          <button
                             onClick={handleOpenStaffModal}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1"
                           >
@@ -1651,7 +1767,7 @@ export default function OperationDetail() {
                       <i className="bi bi-tools text-indigo-500 mr-2"></i> Detalles del Servicio Técnico
                     </h4>
                     {canEdit && (
-                      <button 
+                      <button
                         onClick={handleSaveServiceDetails}
                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2"
                       >
@@ -1783,11 +1899,11 @@ export default function OperationDetail() {
                               </button>
                             )}
                             {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                            <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
-                              {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
-                              Verificar Stock
-                            </button>
-                          )}
+                              <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
+                                {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
+                                Verificar Stock
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1806,49 +1922,49 @@ export default function OperationDetail() {
                         </div>
                       ) : (
                         <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                          <thead>
-                            <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
-                              <th className="px-6 py-4 text-left">Producto</th>
-                              <th className="px-6 py-4 text-center">Cant.</th>
-                              <th className="px-6 py-4 text-center">Disponibilidad</th>
-                              <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
-                            {operation.products?.map((prod, idx) => {
-                              const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
-                              return (
-                                <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
-                                  <td className="px-6 py-4">
-                                    <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
-                                  </td>
-                                  <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
-                                  <td className="px-6 py-4 text-center">
-                                    {isSuficiente ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
-                                        <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
-                                        <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
-                                    ${(prod.quantity * prod.unit_price).toFixed(2)}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
-                              <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
-                              <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                            <thead>
+                              <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
+                                <th className="px-6 py-4 text-left">Producto</th>
+                                <th className="px-6 py-4 text-center">Cant.</th>
+                                <th className="px-6 py-4 text-center">Disponibilidad</th>
+                                <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+                              {operation.products?.map((prod, idx) => {
+                                const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
+                                return (
+                                  <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
+                                    <td className="px-6 py-4">
+                                      <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
+                                    </td>
+                                    <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
+                                    <td className="px-6 py-4 text-center">
+                                      {isSuficiente ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
+                                          <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
+                                          <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
+                                      ${(prod.quantity * prod.unit_price).toFixed(2)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
+                                <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
+                                <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       )}
 
                       {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
@@ -2001,6 +2117,204 @@ export default function OperationDetail() {
                 </div>
               )}
 
+
+              {operation.tipo_operacion === 'servicios' && (
+                <>
+                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-card-text text-indigo-500"></i> Detalles del Trabajo a Realizar
+                      </h3>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="col-span-1 sm:col-span-2">
+                          <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                            {operation.detalle_servicio || <span className="text-slate-400 italic">No se ha detallado el trabajo a realizar.</span>}
+                          </p>
+                        </div>
+                        {operation.valor_servicio && (
+                          <div className="col-span-1">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Valor Total del Servicio</p>
+                            <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">${parseFloat(operation.valor_servicio).toFixed(2)}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-tools text-amber-500"></i> Solicitud Particular PNA (Herramientas a Bordo)
+                      </h3>
+                    </div>
+                    <div className="p-4 sm:p-6 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
+                          {operation.solicitud_particular_file && (
+                            <button
+                              onClick={() => openPreview(getMediaUrl(operation.solicitud_particular_file), 'Solicitud Particular Externa')}
+                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                            >
+                              <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                          {canEdit && (
+                            <button
+                              onClick={() => setIsToolsModalOpen(true)}
+                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            >
+                              <i className="bi bi-card-list"></i> Gestionar Herramientas
+                            </button>
+                          )}
+                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
+                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* EXPENSAS DETALLADAS (NUEVO) */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <i className="bi bi-cash-stack text-emerald-500"></i> Expensas (Gastos Detallados)
+                  </h3>
+                  <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                    <button
+                      onClick={() => setCotizacionLang('es')}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'es' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+                    >
+                      ES
+                    </button>
+                    <button
+                      onClick={() => setCotizacionLang('en')}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'en' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+                    >
+                      EN
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {expensas.map((exp, index) => (
+                    <div key={index} className="flex gap-2 items-start">
+                      <input
+                        type="text"
+                        placeholder="Descripción"
+                        className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.descripcion}
+                        onChange={(e) => handleExpensaChange(index, 'descripcion', e.target.value)}
+                      />
+                      <FormattedNumberInput
+                        placeholder="Cant."
+                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.cantidad}
+                        onChange={(val) => handleExpensaChange(index, 'cantidad', val)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Unid."
+                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.unidad}
+                        onChange={(e) => handleExpensaChange(index, 'unidad', e.target.value)}
+                      />
+                      <FormattedNumberInput
+                        placeholder="Precio"
+                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.precio}
+                        onChange={(val) => handleExpensaChange(index, 'precio', val)}
+                      />
+                      <FormattedNumberInput
+                        placeholder="Importe"
+                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                        value={exp.importe}
+                        onChange={(val) => handleExpensaChange(index, 'importe', val)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newExp = [...expensas];
+                          newExp.splice(index, 1);
+                          setExpensas(newExp);
+                        }}
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
+                        title="Eliminar fila"
+                      >
+                        <i className="bi bi-trash-fill"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
+                  className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
+                </button>
+              </div>
+
+              {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Configura las condiciones comerciales y descarga la cotización en PDF.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCotizacionWordModal(true)}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                    title="Configurar y generar cotización en Word"
+                  >
+                    Generar Cotización
+                  </button>
+                </div>
+              )}
+
+              {/* Generar Remito Box */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Descarga el remito autogenerado con los datos de esta operación.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={handleStartLogisticaEmail}
+                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      title="Enviar Remito a Logística"
+                    >
+                      <i className="bi bi-envelope"></i> Enviar Logística
+                    </button>
+                    <button
+                      onClick={handleGenerateRemito}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      title="Descargar Remito"
+                    >
+                      <i className="bi bi-download"></i> Generar Remito
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {true && (
                 <>
                   <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
@@ -2126,6 +2440,42 @@ export default function OperationDetail() {
                         </label>
                       </div>
 
+                      {/* Lista de Ingredientes (Solo para Químicos) */}
+                      {operation.tipo_operacion === 'quimicos' && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-800 dark:text-white">Lista de Ingredientes</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Detalle de fórmulas y cantidades a fabricar.</p>
+                            {operation.lista_ingredientes_file && (
+                              <button
+                                onClick={() => openPreview(getMediaUrl(operation.lista_ingredientes_file), 'Lista de Ingredientes Subida')}
+                                className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                              >
+                                <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                            <button
+                              onClick={previewListaIngredientesExcel}
+                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            >
+                              <i className="bi bi-eye-fill"></i> Vista Previa
+                            </button>
+                            <button
+                              onClick={downloadListaIngredientesExcel}
+                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            >
+                              <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
+                            </button>
+                            <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                              <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                              <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Factura */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
                         <div>
@@ -2149,237 +2499,6 @@ export default function OperationDetail() {
                   </div>
                 </>
               )}
-
-              {operation.tipo_operacion === 'servicios' && (
-                <>
-                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <i className="bi bi-card-text text-indigo-500"></i> Detalles del Trabajo a Realizar
-                      </h3>
-                    </div>
-                    <div className="p-4 sm:p-6 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="col-span-1 sm:col-span-2">
-                          <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                            {operation.detalle_servicio || <span className="text-slate-400 italic">No se ha detallado el trabajo a realizar.</span>}
-                          </p>
-                        </div>
-                        {operation.valor_servicio && (
-                          <div className="col-span-1">
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Valor Total del Servicio</p>
-                            <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">${parseFloat(operation.valor_servicio).toFixed(2)}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <i className="bi bi-tools text-amber-500"></i> Solicitud Particular PNA (Herramientas a Bordo)
-                      </h3>
-                    </div>
-                    <div className="p-4 sm:p-6 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
-                          {operation.solicitud_particular_file && (
-                            <button
-                              onClick={() => openPreview(getMediaUrl(operation.solicitud_particular_file), 'Solicitud Particular Externa')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver Documento Subido
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                          {canEdit && (
-                            <button
-                              onClick={() => setIsToolsModalOpen(true)}
-                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                            >
-                              <i className="bi bi-card-list"></i> Gestionar Herramientas
-                            </button>
-                          )}
-                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
-                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* EXPENSAS DETALLADAS (NUEVO) */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
-                <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
-                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <i className="bi bi-cash-stack text-emerald-500"></i> Expensas (Gastos Detallados)
-                  </h3>
-                  <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
-                    <button 
-                      onClick={() => setCotizacionLang('es')}
-                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'es' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-                    >
-                      ES
-                    </button>
-                    <button 
-                      onClick={() => setCotizacionLang('en')}
-                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'en' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-                    >
-                      EN
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  {expensas.map((exp, index) => (
-                    <div key={index} className="flex gap-2 items-start">
-                      <input 
-                        type="text" 
-                        placeholder="Descripción"
-                        className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.descripcion}
-                        onChange={(e) => {
-                          const newExp = [...expensas];
-                          newExp[index].descripcion = e.target.value;
-                          setExpensas(newExp);
-                        }}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Cant."
-                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.cantidad}
-                        onChange={(e) => {
-                          const newExp = [...expensas];
-                          newExp[index].cantidad = e.target.value;
-                          const cant = parseFloat(e.target.value);
-                          const prec = parseFloat(newExp[index].precio);
-                          if (!isNaN(cant) && !isNaN(prec)) {
-                            newExp[index].importe = (cant * prec).toFixed(2).toString();
-                          }
-                          setExpensas(newExp);
-                        }}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Unid."
-                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.unidad}
-                        onChange={(e) => {
-                          const newExp = [...expensas];
-                          newExp[index].unidad = e.target.value;
-                          setExpensas(newExp);
-                        }}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Precio"
-                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.precio}
-                        onChange={(e) => {
-                          const newExp = [...expensas];
-                          newExp[index].precio = e.target.value;
-                          const cant = parseFloat(newExp[index].cantidad);
-                          const prec = parseFloat(e.target.value);
-                          if (!isNaN(cant) && !isNaN(prec)) {
-                            newExp[index].importe = (cant * prec).toFixed(2).toString();
-                          }
-                          setExpensas(newExp);
-                        }}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Importe"
-                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.importe}
-                        onChange={(e) => {
-                          const newExp = [...expensas];
-                          newExp[index].importe = e.target.value;
-                          setExpensas(newExp);
-                        }}
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const newExp = [...expensas];
-                          newExp.splice(index, 1);
-                          setExpensas(newExp);
-                        }}
-                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
-                        title="Eliminar fila"
-                      >
-                        <i className="bi bi-trash-fill"></i>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
-                  className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                >
-                  <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
-                </button>
-              </div>
-
-                            {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Configura las condiciones comerciales y descarga la cotización en PDF.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowCotizacionWordModal(true)}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                    title="Configurar y generar cotización en Word"
-                  >
-                    Generar Cotización
-                  </button>
-                </div>
-              )}
-
-              {/* Generar Remito Box */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Descarga el remito autogenerado con los datos de esta operación.
-                    </p>
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={handleStartLogisticaEmail}
-                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                      title="Enviar Remito a Logística"
-                    >
-                      <i className="bi bi-envelope"></i> Enviar Logística
-                    </button>
-                    <button
-                      onClick={handleGenerateRemito}
-                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                      title="Descargar Remito"
-                    >
-                      <i className="bi bi-download"></i> Generar Remito
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
               <OperationDocuments
                 operacionId={operation.id}
@@ -3108,9 +3227,9 @@ Saludos cordiales.`
                 </pre>
               )}
               {previewFile.type === 'word' && (
-                <div 
+                <div
                   className="w-full h-full min-h-[80vh] p-8 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg overflow-auto text-sm word-preview"
-                  dangerouslySetInnerHTML={{ __html: previewFile.content }} 
+                  dangerouslySetInnerHTML={{ __html: previewFile.content }}
                 />
               )}
               {previewFile.type === 'unknown' && (

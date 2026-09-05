@@ -54,7 +54,7 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
   const handleQuantityChange = (productId, quantity) => {
     setSelected(prev => ({
       ...prev,
-      [productId]: { ...prev[productId], quantity: parseInt(quantity) || 1 },
+      [productId]: { ...prev[productId], quantity: quantity },
     }));
   };
 
@@ -68,7 +68,7 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
       return {
         product: product.id,
         product_name: product.nombre,
-        quantity: data.quantity,
+        quantity: parseFloat(String(data.quantity).replace(',', '.')) || 1,
         unit_price: parseFloat(product.precio_venta) || 0,
         stock_actual: product.stock_actual || 0,
         weight_kg: product.peso_kg || 0,
@@ -136,7 +136,7 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
                       </td>
                       <td className="px-4 py-2 text-sm">{product.nombre}</td>
                       <td className="px-4 py-2 text-sm">{product.presentacion}</td>
-                      <td className="px-4 py-2 text-sm font-semibold">{product.stock_actual}</td>
+                      <td className="px-4 py-2 text-sm font-semibold">{Number(product.stock_actual) % 1 === 0 ? Number(product.stock_actual) : Number(product.stock_actual).toLocaleString('es-AR', { maximumFractionDigits: 2 })}</td>
                       <td className="px-4 py-2">
                         <input
                           type="text"

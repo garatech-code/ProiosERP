@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from '../api/axios';
 import AutocompleteCreate from './AutocompleteCreate';
 import ProductMultiSelectModal from './ProductMultiSelectModal';
+import FormattedNumberInput from './FormattedNumberInput';
 
 function ProductRow({ product, index, onUpdate, onRemove, canEdit }) {
   const [selectedProduct, setSelectedProduct] = useState(
@@ -61,21 +62,9 @@ function ProductRow({ product, index, onUpdate, onRemove, canEdit }) {
       <div className="sm:col-span-2">
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cantidad *</label>
         {canEdit ? (
-          <input
-            type="text"
-            inputMode="decimal"
-            value={String(cantidad).replace('.', ',')}
-            onChange={(e) => {
-              let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',');
-              const parts = val.split(',');
-              if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('');
-              onUpdate(index, 'quantity', val);
-            }}
-            onBlur={(e) => {
-              let val = parseFloat(e.target.value.replace(',', '.'));
-              if (isNaN(val) || val <= 0) val = 1;
-              onUpdate(index, 'quantity', val);
-            }}
+          <FormattedNumberInput
+            value={cantidad}
+            onChange={(val) => onUpdate(index, 'quantity', val)}
             className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors dark:bg-slate-700 dark:text-white ${isStockInsufficient ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-slate-600'}`}
           />
         ) : (
@@ -92,12 +81,9 @@ function ProductRow({ product, index, onUpdate, onRemove, canEdit }) {
 
       <div className="sm:col-span-3">
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Unit. ($)</label>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
+        <FormattedNumberInput
           value={product.unit_price || 0}
-          onChange={(e) => onUpdate(index, 'unit_price', parseFloat(e.target.value) || 0)}
+          onChange={(val) => onUpdate(index, 'unit_price', val || 0)}
           disabled={!canEdit}
           className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         />
@@ -137,15 +123,17 @@ export default function DetalleCargaEditor({ operationId, initialProducts, canEd
 
   const handleAddMultipleProducts = (selectedProducts) => {
     const newProds = [];
-    Object.entries(selectedProducts).forEach(([productId, data]) => {
-      const exists = products.find(p => p.product === productId || String(p.product) === String(productId));
+    selectedProducts.forEach((data) => {
+      const exists = products.find(p => p.product === data.product || String(p.product) === String(data.product));
       if (!exists) {
         newProds.push({
-          product: productId,
+          product: data.product,
+          product_name: data.product_name,
           quantity: data.quantity || 1,
-          unit_price: 0,
-          weight_kg: null,
-          presentation: ''
+          unit_price: data.unit_price || 0,
+          weight_kg: data.weight_kg || null,
+          presentation: data.presentation || '',
+          stock_actual: data.stock_actual || 0
         });
       }
     });
