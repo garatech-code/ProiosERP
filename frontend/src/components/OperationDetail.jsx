@@ -10,6 +10,7 @@ import ProductSearchCards from './ProductSearchCards';
 import OperationEmails from './OperationEmails';
 import LogoSpinner from './LogoSpinner';
 import OperationDocuments from './OperationDocuments';
+import DetalleCargaEditor from './DetalleCargaEditor';
 import AutocompleteCreate from './AutocompleteCreate';
 import ToolsModal from './ToolsModal';
 import OperationFormProductos from './OperationFormProductos';
@@ -70,6 +71,7 @@ export default function OperationDetail() {
     operation_id: '', client: '', ship: '', port: '', eta: '', products: [], total_weight: 0, total_price: 0
   });
   const [isEditingPacking, setIsEditingPacking] = useState(false);
+  const [isEditingCarga, setIsEditingCarga] = useState(false);
   const [editPackingProducts, setEditPackingProducts] = useState([]);
 
   const editTotalWeight = useMemo(() => {
@@ -1557,56 +1559,9 @@ export default function OperationDetail() {
 
             <div className="lg:col-span-2 space-y-6">
 
-              {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Configura las condiciones comerciales y descarga la cotización en PDF.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowCotizacionWordModal(true)}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                    title="Configurar y generar cotización en Word"
-                  >
-                    Generar Cotización
-                  </button>
-                </div>
-              )}
+              
 
-              {/* Generar Remito Box */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Descarga el remito autogenerado con los datos de esta operación.
-                    </p>
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={handleStartLogisticaEmail}
-                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                      title="Enviar Remito a Logística"
-                    >
-                      <i className="bi bi-envelope"></i> Enviar Logística
-                    </button>
-                    <button
-                      onClick={handleGenerateRemito}
-                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                      title="Descargar Remito"
-                    >
-                      <i className="bi bi-download"></i> Generar Remito
-                    </button>
-                  </div>
-                </div>
-              )}
+              
 
 
               <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
@@ -1807,7 +1762,7 @@ export default function OperationDetail() {
                 </div>
               )}
 
-              {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+              {true && (
                 <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
                   {!isOperario ? (
                     <>
@@ -1816,16 +1771,41 @@ export default function OperationDetail() {
                           <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
                             <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
                           </h3>
-                          {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                          <div className="flex items-center gap-2">
+                            {canEdit && !isEditingCarga && (
+                              <button onClick={() => setIsEditingCarga(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
+                                <i className="bi bi-pencil-fill"></i> Editar Carga
+                              </button>
+                            )}
+                            {isEditingCarga && (
+                              <button onClick={() => setIsEditingCarga(false)} className="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 bg-white dark:bg-slate-800">
+                                Cancelar
+                              </button>
+                            )}
+                            {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
                             <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
                               {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
                               Verificar Stock
                             </button>
                           )}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto">
+                      {isEditingCarga ? (
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50">
+                          <DetalleCargaEditor
+                            operationId={operation.id}
+                            initialProducts={operation.products || []}
+                            canEdit={canEdit}
+                            onSaved={() => {
+                              setIsEditingCarga(false);
+                              fetchOperation();
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                           <thead>
                             <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
@@ -1869,6 +1849,7 @@ export default function OperationDetail() {
                           </tbody>
                         </table>
                       </div>
+                      )}
 
                       {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
                         <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl flex items-start gap-3">
@@ -2020,7 +2001,7 @@ export default function OperationDetail() {
                 </div>
               )}
 
-              {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+              {true && (
                 <>
                   <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
                     <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
@@ -2347,6 +2328,57 @@ export default function OperationDetail() {
                   <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
                 </button>
               </div>
+
+                            {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Configura las condiciones comerciales y descarga la cotización en PDF.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCotizacionWordModal(true)}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+                    title="Configurar y generar cotización en Word"
+                  >
+                    Generar Cotización
+                  </button>
+                </div>
+              )}
+
+              {/* Generar Remito Box */}
+              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
+                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                      Descarga el remito autogenerado con los datos de esta operación.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={handleStartLogisticaEmail}
+                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      title="Enviar Remito a Logística"
+                    >
+                      <i className="bi bi-envelope"></i> Enviar Logística
+                    </button>
+                    <button
+                      onClick={handleGenerateRemito}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      title="Descargar Remito"
+                    >
+                      <i className="bi bi-download"></i> Generar Remito
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
               <OperationDocuments

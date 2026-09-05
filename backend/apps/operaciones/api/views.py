@@ -332,6 +332,15 @@ class OperacionViewSet(viewsets.ModelViewSet):
         op.save()
         return Response({'status': 'ok'})
 
+    @action(detail=True, methods=['post'], url_path='upload_lista_ingredientes')
+    def upload_lista_ingredientes(self, request, pk=None):
+        op = self.get_object()
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=400)
+        op.lista_ingredientes_file = request.FILES['file']
+        op.save()
+        return Response({'status': 'ok'})
+
     @action(detail=True, methods=['post'], url_path='upload_remito')
     def upload_remito(self, request, pk=None):
         op = self.get_object()
@@ -365,6 +374,15 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.factura_file = request.FILES['file']
+        op.save()
+        return Response({'status': 'ok'})
+
+    @action(detail=True, methods=['post'], url_path='upload_reporte')
+    def upload_reporte(self, request, pk=None):
+        op = self.get_object()
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=400)
+        op.reporte_file = request.FILES['file']
         op.save()
         return Response({'status': 'ok'})
 
@@ -663,24 +681,37 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 cell.alignment = center_align
                 cell.fill = gray_header_fill
 
+            number_format = '#,##0.00'
+            currency_format = '"USD "#,##0.00'
+
             for prod in productos:
                 row += 1
                 ws.cell(row=row, column=1, value=prod['descripcion'])
-                ws.cell(row=row, column=2, value=prod['qty'])
-                ws.cell(row=row, column=3, value=round(prod['peso_neto'], 2))
-                ws.cell(row=row, column=4, value=round(prod['peso_bruto'], 2))
+                c2 = ws.cell(row=row, column=2, value=prod['qty'])
+                c2.number_format = number_format
+                c3 = ws.cell(row=row, column=3, value=float(prod['peso_neto']))
+                c3.number_format = number_format
+                c4 = ws.cell(row=row, column=4, value=float(prod['peso_bruto']))
+                c4.number_format = number_format
                 ws.cell(row=row, column=5, value=prod['un_vta'])
-                ws.cell(row=row, column=6, value=round(prod['fob_unitario'], 2))
-                ws.cell(row=row, column=7, value=round(prod['fob_total'], 2))
+                c6 = ws.cell(row=row, column=6, value=float(prod['fob_unitario']))
+                c6.number_format = number_format
+                c7 = ws.cell(row=row, column=7, value=float(prod['fob_total']))
+                c7.number_format = number_format
 
             row += 1
             ws.cell(row=row, column=1, value="TOTALES").font = Font(bold=True)
-            ws.cell(row=row, column=2, value=total_qty)
-            ws.cell(row=row, column=3, value=round(total_weight_neto, 2))
-            ws.cell(row=row, column=4, value=round(total_weight_bruto, 2))
+            c2_tot = ws.cell(row=row, column=2, value=float(total_qty))
+            c2_tot.number_format = number_format
+            c3_tot = ws.cell(row=row, column=3, value=float(total_weight_neto))
+            c3_tot.number_format = number_format
+            c4_tot = ws.cell(row=row, column=4, value=float(total_weight_bruto))
+            c4_tot.number_format = number_format
             ws.cell(row=row, column=5, value="")
-            ws.cell(row=row, column=6, value=f"USD {round(total_price, 2)}")
-            ws.cell(row=row, column=7, value=f"USD {round(total_price, 2)}")
+            c6_tot = ws.cell(row=row, column=6, value=float(total_price))
+            c6_tot.number_format = currency_format
+            c7_tot = ws.cell(row=row, column=7, value=float(total_price))
+            c7_tot.number_format = currency_format
 
             for col in range(1, 8):
                 ws.cell(row=row, column=col).fill = orange_fill
@@ -704,6 +735,112 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             logger.exception("Error generando packing list Excel")
+            return Response({"error": str(e)}, status=500)
+
+    @action(detail=True, methods=['get'], url_path='lista_ingredientes_excel')
+    def lista_ingredientes_excel(self, request, pk=None):
+        try:
+            op = self.get_object()
+            from apps.inventario.models import Articulo
+            from apps.produccion.models import FormulaBOM
+            
+            # Recolectar ingredientes
+            # Diccionario para agrupar por ingrediente: id -> {'articulo': obj, 'cantidad_requerida': total, 'formulas': set()}
+            ingredientes_consolidados = {}
+            
+            for detalle in op.detalles.all():
+                try:
+                    formula = FormulaBOM.objects.filter(articulo_final_id=detalle.articulo_id, activa=True).first()
+                    if not formula:
+                        continue
+                    for comp in formula.componentes.all():
+                        if comp.insumo_id not in ingredientes_consolidados:
+                            try:
+                                insumo = Articulo.objects.get(id=comp.insumo_id)
+                                ingredientes_consolidados[comp.insumo_id] = {
+                                    'articulo': insumo,
+                                    'cantidad_requerida': 0,
+                                    'formulas': set()
+                                }
+                            except Articulo.DoesNotExist:
+                                continue
+                        
+                        ingredientes_consolidados[comp.insumo_id]['cantidad_requerida'] += float(comp.cantidad_requerida) * float(detalle.cantidad)
+                        ingredientes_consolidados[comp.insumo_id]['formulas'].add(formula.nombre)
+                except Exception as e:
+                    print(f"Error procesando FormulaBOM para articulo {detalle.articulo_id}: {e}")
+                    continue
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "LISTA DE INGREDIENTES"
+
+            header_font = Font(bold=True, name='Arial', color='FFFFFF')
+            center_align = Alignment(horizontal='center', vertical='center')
+            left_align = Alignment(horizontal='left', vertical='center')
+            thin_border = Border(
+                left=Side(style='thin'), right=Side(style='thin'),
+                top=Side(style='thin'), bottom=Side(style='thin')
+            )
+            indigo_fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
+
+            encabezados_info = [
+                ("OPERACIÓN:", op.nombre or f"OP-{op.id}"),
+                ("CLIENTE:", op.cliente.name if op.cliente else ""),
+                ("BUQUE:", op.ship.name if op.ship else ""),
+            ]
+            row = 1
+            for label, value in encabezados_info:
+                ws.cell(row=row, column=1, value=label).font = Font(bold=True)
+                ws.cell(row=row, column=2, value=value)
+                row += 1
+
+            row += 1
+            headers = ["ID", "INGREDIENTE", "CANTIDAD REQUERIDA", "UNIDAD", "USADO EN (RECETAS)"]
+            for col, header in enumerate(headers, start=1):
+                cell = ws.cell(row=row, column=col, value=header)
+                cell.font = header_font
+                cell.alignment = center_align
+                cell.fill = indigo_fill
+
+            number_format = '#,##0.00'
+
+            for insumo_id, data in ingredientes_consolidados.items():
+                row += 1
+                ins = data['articulo']
+                
+                c1 = ws.cell(row=row, column=1, value=ins.id)
+                c1.alignment = center_align
+                
+                c2 = ws.cell(row=row, column=2, value=ins.nombre)
+                c2.alignment = left_align
+                
+                c3 = ws.cell(row=row, column=3, value=float(data['cantidad_requerida']))
+                c3.number_format = number_format
+                
+                c4 = ws.cell(row=row, column=4, value=ins.unidad or ins.presentacion or 'u')
+                c4.alignment = center_align
+                
+                c5 = ws.cell(row=row, column=5, value=", ".join(data['formulas']))
+                c5.alignment = left_align
+
+                for c in range(1, 6):
+                    ws.cell(row=row, column=c).border = thin_border
+
+            column_widths = [10, 40, 20, 15, 40]
+            for i, width in enumerate(column_widths, start=1):
+                ws.column_dimensions[get_column_letter(i)].width = width
+
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+
+            response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="lista_ingredientes_{op.id}.xlsx"'
+            return response
+
+        except Exception as e:
+            logger.exception("Error generando lista ingredientes Excel")
             return Response({"error": str(e)}, status=500)
 
     @action(detail=True, methods=['post'])

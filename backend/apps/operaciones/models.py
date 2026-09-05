@@ -146,6 +146,8 @@ class Operacion(models.Model):
     rancho_file = models.FileField(upload_to='ranchos/', null=True, blank=True)
     solicitud_particular_file = models.FileField(upload_to='solicitud_particular/', null=True, blank=True)
     factura_file = models.FileField(upload_to='facturas/', null=True, blank=True)
+    reporte_file = models.FileField(upload_to='reportes/', null=True, blank=True)
+    lista_ingredientes_file = models.FileField(upload_to='lista_ingredientes/', null=True, blank=True)
     stock_consumido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

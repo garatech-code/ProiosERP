@@ -68,10 +68,20 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       <div className="sm:col-span-2">
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cantidad *</label>
         <input
-          type="number"
-          min="1"
-          value={cantidad}
-          onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
+          type="text"
+          inputMode="decimal"
+          value={String(cantidad).replace('.', ',')}
+          onChange={(e) => {
+            let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',');
+            const parts = val.split(',');
+            if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('');
+            onUpdate(index, 'quantity', val);
+          }}
+          onBlur={(e) => {
+            let val = parseFloat(e.target.value.replace(',', '.'));
+            if (isNaN(val) || val <= 0) val = 1;
+            onUpdate(index, 'quantity', val);
+          }}
           className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors dark:bg-slate-700 dark:text-white ${isStockInsufficient ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-slate-600'}`}
         />
         {isStockInsufficient && (
@@ -729,17 +739,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Notas Adicionales</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows={3}
-                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                placeholder="Información extra para logística o planta..."
-              />
-            </div>
+            
 
             <div className="flex items-center gap-2 mt-4 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl">
               <input
@@ -756,60 +756,7 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
               </label>
             </div>
 
-            {id && (
-              <div className="bg-gray-50 dark:bg-slate-900/50 p-5 rounded-xl border border-gray-200">
-                <h4 className="text-md font-bold text-gray-900 dark:text-white mb-4 border-b pb-2">Documentos de la Operación</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Packing List</span>
-                      {existingFiles.packing_list_file ? (
-                        <a href={existingFiles.packing_list_file} target="_blank" rel="noreferrer" className="text-indigo-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.packing_list_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'packing_list_file')} disabled={uploading} />
-                    </label>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Remito</span>
-                      {existingFiles.remito_file ? (
-                        <a href={existingFiles.remito_file} target="_blank" rel="noreferrer" className="text-emerald-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <div className="flex flex-col gap-2 mt-3">
-                      <label className="cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                        {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
-                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleGenerateRemito}
-                        className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 py-1.5 px-3 text-center rounded text-xs font-bold hover:bg-indigo-100 dark:bg-indigo-900/30 transition-colors"
-                      >
-                        Generar DOCX
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Rancho</span>
-                      {existingFiles.rancho_file ? (
-                        <a href={existingFiles.rancho_file} target="_blank" rel="noreferrer" className="text-amber-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.rancho_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'rancho_file')} disabled={uploading} />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
+            
           </form>
         </div>
         

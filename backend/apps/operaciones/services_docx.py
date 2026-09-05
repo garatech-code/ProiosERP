@@ -117,6 +117,32 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 'precio': precio_unit_str,
                 'importe': format_num(importe_total)
             })
+
+        # --- AÑADIDO: También cargar productos para operaciones de servicio si tienen Detalle de Carga ---
+        from apps.inventario.models import Articulo
+        for detalle in op.detalles.all():
+            try:
+                articulo = Articulo.objects.get(id=detalle.articulo_id)
+                desc = (articulo.nombre_en if getattr(articulo, 'nombre_en', None) else articulo.nombre) if lang == 'en' else articulo.nombre
+                item_unidad = format_unit(articulo.unidad, lang)
+            except Articulo.DoesNotExist:
+                desc = f"Item {detalle.articulo_id}"
+                item_unidad = format_unit("u", lang)
+                
+            cant = float(detalle.cantidad or 1)
+            precio = float(detalle.precio_unitario or 0)
+            subtotal = cant * precio
+            importe_total += subtotal
+            
+            items_context.append({
+                'descripcion': desc,
+                'scope_of_work': desc,
+                'categoria': 'Product' if lang == 'en' else 'Producto',
+                'cantidad': cant,
+                'unidad': item_unidad,
+                'precio': format_num(precio),
+                'importe': format_num(subtotal)
+            })
     else:
         scope_lines = []
         importe_total = 0.0

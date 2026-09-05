@@ -4,6 +4,8 @@ import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { formatUserName } from '../utils/formatters';
 import AutocompleteCreate from './AutocompleteCreate';
+import OperationEmails from './OperationEmails';
+import * as XLSX from 'xlsx';
 import ProductMultiSelectModal from './ProductMultiSelectModal';
 
 function ProductRow({ product, index, onUpdate, onRemove }) {
@@ -63,10 +65,20 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       <div className="sm:col-span-2">
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cantidad (Litros) *</label>
         <input
-          type="number"
-          min="1"
-          value={cantidad}
-          onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
+          type="text"
+          inputMode="decimal"
+          value={String(cantidad).replace('.', ',')}
+          onChange={(e) => {
+            let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',');
+            const parts = val.split(',');
+            if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('');
+            onUpdate(index, 'quantity', val);
+          }}
+          onBlur={(e) => {
+            let val = parseFloat(e.target.value.replace(',', '.'));
+            if (isNaN(val) || val <= 0) val = 1;
+            onUpdate(index, 'quantity', val);
+          }}
           className={`block w-full py-2 px-3 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors dark:bg-slate-700 dark:text-white ${isStockInsufficient ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-slate-600'}`}
         />
         {isStockInsufficient && (
@@ -123,6 +135,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
   };
 
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [showEmails, setShowEmails] = useState(false);
   const [availableStaff, setAvailableStaff] = useState([]);
   const [filterOp, setFilterOp] = useState('');
   const [filterUserOp, setFilterUserOp] = useState('');
@@ -459,17 +472,27 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-2 sm:p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+      <div className={`bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full ${showEmails ? 'max-w-[95vw]' : 'max-w-4xl'} max-h-[95vh] flex flex-col overflow-hidden my-auto transition-all duration-300`}>
         <div className="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-teal-50 dark:bg-slate-700/50 shrink-0">
-          <h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">
+          <h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-3">
             {id ? `Editar Operación Químicos #${id}` : 'Nueva Operación: Químicos'}
+            {(id || initialEmailData) && (
+              <button
+                type="button"
+                onClick={() => setShowEmails(!showEmails)}
+                className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 transition-colors ${showEmails ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50'}`}
+              >
+                <i className="bi bi-envelope"></i> {showEmails ? 'Ocultar Correos' : 'Ver Correos'}
+              </button>
+            )}
           </h2>
           <button onClick={() => { localStorage.removeItem(DRAFT_KEY); onClose && onClose(); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-emerald-100 dark:bg-slate-600 hover:bg-emerald-200 dark:hover:bg-slate-500 rounded-full p-2 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="flex flex-1 overflow-hidden">
+          <div className={`p-6 overflow-y-auto flex-1 custom-scrollbar ${showEmails ? 'border-r border-slate-200 dark:border-slate-700' : ''}`}>
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
               <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
@@ -636,67 +659,27 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Notas Adicionales</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows={3}
-                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                placeholder="Información extra para logística o planta..."
-              />
-            </div>
+            
 
-            {id && (
-              <div className="bg-gray-50 dark:bg-slate-900/50 p-5 rounded-xl border border-gray-200">
-                <h4 className="text-md font-bold text-gray-900 dark:text-white mb-4 border-b pb-2">Documentos de la Operación</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Packing List</span>
-                      {existingFiles.packing_list_file ? (
-                        <a href={existingFiles.packing_list_file} target="_blank" rel="noreferrer" className="text-indigo-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.packing_list_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'packing_list_file')} disabled={uploading} />
-                    </label>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Remito</span>
-                      {existingFiles.remito_file ? (
-                        <a href={existingFiles.remito_file} target="_blank" rel="noreferrer" className="text-emerald-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
-                    </label>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Rancho</span>
-                      {existingFiles.rancho_file ? (
-                        <a href={existingFiles.rancho_file} target="_blank" rel="noreferrer" className="text-amber-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.rancho_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'rancho_file')} disabled={uploading} />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
+            
           </form>
         </div>
+        
+        {showEmails && (
+          <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-envelope-paper text-indigo-500"></i> Historial de Correos
+              </h3>
+            </div>
+            <div className="p-4 flex-1">
+              <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
+            </div>
+          </div>
+        )}
+      </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl">
+      <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}

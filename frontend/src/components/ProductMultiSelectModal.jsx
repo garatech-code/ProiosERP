@@ -139,11 +139,22 @@ export default function ProductMultiSelectModal({ isOpen, onClose, onAddProducts
                       <td className="px-4 py-2 text-sm font-semibold">{product.stock_actual}</td>
                       <td className="px-4 py-2">
                         <input
-                          type="number"
-                          min="1"
-                          value={selected[product.id]?.quantity || 1}
+                          type="text"
+                          inputMode="decimal"
+                          value={selected[product.id]?.quantity !== undefined ? String(selected[product.id].quantity).replace('.', ',') : '1'}
                           disabled={!isSelected || isAlreadyInOperation}
-                          onChange={(e) => handleQuantityChange(product.id, e.target.value)}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/[^0-9,.]/g, '').replace('.', ',');
+                            // Allow only one comma
+                            const parts = val.split(',');
+                            if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('');
+                            handleQuantityChange(product.id, val);
+                          }}
+                          onBlur={(e) => {
+                            let val = parseFloat(e.target.value.replace(',', '.'));
+                            if (isNaN(val) || val <= 0) val = 1;
+                            handleQuantityChange(product.id, val);
+                          }}
                           className="w-20 px-2 py-1 border rounded text-center dark:bg-slate-600"
                         />
                       </td>

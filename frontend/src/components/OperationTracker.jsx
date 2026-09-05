@@ -7,7 +7,7 @@ export default function OperationTracker({ currentState, operationType }) {
     // Mapeo robusto de estados (soporta los tuyos en español e inglés)
     const getActiveStep = (state) => {
         if (state === 'cancelada' || state === 'cancelled') return -1;
-        
+
         if (isService) {
             switch (state) {
                 case 'recibida':
@@ -67,7 +67,7 @@ export default function OperationTracker({ currentState, operationType }) {
     const stepsService = [
         { num: 1, label: 'Solicitud Recibida', icon: 'bi-file-earmark-text', desc: 'Análisis de servicio' },
         { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
-        { num: 3, label: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA' },
+        { num: 3, label: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA/Aduana' },
         { num: 4, label: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
         { num: 5, label: 'Reporte Final', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
     ];

@@ -678,59 +678,9 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
             </div>
 
 
-            <div>
-              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Notas Adicionales</label>
-              <textarea name="notes" value={formData.notes} onChange={handleChange} rows={3}
-                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                placeholder="Información extra para logística o planta..."
-              />
-            </div>
+            
 
-            {id && (
-              <div className="bg-gray-50 dark:bg-slate-900/50 p-5 rounded-xl border border-gray-200">
-                <h4 className="text-md font-bold text-gray-900 dark:text-white mb-4 border-b pb-2">Documentos de la Operación</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Packing List</span>
-                      {existingFiles.packing_list_file ? (
-                        <a href={existingFiles.packing_list_file} target="_blank" rel="noreferrer" className="text-indigo-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.packing_list_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'packing_list_file')} disabled={uploading} />
-                    </label>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Remito</span>
-                      {existingFiles.remito_file ? (
-                        <a href={existingFiles.remito_file} target="_blank" rel="noreferrer" className="text-emerald-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.remito_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'remito_file')} disabled={uploading} />
-                    </label>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <span className="text-sm font-bold text-gray-800 dark:text-slate-200 block">Rancho</span>
-                      {existingFiles.rancho_file ? (
-                        <a href={existingFiles.rancho_file} target="_blank" rel="noreferrer" className="text-amber-600 text-xs font-medium hover:underline">Ver Archivo</a>
-                      ) : <span className="text-xs text-gray-400">Sin archivo</span>}
-                    </div>
-                    <label className="mt-3 cursor-pointer bg-slate-100 dark:bg-slate-900/30 py-1.5 px-3 text-center rounded text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors">
-                      {existingFiles.rancho_file ? 'Reemplazar' : 'Subir'}
-                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'rancho_file')} disabled={uploading} />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
+            
 
           </form>
         </div>
