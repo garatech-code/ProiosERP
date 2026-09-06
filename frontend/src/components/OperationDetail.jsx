@@ -186,7 +186,7 @@ export default function OperationDetail() {
             setExpensas(parsed);
             return; // Cargado desde localStorage
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // 2. Intentar cargar desde el backend (operation.expensas)
@@ -197,7 +197,7 @@ export default function OperationDetail() {
             setExpensas(parsed);
             return; // Cargado exitosamente desde DB
           }
-        } catch(e) {}
+        } catch (e) { }
       }
 
       // 3. Fallback: cargar los defaults vacíos si no hay nada
@@ -217,7 +217,7 @@ export default function OperationDetail() {
     const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
     const defaultHsEn = 'Customs Overtime';
     const defaultHsEs = 'Hs extra de Aduana';
-    
+
     if (expensas.length > 0) {
       setExpensas(prev => prev.map(exp => {
         let newDesc = exp.descripcion;
@@ -239,7 +239,7 @@ export default function OperationDetail() {
   const handleExpensaChange = (index, field, value) => {
     const newExp = [...expensas];
     newExp[index][field] = value;
-    
+
     if (field === 'cantidad' || field === 'precio') {
       const parseVal = (v) => parseFloat(String(v).replace(',', '.'));
       const cant = parseVal(newExp[index].cantidad);
@@ -1519,6 +1519,621 @@ export default function OperationDetail() {
 
   const shipFlag = operation.ship_flag || (operation.ship ? operation.ship.flag : '');
 
+
+  // --- LAYOUT BLOCKS ---
+  const nodeDetalleCarga = (
+    <>
+      <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+        {!isOperario ? (
+          <>
+            <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
+                </h3>
+                <div className="flex items-center gap-2">
+                  {canEdit && !isEditingCarga && (
+                    <button onClick={() => setIsEditingCarga(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
+                      <i className="bi bi-pencil-fill"></i> Editar Carga
+                    </button>
+                  )}
+                  {isEditingCarga && (
+                    <button onClick={() => setIsEditingCarga(false)} className="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 bg-white dark:bg-slate-800">
+                      Cancelar
+                    </button>
+                  )}
+                  {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                    <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
+                      {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
+                      Verificar Stock
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {isEditingCarga ? (
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50">
+                <DetalleCargaEditor
+                  operationId={operation.id}
+                  initialProducts={operation.products || []}
+                  canEdit={canEdit}
+                  onSaved={() => {
+                    setIsEditingCarga(false);
+                    fetchOperation();
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                  <thead>
+                    <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
+                      <th className="px-6 py-4 text-left">Producto</th>
+                      <th className="px-6 py-4 text-center">Cant.</th>
+                      <th className="px-6 py-4 text-center">Disponibilidad</th>
+                      <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+                    {operation.products?.map((prod, idx) => {
+                      const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
+                      return (
+                        <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
+                          </td>
+                          <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
+                          <td className="px-6 py-4 text-center">
+                            {isSuficiente ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
+                                <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
+                                <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
+                            ${(prod.quantity * prod.unit_price).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
+                      <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
+                      <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+              <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl flex items-start gap-3">
+                <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
+                <div>
+                  <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
+                  <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
+                    {stockVerification.errores?.map((err, idx) => (
+                      <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
+                        <div>
+                          • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
+                        </div>
+                        {err.formula_shortage && err.formula_shortage.length > 0 && (
+                          <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
+                            <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
+                              <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
+                            </span>
+                            <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
+                              {err.formula_shortage.map((fS, fIdx) => (
+                                <li key={fIdx}>
+                                  <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <OperarioActionPanel products={operation.products} />
+        )}
+      </div>
+    </>
+  );
+
+  const nodeOrdersAndPedido = (
+    <>
+      {(!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing' || productionOrders.length > 0)) && (
+        <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+          <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex justify-between items-center">
+            <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <i className="bi bi-gear-fill text-indigo-500"></i> Órdenes de Fabricación (BOM)
+            </h3>
+            {(operation.estado === 'solicitada' || operation.estado === 'armado_packing') && stockVerification && !stockVerification.todo_suficiente && (
+              <button
+                onClick={handleGenerateProductionOrders}
+                disabled={generatingProduction}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {generatingProduction ? (
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                ) : (
+                  <i className="bi bi-plus-circle-fill"></i>
+                )}
+                Generar Órdenes de Producción
+              </button>
+            )}
+          </div>
+          <div className="p-4 sm:p-6 space-y-4">
+            {productionOrders.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
+                No hay órdenes de fabricación generadas para esta operación.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                {productionOrders.map((order) => (
+                  <div key={order.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-800 dark:text-white truncate">
+                        {order.articulo_final_nombre}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                        Fórmula: {order.formula_nombre} • Cantidad: <span className="font-bold text-slate-700 dark:text-slate-300">{parseFloat(order.cantidad_a_producir).toFixed(2)}</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Solicitado: {new Date(order.fecha_solicitud).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {order.completada ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
+                          <i className="bi bi-check-circle-fill"></i> Completada
+                        </span>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-amber-50 text-amber-600 border border-amber-200 uppercase">
+                            <i className="bi bi-hourglass-split"></i> Pendiente
+                          </span>
+                          <button
+                            onClick={() => handleCompleteProductionOrder(order.id)}
+                            disabled={completingProduction[order.id]}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 animate-pulse"
+                          >
+                            {completingProduction[order.id] ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                            ) : (
+                              <i className="bi bi-play-fill text-sm"></i>
+                            )}
+                            Completar Producción
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {operation.texto_pedido && (
+        <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+          <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+            <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <i className="bi bi-chat-left-text-fill text-indigo-500"></i> Pedido Original (Preparación)
+            </h3>
+          </div>
+          <div className="p-4 sm:p-6 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
+            {operation.texto_pedido}
+          </div>
+
+          {(!isOperario) && (
+            <div className="px-4 py-4 sm:px-6 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <ProductSearchCards initialProducts={detectedProducts} />
+            </div>
+          )}
+        </div>
+      )}
+
+    </>
+  );
+
+  const nodeMaterialesABordo = (
+    <>
+      <div className="bg-indigo-50/50 dark:bg-indigo-900/10 shadow-sm sm:rounded-2xl border border-indigo-100 dark:border-indigo-800/30 overflow-hidden mb-6 p-4 sm:p-6 flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300">Materiales que quedarán a bordo (Consumibles / Repuestos)</h4>
+          <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mt-1">
+            Activa esta opción si se dejarán materiales en el buque. Esto habilitará la generación de Packing List y Rancho Aduanero.
+          </p>
+        </div>
+        <button
+          onClick={() => setLeaveMaterials(!leaveMaterials)}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${leaveMaterials ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+          role="switch"
+          aria-checked={leaveMaterials}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-slate-800 shadow ring-0 transition duration-200 ease-in-out ${leaveMaterials ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+      </div>
+    </>
+  );
+
+  const nodeSolicitudParticular = (
+    <>
+      <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+        <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+          <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <i className="bi bi-tools text-amber-500"></i> Solicitud Particular (Herramientas a Bordo)
+          </h3>
+        </div>
+        <div className="p-4 sm:p-6 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
+              {operation.solicitud_particular_file && (
+                <button
+                  onClick={() => openPreview(getMediaUrl(operation.solicitud_particular_file), 'Solicitud Particular Externa')}
+                  className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                >
+                  <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+              {canEdit && (
+                <button
+                  onClick={() => setIsToolsModalOpen(true)}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <i className="bi bi-card-list"></i> Gestionar Herramientas
+                </button>
+              )}
+              <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
+                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  const nodeExpensasYBotones = (
+    <>
+      {/* EXPENSAS DETALLADAS (NUEVO) */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
+        <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+          <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <i className="bi bi-cash-stack text-emerald-500"></i> Expensas (Gastos Detallados)
+          </h3>
+          <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+            <button
+              onClick={() => setCotizacionLang('es')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'es' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+            >
+              ES
+            </button>
+            <button
+              onClick={() => setCotizacionLang('en')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'en' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+            >
+              EN
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {expensas.map((exp, index) => (
+            <div key={index} className="flex gap-2 items-start">
+              <input
+                type="text"
+                placeholder="Descripción"
+                className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                value={exp.descripcion}
+                onChange={(e) => handleExpensaChange(index, 'descripcion', e.target.value)}
+              />
+              <FormattedNumberInput
+                placeholder="Cant."
+                className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                value={exp.cantidad}
+                onChange={(val) => handleExpensaChange(index, 'cantidad', val)}
+              />
+              <input
+                type="text"
+                placeholder="Unid."
+                className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                value={exp.unidad}
+                onChange={(e) => handleExpensaChange(index, 'unidad', e.target.value)}
+              />
+              <FormattedNumberInput
+                placeholder="Precio"
+                className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                value={exp.precio}
+                onChange={(val) => handleExpensaChange(index, 'precio', val)}
+              />
+              <FormattedNumberInput
+                placeholder="Importe"
+                className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
+                value={exp.importe}
+                onChange={(val) => handleExpensaChange(index, 'importe', val)}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const newExp = [...expensas];
+                  newExp.splice(index, 1);
+                  setExpensas(newExp);
+                }}
+                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
+                title="Eliminar fila"
+              >
+                <i className="bi bi-trash-fill"></i>
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
+          className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+        >
+          <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
+        </button>
+      </div>
+
+      {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
+      {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
+        <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+              Configura las condiciones comerciales y descarga la cotización en PDF.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCotizacionWordModal(true)}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
+            title="Configurar y generar cotización en Word"
+          >
+            Generar Cotización
+          </button>
+        </div>
+      )}
+
+      {/* Generar Remito Box */}
+      {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
+        <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+              Descarga el remito autogenerado con los datos de esta operación.
+            </p>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleStartLogisticaEmail}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+              title="Enviar Remito a Logística"
+            >
+              <i className="bi bi-envelope"></i> Enviar Logística
+            </button>
+            <button
+              onClick={handleGenerateRemito}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+              title="Descargar Remito"
+            >
+              <i className="bi bi-download"></i> Generar Remito
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const nodePackingYDoc = (
+    <>
+      <>
+        <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+          <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
+              </h3>
+            </div>
+          </div>
+          <div className="p-4 sm:p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PROVEEDOR</label>
+                <select
+                  value={proveedor}
+                  onChange={(e) => setProveedor(e.target.value)}
+                  className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                >
+                  <option value="PROIOS SA">PROIOS SA (CUIT: 30-63661723-3)</option>
+                  <option value="PROIOS SALVAGE SA">PROIOS SALVAGE SA (CUIT: 33-71087653-9)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
+                <select
+                  value={paisDestino}
+                  onChange={(e) => setPaisDestino(e.target.value)}
+                  className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                >
+                  <option value="argentina">Argentina (empresa argentina)</option>
+                  <option value="bandera">Bandera del buque (cliente extranjero)</option>
+                </select>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  {paisDestino === 'argentina' ? 'Se usará Argentina' : (shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Bandera no especificada en el buque')}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+          <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+            <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
+            </h3>
+          </div>
+          <div className="p-4 sm:p-6 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
+                {operation.packing_list_file && (
+                  <button
+                    onClick={() => openPreview(getMediaUrl(operation.packing_list_file), 'Packing List')}
+                    className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                  >
+                    <i className="bi bi-eye-fill"></i> Ver Documento
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                <button
+                  onClick={handleOpenPackingModal}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <i className={`bi ${canEdit ? 'bi-pencil-square' : 'bi-eye-fill'}`}></i> {canEdit ? 'Editar' : 'Ver'}
+                </button>
+                <button
+                  onClick={previewPackingListExcel}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <i className="bi bi-eye-fill"></i> Vista Previa
+                </button>
+                <button
+                  onClick={downloadPackingListExcel}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
+                </button>
+                <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
+                {operation.remito_file && (
+                  <button
+                    onClick={() => openPreview(getMediaUrl(operation.remito_file), 'Remito Firmado')}
+                    className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                  >
+                    <i className="bi bi-eye-fill"></i> Ver Documento
+                  </button>
+                )}
+              </div>
+              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
+                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+              </label>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
+                {operation.rancho_file && (
+                  <button
+                    onClick={() => openPreview(getMediaUrl(operation.rancho_file), 'Rancho / Permiso Aduanero')}
+                    className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                  >
+                    <i className="bi bi-eye-fill"></i> Ver Documento
+                  </button>
+                )}
+              </div>
+              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
+                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+              </label>
+            </div>
+
+            {/* Lista de Ingredientes (Solo para Químicos) */}
+            {operation.tipo_operacion === 'quimicos' && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-white">Lista de Ingredientes</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Detalle de fórmulas y cantidades a fabricar.</p>
+                  {operation.lista_ingredientes_file && (
+                    <button
+                      onClick={() => openPreview(getMediaUrl(operation.lista_ingredientes_file), 'Lista de Ingredientes Subida')}
+                      className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                    >
+                      <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                  <button
+                    onClick={previewListaIngredientesExcel}
+                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <i className="bi bi-eye-fill"></i> Vista Previa
+                  </button>
+                  <button
+                    onClick={downloadListaIngredientesExcel}
+                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
+                  </button>
+                  <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Factura */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Factura de Operación</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Documento de facturación obligatoria.</p>
+                {operation.factura_file && (
+                  <button
+                    onClick={() => openPreview(getMediaUrl(operation.factura_file), 'Factura')}
+                    className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                  >
+                    <i className="bi bi-eye-fill"></i> Ver Documento
+                  </button>
+                )}
+              </div>
+              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
+                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+              </label>
+            </div>
+          </div>
+        </div>
+      </>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
       <nav className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40 border-b border-transparent dark:border-slate-700">
@@ -1878,627 +2493,30 @@ export default function OperationDetail() {
                 </div>
               )}
 
-              {true && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                  {!isOperario ? (
+
+              {/* === LAYOUT DINAMICO === */}
+              {operation.tipo_operacion === 'servicios' ? (
+                <>
+                  {nodeExpensasYBotones}
+                  {nodeMaterialesABordo}
+                  {leaveMaterials && (
                     <>
-                      <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                        <div className="flex justify-between items-center">
-                          <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                            <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            {canEdit && !isEditingCarga && (
-                              <button onClick={() => setIsEditingCarga(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
-                                <i className="bi bi-pencil-fill"></i> Editar Carga
-                              </button>
-                            )}
-                            {isEditingCarga && (
-                              <button onClick={() => setIsEditingCarga(false)} className="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 bg-white dark:bg-slate-800">
-                                Cancelar
-                              </button>
-                            )}
-                            {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                              <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
-                                {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
-                                Verificar Stock
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {isEditingCarga ? (
-                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50">
-                          <DetalleCargaEditor
-                            operationId={operation.id}
-                            initialProducts={operation.products || []}
-                            canEdit={canEdit}
-                            onSaved={() => {
-                              setIsEditingCarga(false);
-                              fetchOperation();
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                            <thead>
-                              <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
-                                <th className="px-6 py-4 text-left">Producto</th>
-                                <th className="px-6 py-4 text-center">Cant.</th>
-                                <th className="px-6 py-4 text-center">Disponibilidad</th>
-                                <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
-                              {operation.products?.map((prod, idx) => {
-                                const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
-                                return (
-                                  <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
-                                    <td className="px-6 py-4">
-                                      <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
-                                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
-                                    </td>
-                                    <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
-                                    <td className="px-6 py-4 text-center">
-                                      {isSuficiente ? (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
-                                          <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
-                                        </span>
-                                      ) : (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
-                                          <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
-                                      ${(prod.quantity * prod.unit_price).toFixed(2)}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
-                                <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
-                                <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                        <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl flex items-start gap-3">
-                          <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
-                          <div>
-                            <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
-                            <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
-                              {stockVerification.errores?.map((err, idx) => (
-                                <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
-                                  <div>
-                                    • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
-                                  </div>
-                                  {err.formula_shortage && err.formula_shortage.length > 0 && (
-                                    <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
-                                      <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
-                                        <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
-                                      </span>
-                                      <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
-                                        {err.formula_shortage.map((fS, fIdx) => (
-                                          <li key={fIdx}>
-                                            <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      )}
+                      {nodeDetalleCarga}
+                      {nodePackingYDoc}
                     </>
-                  ) : (
-                    <OperarioActionPanel products={operation.products} />
                   )}
-                </div>
-              )}
-
-              {(!isOperario && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing' || productionOrders.length > 0)) && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex justify-between items-center">
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-gear-fill text-indigo-500"></i> Órdenes de Fabricación (BOM)
-                    </h3>
-                    {(operation.estado === 'solicitada' || operation.estado === 'armado_packing') && stockVerification && !stockVerification.todo_suficiente && (
-                      <button
-                        onClick={handleGenerateProductionOrders}
-                        disabled={generatingProduction}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
-                      >
-                        {generatingProduction ? (
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                        ) : (
-                          <i className="bi bi-plus-circle-fill"></i>
-                        )}
-                        Generar Órdenes de Producción
-                      </button>
-                    )}
-                  </div>
-                  <div className="p-4 sm:p-6 space-y-4">
-                    {productionOrders.length === 0 ? (
-                      <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
-                        No hay órdenes de fabricación generadas para esta operación.
-                      </p>
-                    ) : (
-                      <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {productionOrders.map((order) => (
-                          <div key={order.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-bold text-slate-800 dark:text-white truncate">
-                                {order.articulo_final_nombre}
-                              </p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                Fórmula: {order.formula_nombre} • Cantidad: <span className="font-bold text-slate-700 dark:text-slate-300">{parseFloat(order.cantidad_a_producir).toFixed(2)}</span>
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                Solicitado: {new Date(order.fecha_solicitud).toLocaleString()}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              {order.completada ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
-                                  <i className="bi bi-check-circle-fill"></i> Completada
-                                </span>
-                              ) : (
-                                <>
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-amber-50 text-amber-600 border border-amber-200 uppercase">
-                                    <i className="bi bi-hourglass-split"></i> Pendiente
-                                  </span>
-                                  <button
-                                    onClick={() => handleCompleteProductionOrder(order.id)}
-                                    disabled={completingProduction[order.id]}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 animate-pulse"
-                                  >
-                                    {completingProduction[order.id] ? (
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                    ) : (
-                                      <i className="bi bi-play-fill text-sm"></i>
-                                    )}
-                                    Completar Producción
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {operation.texto_pedido && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                  <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-chat-left-text-fill text-indigo-500"></i> Pedido Original (Preparación)
-                    </h3>
-                  </div>
-                  <div className="p-4 sm:p-6 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 overflow-x-auto">
-                    {operation.texto_pedido}
-                  </div>
-
-                  {(!isOperario) && (
-                    <div className="px-4 py-4 sm:px-6 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                      <ProductSearchCards initialProducts={detectedProducts} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {operation.tipo_operacion === 'servicios' && (
-                <div className="bg-indigo-50/50 dark:bg-indigo-900/10 shadow-sm sm:rounded-2xl border border-indigo-100 dark:border-indigo-800/30 overflow-hidden mb-6 p-4 sm:p-6 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300">Materiales a bordo (Consumibles / Repuestos)</h4>
-                    <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mt-1">
-                      Activa esta opción si se dejarán materiales en el buque. Esto habilitará la generación de Packing List y Rancho Aduanero.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setLeaveMaterials(!leaveMaterials)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${leaveMaterials ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
-                    role="switch"
-                    aria-checked={leaveMaterials}
-                  >
-                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-slate-800 shadow ring-0 transition duration-200 ease-in-out ${leaveMaterials ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              )}
-
-
-              {operation.tipo_operacion === 'servicios' && (
+                  {nodeSolicitudParticular}
+                </>
+              ) : (
                 <>
-                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <i className="bi bi-card-text text-indigo-500"></i> Detalles del Trabajo a Realizar
-                      </h3>
-                    </div>
-                    <div className="p-4 sm:p-6 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="col-span-1 sm:col-span-2">
-                          <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                            {operation.detalle_servicio || <span className="text-slate-400 italic">No se ha detallado el trabajo a realizar.</span>}
-                          </p>
-                        </div>
-                        {operation.valor_servicio && (
-                          <div className="col-span-1">
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Valor Total del Servicio</p>
-                            <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">${parseFloat(operation.valor_servicio).toFixed(2)}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <i className="bi bi-tools text-amber-500"></i> Solicitud Particular PNA (Herramientas a Bordo)
-                      </h3>
-                    </div>
-                    <div className="p-4 sm:p-6 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Documento Solicitud Particular</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes crear el listado desde aquí o subir uno externo firmado.</p>
-                          {operation.solicitud_particular_file && (
-                            <button
-                              onClick={() => openPreview(getMediaUrl(operation.solicitud_particular_file), 'Solicitud Particular Externa')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver Documento Subido
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                          {canEdit && (
-                            <button
-                              onClick={() => setIsToolsModalOpen(true)}
-                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                            >
-                              <i className="bi bi-card-list"></i> Gestionar Herramientas
-                            </button>
-                          )}
-                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
-                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {nodeDetalleCarga}
+                  {nodeOrdersAndPedido}
+                  {nodeSolicitudParticular}
+                  {nodeExpensasYBotones}
+                  {nodePackingYDoc}
                 </>
               )}
 
-              {/* EXPENSAS DETALLADAS (NUEVO) */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
-                <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
-                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <i className="bi bi-cash-stack text-emerald-500"></i> Expensas (Gastos Detallados)
-                  </h3>
-                  <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
-                    <button
-                      onClick={() => setCotizacionLang('es')}
-                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'es' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-                    >
-                      ES
-                    </button>
-                    <button
-                      onClick={() => setCotizacionLang('en')}
-                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'en' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-                    >
-                      EN
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {expensas.map((exp, index) => (
-                    <div key={index} className="flex gap-2 items-start">
-                      <input
-                        type="text"
-                        placeholder="Descripción"
-                        className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.descripcion}
-                        onChange={(e) => handleExpensaChange(index, 'descripcion', e.target.value)}
-                      />
-                      <FormattedNumberInput
-                        placeholder="Cant."
-                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.cantidad}
-                        onChange={(val) => handleExpensaChange(index, 'cantidad', val)}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Unid."
-                        className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.unidad}
-                        onChange={(e) => handleExpensaChange(index, 'unidad', e.target.value)}
-                      />
-                      <FormattedNumberInput
-                        placeholder="Precio"
-                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.precio}
-                        onChange={(val) => handleExpensaChange(index, 'precio', val)}
-                      />
-                      <FormattedNumberInput
-                        placeholder="Importe"
-                        className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                        value={exp.importe}
-                        onChange={(val) => handleExpensaChange(index, 'importe', val)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newExp = [...expensas];
-                          newExp.splice(index, 1);
-                          setExpensas(newExp);
-                        }}
-                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
-                        title="Eliminar fila"
-                      >
-                        <i className="bi bi-trash-fill"></i>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
-                  className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                >
-                  <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
-                </button>
-              </div>
-
-              {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Configura las condiciones comerciales y descarga la cotización en PDF.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowCotizacionWordModal(true)}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto"
-                    title="Configurar y generar cotización en Word"
-                  >
-                    Generar Cotización
-                  </button>
-                </div>
-              )}
-
-              {/* Generar Remito Box */}
-              {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <i className="bi bi-file-earmark-pdf-fill text-indigo-500"></i> Generar Remito (PDF)
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                      Descarga el remito autogenerado con los datos de esta operación.
-                    </p>
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={handleStartLogisticaEmail}
-                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                      title="Enviar Remito a Logística"
-                    >
-                      <i className="bi bi-envelope"></i> Enviar Logística
-                    </button>
-                    <button
-                      onClick={handleGenerateRemito}
-                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                      title="Descargar Remito"
-                    >
-                      <i className="bi bi-download"></i> Generar Remito
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {true && (
-                <>
-                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                          <i className="bi bi-file-earmark-spreadsheet-fill text-emerald-600"></i> Opciones del Packing List
-                        </h3>
-                      </div>
-                    </div>
-                    <div className="p-4 sm:p-6 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PROVEEDOR</label>
-                          <select
-                            value={proveedor}
-                            onChange={(e) => setProveedor(e.target.value)}
-                            className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                          >
-                            <option value="PROIOS SA">PROIOS SA (CUIT: 30-63661723-3)</option>
-                            <option value="PROIOS SALVAGE SA">PROIOS SALVAGE SA (CUIT: 33-71087653-9)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">PAÍS DE DESTINO DE LA FACTURA</label>
-                          <select
-                            value={paisDestino}
-                            onChange={(e) => setPaisDestino(e.target.value)}
-                            className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                          >
-                            <option value="argentina">Argentina (empresa argentina)</option>
-                            <option value="bandera">Bandera del buque (cliente extranjero)</option>
-                          </select>
-                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                            {paisDestino === 'argentina' ? 'Se usará Argentina' : (shipFlag ? `Se usará la bandera: ${shipFlag}` : 'Bandera no especificada en el buque')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-                    <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <i className="bi bi-folder-fill text-indigo-500"></i> Documentación {operation.tipo_operacion === 'servicios' && '(Por Materiales a Bordo)'}
-                      </h3>
-                    </div>
-                    <div className="p-4 sm:p-6 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
-                          {operation.packing_list_file && (
-                            <button
-                              onClick={() => openPreview(getMediaUrl(operation.packing_list_file), 'Packing List')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver Documento
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                          <button
-                            onClick={handleOpenPackingModal}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                          >
-                            <i className={`bi ${canEdit ? 'bi-pencil-square' : 'bi-eye-fill'}`}></i> {canEdit ? 'Editar' : 'Ver'}
-                          </button>
-                          <button
-                            onClick={previewPackingListExcel}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                          >
-                            <i className="bi bi-eye-fill"></i> Vista Previa
-                          </button>
-                          <button
-                            onClick={downloadPackingListExcel}
-                            className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                          >
-                            <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
-                          </button>
-                          <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_packing', '¿Subir packing list?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Constancia de entrega sellada por la tripulación.</p>
-                          {operation.remito_file && (
-                            <button
-                              onClick={() => openPreview(getMediaUrl(operation.remito_file), 'Remito Firmado')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver Documento
-                            </button>
-                          )}
-                        </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                        </label>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Autorización oficial de embarque de provisiones.</p>
-                          {operation.rancho_file && (
-                            <button
-                              onClick={() => openPreview(getMediaUrl(operation.rancho_file), 'Rancho / Permiso Aduanero')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver Documento
-                            </button>
-                          )}
-                        </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                        </label>
-                      </div>
-
-                      {/* Lista de Ingredientes (Solo para Químicos) */}
-                      {operation.tipo_operacion === 'quimicos' && (
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-800 dark:text-white">Lista de Ingredientes</h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Detalle de fórmulas y cantidades a fabricar.</p>
-                            {operation.lista_ingredientes_file && (
-                              <button
-                                onClick={() => openPreview(getMediaUrl(operation.lista_ingredientes_file), 'Lista de Ingredientes Subida')}
-                                className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                              >
-                                <i className="bi bi-eye-fill"></i> Ver Documento Subido
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                            <button
-                              onClick={previewListaIngredientesExcel}
-                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                            >
-                              <i className="bi bi-eye-fill"></i> Vista Previa
-                            </button>
-                            <button
-                              onClick={downloadListaIngredientesExcel}
-                              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                            >
-                              <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
-                            </button>
-                            <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                              <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                              <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                            </label>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Factura */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Factura de Operación</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Documento de facturación obligatoria.</p>
-                          {operation.factura_file && (
-                            <button
-                              onClick={() => openPreview(getMediaUrl(operation.factura_file), 'Factura')}
-                              className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver Documento
-                            </button>
-                          )}
-                        </div>
-                        <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
-                          <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
               <OperationDocuments
                 operacionId={operation.id}

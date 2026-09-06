@@ -67,3 +67,9 @@ schema_export.sql
 schema_export_models.md
 *.md
 !README.md
+
+# Temporary scripts and backups
+reorder*.js
+reorder*.cjs
+*_backup.jsx
+

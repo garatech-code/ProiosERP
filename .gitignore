@@ -60,3 +60,9 @@ packing_lists/
 # Documentos de propuesta de backups
 *[Bb]ackup*.md
 *[Bb]ackup*.html
+
+# Temporary scripts and backups
+reorder*.js
+reorder*.cjs
+*_backup.jsx
+

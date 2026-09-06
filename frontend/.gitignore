@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary scripts and backups
+reorder*.js
+reorder*.cjs
+*_backup.jsx
+
