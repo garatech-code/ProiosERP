@@ -1522,8 +1522,7 @@ export default function OperationDetail() {
 
   // --- LAYOUT BLOCKS ---
   const nodeDetalleCarga = (
-    <>
-      <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+    <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
         {!isOperario ? (
           <>
             <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
@@ -1647,7 +1646,6 @@ export default function OperationDetail() {
           <OperarioActionPanel products={operation.products} />
         )}
       </div>
-    </>
   );
 
   const nodeOrdersAndPedido = (
@@ -1916,7 +1914,7 @@ export default function OperationDetail() {
       )}
 
       {/* Generar Remito Box */}
-      {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation?.tipo_operacion !== 'servicios' && (
+      {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation?.tipo_operacion !== 'servicios' || leaveMaterials) && (
         <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -1949,7 +1947,7 @@ export default function OperationDetail() {
 
   const nodePackingYDoc = (
     <>
-      <>
+      {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
         <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
           <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
             <div className="flex justify-between items-center">
@@ -1988,16 +1986,18 @@ export default function OperationDetail() {
             </div>
           </div>
         </div>
+      )}
 
-        <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
+      <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
           <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
             <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
               <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
             </h3>
           </div>
           <div className="p-4 sm:p-6 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-              <div>
+            {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                <div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                 {operation.packing_list_file && (
@@ -2034,7 +2034,9 @@ export default function OperationDetail() {
                 </label>
               </div>
             </div>
+            )}
 
+            {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
@@ -2053,7 +2055,9 @@ export default function OperationDetail() {
                 <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
               </label>
             </div>
+            )}
 
+            {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
@@ -2072,6 +2076,7 @@ export default function OperationDetail() {
                 <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
               </label>
             </div>
+            )}
 
             {/* Lista de Ingredientes (Solo para Químicos) */}
             {operation.tipo_operacion === 'quimicos' && (
@@ -2109,6 +2114,28 @@ export default function OperationDetail() {
               </div>
             )}
 
+            {/* Reporte (NUEVO CAMPO - EXCLUSIVO SERVICIOS) */}
+            {operation.tipo_operacion === 'servicios' && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-white">Reporte</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Reporte final de la operación.</p>
+                  {operation.reporte_file && (
+                    <button
+                      onClick={() => openPreview(getMediaUrl(operation.reporte_file), 'Reporte')}
+                      className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                    >
+                      <i className="bi bi-eye-fill"></i> Ver Documento
+                    </button>
+                  )}
+                </div>
+                <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir Reporte
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_reporte', '¿Subir reporte?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              </div>
+            )}
+
             {/* Factura */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
@@ -2130,7 +2157,6 @@ export default function OperationDetail() {
             </div>
           </div>
         </div>
-      </>
     </>
   );
 
@@ -2499,19 +2525,14 @@ export default function OperationDetail() {
                 <>
                   {nodeExpensasYBotones}
                   {nodeMaterialesABordo}
-                  {leaveMaterials && (
-                    <>
-                      {nodeDetalleCarga}
-                      {nodePackingYDoc}
-                    </>
-                  )}
+                  {leaveMaterials && nodeDetalleCarga}
+                  {nodePackingYDoc}
                   {nodeSolicitudParticular}
                 </>
               ) : (
                 <>
                   {nodeDetalleCarga}
                   {nodeOrdersAndPedido}
-                  {nodeSolicitudParticular}
                   {nodeExpensasYBotones}
                   {nodePackingYDoc}
                 </>

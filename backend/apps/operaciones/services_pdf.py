@@ -43,6 +43,7 @@ def get_logo():
 def format_unit(u_val, lang):
     u_val = str(u_val).strip() if u_val else 'u'
     if u_val == 'u':
+        return 'Unit' if lang == 'en' else 'Unidad'
     if u_val == 'par':
         return 'Pair' if lang == 'en' else 'Par'
     return u_val

@@ -1474,7 +1474,6 @@ class OperacionViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=500)
 
     @action(detail=True, methods=['get'])
-
     def generate_permiso_pna(self, request, pk=None):
         op = self.get_object()
         tipo_trabajo = request.query_params.get('tipo', 'frio')

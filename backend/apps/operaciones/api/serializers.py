@@ -137,6 +137,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'order_received_date', 'client_confirmed_date', 'quotation_sent_date', 'quoted_by', 'dificil_conseguir',
             'delivery_date', 'closed_date', 'closed_by', 'motivo_rechazo',
             'packing_list_file', 'remito_file', 'rancho_file', 'solicitud_particular_file',
+            'factura_file', 'reporte_file', 'lista_ingredientes_file',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
             'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
