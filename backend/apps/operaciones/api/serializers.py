@@ -132,7 +132,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         model = Operacion
         fields = [
             'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'agency_email', 'eta',
-            'delivery_method', 'status', 'estado', 'products', 'detalles', 'documentos_adjuntos',
+            'delivery_method', 'detalle_lugar_entrega', 'status', 'estado', 'products', 'detalles', 'documentos_adjuntos',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date', 'quotation_sent_date', 'quoted_by', 'dificil_conseguir',
             'delivery_date', 'closed_date', 'closed_by', 'motivo_rechazo',

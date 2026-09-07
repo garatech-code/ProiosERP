@@ -97,6 +97,7 @@ class Operacion(models.Model):
     eta = models.DateTimeField(null=True, blank=True)
 
     delivery_method = models.CharField(max_length=20, choices=[('muelle', 'Muelle'), ('lancha', 'Lancha')], default='muelle')
+    detalle_lugar_entrega = models.CharField(max_length=255, blank=True, null=True, help_text="Información adicional sobre el lugar de entrega")
     notas = models.TextField(blank=True)
 
     texto_pedido = models.TextField(blank=True, null=True, help_text="Contenido original del e-mail o pedido del cliente.")

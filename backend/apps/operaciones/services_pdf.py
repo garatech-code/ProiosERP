@@ -1245,7 +1245,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     # --- 8. FOOTER WITH WATERMARK ---
     def add_proios_footer(canvas, doc):
         canvas.saveState()
-        logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
+        logo_path = os.path.join(settings.BASE_DIR, 'logo.png')
         if os.path.exists(logo_path):
             canvas.saveState()
             canvas.setFillAlpha(0.08)

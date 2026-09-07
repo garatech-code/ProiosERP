@@ -2953,7 +2953,7 @@ export default function OperationDetail() {
           defaultOperacionId={id}
           defaultRecipient={""}
           initialSubject={`Logística de Despacho - Buque: ${operation.ship_name} - Cliente: ${operation.client_name}`}
-          initialBody={`Estimados,\n\nAdjunto remitimos la documentación para la logística de entrega de la siguiente operación:\n\nCliente: ${operation.client_name}\nBuque: ${operation.ship_name}\nPuerto: ${operation.port_name}\nETA: ${operation.eta ? new Date(operation.eta).toLocaleString() : 'No especificado'}\nLugar de Entrega: ${operation.delivery_method || 'No especificado'}\n\nFavor coordinar la entrega.\n\nSaludos.`}
+          initialBody={`Estimados,\n\nAdjunto remitimos la documentación para la logística de entrega de la siguiente operación:\n\nCliente: ${operation.client_name}\nBuque: ${operation.ship_name}\nPuerto: ${operation.port_name}\nETA: ${operation.eta ? new Date(operation.eta).toLocaleString() : 'No especificado'}\nLugar de Entrega: ${operation.delivery_method || 'No especificado'}${operation.detalle_lugar_entrega ? ' - Detalle: ' + operation.detalle_lugar_entrega : ''}\n\nFavor coordinar la entrega.\n\nSaludos.`}
           initialAttachments={logisticaEmailAttachments}
         />
       )}

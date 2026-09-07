@@ -163,6 +163,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
       eta: '',
       tipo_operacion: 'servicios',
       delivery_method: 'muelle',
+      detalle_lugar_entrega: '',
       detalle_servicio: '',
       valor_servicio: '',
       forma_cotizacion_servicio: 'hora_hombre',
@@ -216,6 +217,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
             eta: formatToDatetimeLocal(op.eta),
             tipo_operacion: op.tipo_operacion || 'servicios',
             delivery_method: op.delivery_method || 'muelle',
+            detalle_lugar_entrega: op.detalle_lugar_entrega || '',
             detalle_servicio: op.detalle_servicio || '',
             valor_servicio: op.valor_servicio || '',
             forma_cotizacion_servicio: op.forma_cotizacion_servicio || 'hora_hombre',
@@ -624,14 +626,23 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
                     />
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
-                  <select name="delivery_method" value={formData.delivery_method} onChange={handleChange}
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                  >
-                    <option value="muelle">Muelle</option>
-                    <option value="lancha">Lancha</option>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
+                    <select name="delivery_method" value={formData.delivery_method} onChange={handleChange}
+                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                    >
+                      <option value="muelle">Muelle</option>
+                      <option value="lancha">Lancha</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Detalle (Lugar)</label>
+                    <input type="text" name="detalle_lugar_entrega" value={formData.detalle_lugar_entrega} onChange={handleChange}
+                      placeholder="Ej. Terminal 4"
+                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
