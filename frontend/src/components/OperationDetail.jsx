@@ -585,6 +585,35 @@ export default function OperationDetail() {
     } else if (action === 'finalize_production' && !operation.rancho_file) {
       const warningMsg = "ATENCIÓN: Vas a continuar sin cargar el Documento Rancho.\n\nÉste DEBE ser cargado posteriormente para poder cerrar la operación, de lo contrario la operación no podrá cerrarse.\n\n¿Deseas continuar de todas formas?";
       if (!window.confirm(warningMsg)) return;
+    } else if (action === 'close_operation' || action === 'close_servicio') {
+      if (!operation.factura_file) {
+        showToast('Debe subir la Factura para poder cerrar la operación.', 'error');
+        return;
+      }
+      if (operation.tipo_operacion === 'servicios') {
+        if (!operation.reporte_file) {
+          showToast('Debe subir el Reporte para poder cerrar la operación de servicio.', 'error');
+          return;
+        }
+        if (operation.products && operation.products.length > 0 && !operation.remito_file) {
+          showToast('La operación incluye productos cargados a bordo, por lo tanto debe subir el Remito Firmado para poder cerrarla.', 'error');
+          return;
+        }
+      } else {
+        if (!operation.rancho_file) {
+          showToast('Debe subir el Documento Rancho para poder cerrar la operación.', 'error');
+          return;
+        }
+        if (!operation.remito_file) {
+          showToast('Debe subir el Remito Firmado para poder cerrar la operación.', 'error');
+          return;
+        }
+        if (operation.tipo_operacion === 'quimicos' && !operation.lista_ingredientes_file) {
+          showToast('Debe subir la Lista de Ingredientes para poder cerrar esta operación de químicos.', 'error');
+          return;
+        }
+      }
+      if (confirmMessage && !window.confirm(confirmMessage)) return;
     } else {
       if (confirmMessage && !window.confirm(confirmMessage)) return;
     }

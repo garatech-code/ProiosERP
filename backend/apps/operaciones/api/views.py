@@ -314,6 +314,14 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if not op.factura_file:
             return Response({'error': 'Debe subir la Factura para poder cerrar la operación.'}, status=400)
 
+        # Validación de Remito antes de cerrar
+        if not op.remito_file:
+            return Response({'error': 'Debe subir el Remito Firmado para poder cerrar la operación.'}, status=400)
+            
+        # Validación de Lista de Ingredientes (solo Químicos)
+        if op.tipo_operacion == 'quimicos' and not op.lista_ingredientes_file:
+            return Response({'error': 'Debe subir la Lista de Ingredientes para poder cerrar esta operación de químicos.'}, status=400)
+
         try:
             op.close()
             op.closed_by = request.user
@@ -1206,6 +1214,18 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if request.user.role != User.Role.OWNER:
             return Response({'error': 'Solo el Owner puede cerrar operaciones.'}, status=403)
         op = self.get_object()
+        
+        # Validaciones para cerrar Servicios
+        if not op.factura_file:
+            return Response({'error': 'Debe subir la Factura para poder cerrar la operación.'}, status=400)
+            
+        if not op.reporte_file:
+            return Response({'error': 'Debe subir el Reporte para poder cerrar la operación de servicio.'}, status=400)
+            
+        # Remito es requerido solo si la operación de servicios incluye productos cargados a bordo
+        if op.detalles.exists() and not op.remito_file:
+            return Response({'error': 'La operación incluye productos cargados a bordo, por lo tanto debe subir el Remito Firmado para poder cerrarla.'}, status=400)
+
         try:
             with transaction.atomic():
                 op.close_servicio()
