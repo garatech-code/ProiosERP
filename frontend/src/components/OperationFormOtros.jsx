@@ -77,7 +77,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       </div>
 
       <div className="sm:col-span-3">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. ($)</label>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. (USD)</label>
         <input
           type="number"
           min="0"
@@ -656,9 +656,9 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
               )}
             </div>
 
-            
 
-            
+
+
           </form>
         </div>
 

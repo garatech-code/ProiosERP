@@ -22,16 +22,19 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
     onUpdate(index, 'weight_kg', item?.peso_kg || item?.weight_kg || null);
     onUpdate(index, 'presentation', item?.presentacion || item?.presentation || '');
     onUpdate(index, 'stock_actual', item?.stock_actual || 0);
+    if (!product.forma_cotizacion) onUpdate(index, 'forma_cotizacion', 'hora_hombre');
   };
 
   const cantidad = product.quantity || 0;
   const stockActual = product.stock_actual || 0;
   const isStockInsufficient = cantidad > stockActual;
+  const formaCotizacion = product.forma_cotizacion || 'hora_hombre';
+  const cantidadLabel = formaCotizacion === 'hora_hombre' ? 'Horas *' : formaCotizacion === 'dias' ? 'Días *' : formaCotizacion === 'lumpsum' ? 'Cant. (Lumpsum) *' : 'Cantidad *';
 
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-4 rounded-xl border mb-3 relative group transition-colors ${isStockInsufficient ? 'bg-red-50 border-red-300' : 'bg-gray-50 dark:bg-slate-900/50 border-gray-100'
       }`}>
-      <div className="sm:col-span-4">
+      <div className="sm:col-span-3">
         <AutocompleteCreate
           label="Producto *"
           endpoint="/inventario/products/?categoria=otros"
@@ -47,6 +50,20 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         />
       </div>
 
+      <div className="sm:col-span-2">
+        <label className="block text-xs font-medium text-gray-700 mb-1">Forma de Cotización</label>
+        <select
+          value={formaCotizacion}
+          onChange={(e) => onUpdate(index, 'forma_cotizacion', e.target.value)}
+          className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        >
+          <option value="unidad">Por Unidad</option>
+          <option value="hora_hombre">Por Hora Hombre</option>
+          <option value="dias">Por Días Trabajados</option>
+          <option value="lumpsum">Lumpsum (Global)</option>
+        </select>
+      </div>
+
       <div className="sm:col-span-1">
         <label className="block text-xs font-medium text-gray-700 mb-1">Peso (kg)</label>
         <input
@@ -58,7 +75,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       </div>
 
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Cantidad *</label>
+        <label className="block text-xs font-medium text-gray-700 mb-1">{cantidadLabel}</label>
         <input
           type="number"
           min="1"
@@ -79,8 +96,8 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
         <div className="text-sm font-semibold text-gray-800 dark:text-slate-200 text-center py-2">{stockActual}</div>
       </div>
 
-      <div className="sm:col-span-3">
-        <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. ($)</label>
+      <div className="sm:col-span-2">
+        <label className="block text-xs font-medium text-gray-700 mb-1">Precio Unit. (USD)</label>
         <input
           type="number"
           min="0"
@@ -420,6 +437,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
           product: Number(p.product), // Asegurar número
           quantity: p.quantity,
           unit_price: p.unit_price,
+          forma_cotizacion: p.forma_cotizacion || 'hora_hombre',
         })),
         eta: safeFormatDate(formData.eta),
         delivery_date: safeFormatDate(formData.delivery_date),
@@ -497,217 +515,201 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
         <div className="flex flex-1 overflow-hidden">
           <div className={`p-6 overflow-y-auto flex-1 custom-scrollbar ${showEmails ? 'border-r border-slate-200 dark:border-slate-700' : ''}`}>
 
-          {error && (
-            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
-              <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
-            </div>
-          )}
-
-          {!id && (
-            <div className="mb-8 bg-indigo-50 dark:bg-indigo-900/20/50 border border-indigo-100 rounded-xl p-5">
-              <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Ej: 9432658"
-                  value={imoNumber}
-                  onChange={(e) => setImoNumber(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleImoSearch();
-                    }
-                  }}
-                  className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-slate-800"
-                />
-                <button
-                  type="button"
-                  onClick={handleImoSearch}
-                  disabled={searchingImo}
-                  className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  {searchingImo ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                  )}
-                  Buscar
-                </button>
+            {error && (
+              <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
+                <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
               </div>
-              {imoSuccess && <p className="text-green-600 text-xs font-semibold mt-2">¡Datos del buque y puerto encontrados y cargados!</p>}
-              <p className="text-xs text-indigo-400 mt-2">Si ingresa un IMO válido, intentaremos autocompletar Buque, Puerto y ETA.</p>
-            </div>
-          )}
+            )}
 
-          <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
-
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Datos Generales</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nombre / Identificador de la Operación</label>
+            {!id && (
+              <div className="mb-8 bg-indigo-50 dark:bg-indigo-900/20/50 border border-indigo-100 rounded-xl p-5">
+                <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
+                <div className="flex gap-3">
                   <input
                     type="text"
-                    name="nombre"
-                    value={formData.nombre}
-                    onChange={handleChange}
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                    placeholder="Ej. Revisión anual de equipos..."
-                  />
-                </div>
-                <AutocompleteCreate
-                  label="Cliente *"
-                  endpoint="/operaciones/clients/"
-                  value={formData.client}
-                  onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
-                  extraCreateData={{ email: 'default@email.com' }}
-                  createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
-                />
-                <AutocompleteCreate
-                  label="Agencia"
-                  endpoint="/operaciones/agencies/"
-                  value={formData.agency}
-                  onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
-                  createFields={[
-                    { name: 'contact_name', label: 'Nombre de Contacto', required: true },
-                    { name: 'email', label: 'Correo Electrónico', type: 'email', required: true },
-                    { name: 'phone', label: 'Teléfono', required: true }
-                  ]}
-                  nameField="name"
-                />
-                <div>
-                  <AutocompleteCreate
-                    label="Buque *"
-                    endpoint="/operaciones/ships/"
-                    value={formData.ship}
-                    onSelect={(i) => {
-                      setFormData(p => ({ ...p, ship: i?.id || '' }));
-                      if (i && i.flag) setAutoCompleteFlag(i.flag);
+                    placeholder="Ej: 9432658"
+                    value={imoNumber}
+                    onChange={(e) => setImoNumber(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleImoSearch();
+                      }
                     }}
-                    createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
+                    className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-slate-800"
                   />
-                  {autoCompleteFlag && <p className="text-xs text-gray-500 mt-1 font-medium">Bandera: {autoCompleteFlag}</p>}
-                </div>
-                <AutocompleteCreate
-                  label="Puerto *"
-                  endpoint="/operaciones/ports/"
-                  value={formData.port}
-                  onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
-                  createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
-                />
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">ETA Estimado *</label>
-                  <input
-                    type="datetime-local" name="eta" value={formData.eta} onChange={handleChange} required
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Especialidad de Servicio *</label>
-                  <select name="subtipo_servicio" value={formData.subtipo_servicio} onChange={handleChange} required
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                  <button
+                    type="button"
+                    onClick={handleImoSearch}
+                    disabled={searchingImo}
+                    className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
                   >
-                    <option value="">Seleccione especialidad...</option>
-                    <option value="Mecanica">Mecánica</option>
-                    <option value="Electricidad">Electricidad</option>
-                    <option value="Refrigeracion">Refrigeración</option>
-                    <option value="Pintura">Pintura</option>
-                    <option value="Calderería">Calderería</option>
-                    <option value="destrincado-trincado">Destrincado-Trincado</option>
-                    <option value="Otros">Otros</option>
-                  </select>
-                  {formData.subtipo_servicio === 'Otros' && (
+                    {searchingImo ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    )}
+                    Buscar
+                  </button>
+                </div>
+                {imoSuccess && <p className="text-green-600 text-xs font-semibold mt-2">¡Datos del buque y puerto encontrados y cargados!</p>}
+                <p className="text-xs text-indigo-400 mt-2">Si ingresa un IMO válido, intentaremos autocompletar Buque, Puerto y ETA.</p>
+              </div>
+            )}
+
+            <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
+
+              <div>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Datos Generales</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nombre / Identificador de la Operación</label>
                     <input
                       type="text"
-                      placeholder="Especifique otro..."
-                      className="mt-2 block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      value={formData.otro_servicio || ''}
-                      onChange={(e) => setFormData(p => ({ ...p, otro_servicio: e.target.value }))}
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleChange}
+                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                      placeholder="Ej. Revisión anual de equipos..."
                     />
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+                  </div>
+                  <AutocompleteCreate
+                    label="Cliente *"
+                    endpoint="/operaciones/clients/"
+                    value={formData.client}
+                    onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
+                    extraCreateData={{ email: 'default@email.com' }}
+                    createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
+                  />
+                  <AutocompleteCreate
+                    label="Agencia"
+                    endpoint="/operaciones/agencies/"
+                    value={formData.agency}
+                    onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
+                    createFields={[
+                      { name: 'contact_name', label: 'Nombre de Contacto', required: true },
+                      { name: 'email', label: 'Correo Electrónico', type: 'email', required: true },
+                      { name: 'phone', label: 'Teléfono', required: true }
+                    ]}
+                    nameField="name"
+                  />
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
-                    <select name="delivery_method" value={formData.delivery_method} onChange={handleChange}
+                    <AutocompleteCreate
+                      label="Buque *"
+                      endpoint="/operaciones/ships/"
+                      value={formData.ship}
+                      onSelect={(i) => {
+                        setFormData(p => ({ ...p, ship: i?.id || '' }));
+                        if (i && i.flag) setAutoCompleteFlag(i.flag);
+                      }}
+                      createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
+                    />
+                    {autoCompleteFlag && <p className="text-xs text-gray-500 mt-1 font-medium">Bandera: {autoCompleteFlag}</p>}
+                  </div>
+                  <AutocompleteCreate
+                    label="Puerto *"
+                    endpoint="/operaciones/ports/"
+                    value={formData.port}
+                    onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
+                    createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
+                  />
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">ETA Estimado *</label>
+                    <input
+                      type="datetime-local" name="eta" value={formData.eta} onChange={handleChange} required
+                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Especialidad de Servicio *</label>
+                    <select name="subtipo_servicio" value={formData.subtipo_servicio} onChange={handleChange} required
                       className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                     >
-                      <option value="muelle">Muelle</option>
-                      <option value="lancha">Lancha</option>
+                      <option value="">Seleccione especialidad...</option>
+                      <option value="Mecanica">Mecánica</option>
+                      <option value="Electricidad">Electricidad</option>
+                      <option value="Refrigeracion">Refrigeración</option>
+                      <option value="Pintura">Pintura</option>
+                      <option value="Calderería">Calderería</option>
+                      <option value="destrincado-trincado">Destrincado-Trincado</option>
+                      <option value="Otros">Otros</option>
                     </select>
+                    {formData.subtipo_servicio === 'Otros' && (
+                      <input
+                        type="text"
+                        placeholder="Especifique otro..."
+                        className="mt-2 block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        value={formData.otro_servicio || ''}
+                        onChange={(e) => setFormData(p => ({ ...p, otro_servicio: e.target.value }))}
+                      />
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Detalle (Lugar)</label>
-                    <input type="text" name="detalle_lugar_entrega" value={formData.detalle_lugar_entrega} onChange={handleChange}
-                      placeholder="Ej. Terminal 4"
-                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
+                      <select name="delivery_method" value={formData.delivery_method} onChange={handleChange}
+                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                      >
+                        <option value="muelle">Muelle</option>
+                        <option value="lancha">Lancha</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Detalle (Lugar)</label>
+                      <input type="text" name="detalle_lugar_entrega" value={formData.detalle_lugar_entrega} onChange={handleChange}
+                        placeholder="Ej. Terminal 4"
+                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Detalles del Servicio Técnico</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Descripción del Servicio a Realizar *</label>
-                  <textarea name="detalle_servicio" value={formData.detalle_servicio} onChange={handleChange} rows={4} required
-                    placeholder="Escriba aquí los detalles del servicio..."
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
-                  ></textarea>
-                </div>
-                <div className="sm:col-span-1">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Valor Total del Servicio ($)</label>
-                  <input type="number" name="valor_servicio" value={formData.valor_servicio} onChange={handleChange} step="0.01" min="0" required
-                    placeholder="Ej. 1500.00"
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
-                  />
-                </div>
-                <div className="sm:col-span-1">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Forma de Cotización *</label>
-                  <select name="forma_cotizacion_servicio" value={formData.forma_cotizacion_servicio} onChange={handleChange} required
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
-                  >
-                    <option value="hora_hombre">Por Hora Hombre</option>
-                    <option value="dias">Por Días Trabajados</option>
-                    <option value="lumpsum">Lumpsum (Suma Global)</option>
-                  </select>
+              <div>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Detalles del Servicio Técnico</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Descripción del Servicio a Realizar *</label>
+                    <textarea name="detalle_servicio" value={formData.detalle_servicio} onChange={handleChange} rows={4} required
+                      placeholder="Escriba aquí los detalles del servicio..."
+                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-amber-500 focus:border-amber-500 sm:text-sm transition-colors"
+                    ></textarea>
+                  </div>
+
                 </div>
               </div>
-            </div>
 
 
 
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
-              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Pegue aquí el contenido del correo o pedido original.</p>
-              <textarea name="texto_pedido" value={formData.texto_pedido} onChange={handleChange} rows={6}
-                className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs transition-colors"
-                placeholder="Ejemplo: Dear Shipping Dept..."
-              />
-            </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Texto Original del Pedido (Opcional)</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Pegue aquí el contenido del correo o pedido original.</p>
+                <textarea name="texto_pedido" value={formData.texto_pedido} onChange={handleChange} rows={6}
+                  className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs transition-colors"
+                  placeholder="Ejemplo: Dear Shipping Dept..."
+                />
+              </div>
 
 
-            
 
-            
 
-          </form>
-        </div>
 
-        {showEmails && (
-          <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <i className="bi bi-envelope-paper text-amber-500"></i> Historial de Correos
-              </h3>
-            </div>
-            <div className="p-4 flex-1">
-              <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
-            </div>
+
+            </form>
           </div>
-        )}
+
+          {showEmails && (
+            <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
+                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <i className="bi bi-envelope-paper text-amber-500"></i> Historial de Correos
+                </h3>
+              </div>
+              <div className="p-4 flex-1">
+                <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl shrink-0">

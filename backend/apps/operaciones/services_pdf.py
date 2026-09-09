@@ -138,7 +138,18 @@ def generar_cotizacion_servicio_pdf(operacion, user, params):
             nombre_item = f"Item #{det.articulo_id}"
         precio_item = det.precio_unitario * det.cantidad
         total += precio_item
-        texto_item = f"<b>{letra}.</b> {nombre_item} ({det.cantidad} un): <b>USD {format_num(precio_item)}</b> + taxes."
+        
+        forma_c = getattr(det, 'forma_cotizacion', None)
+        if forma_c == 'hora_hombre':
+            un_txt = f"{det.cantidad} hrs"
+        elif forma_c == 'dias':
+            un_txt = f"{det.cantidad} days"
+        elif forma_c == 'lumpsum':
+            un_txt = "Lumpsum"
+        else:
+            un_txt = f"{det.cantidad} un"
+            
+        texto_item = f"<b>{letra}.</b> {nombre_item} ({un_txt}): <b>USD {format_num(precio_item)}</b> + taxes."
         story.append(Paragraph(texto_item, bullet_style))
     
     story.append(Spacer(1, 0.5*cm))
@@ -338,9 +349,17 @@ from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
 import io
 from datetime import datetime
 
-def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0):
-    if isinstance(notes, str) and '{{notas}}' in notes:
-        notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
+def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0, ubicacion="", lugar_entrega="", otros_gastos="", expensas="[]"):
+    if isinstance(notes, str):
+        if '{{notas}}' in notes:
+            notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
+        if '{{ubicacion}}' in notes:
+            notes = notes.replace('{{ubicacion}}', ubicacion)
+    
+    if isinstance(scope_includes, str) and '{{ubicacion}}' in scope_includes:
+        scope_includes = scope_includes.replace('{{ubicacion}}', ubicacion)
+    if isinstance(scope_excludes, str) and '{{ubicacion}}' in scope_excludes:
+        scope_excludes = scope_excludes.replace('{{ubicacion}}', ubicacion)
         
     import os
     import io
@@ -446,6 +465,14 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
             cat = "GENERAL"
             desc = f"Item #{det.articulo_id}"
             unit = format_unit("u", lang)
+            
+        forma_c = getattr(det, 'forma_cotizacion', None)
+        if forma_c == 'hora_hombre':
+            unit = 'hrs'
+        elif forma_c == 'dias':
+            unit = 'days'
+        elif forma_c == 'lumpsum':
+            unit = 'Lumpsum'
 
         cat = cat.upper()
         if cat not in grupos:
@@ -476,12 +503,22 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
                 
                 qty = float(qty)
                 price = float(price)
+                
+                forma_c = c_item.get('forma_cotizacion', None)
+                unit_label = 'UN'
+                if forma_c == 'hora_hombre':
+                    unit_label = 'hrs'
+                elif forma_c == 'dias':
+                    unit_label = 'days'
+                elif forma_c == 'lumpsum':
+                    unit_label = 'Lumpsum'
+
                 grupos['SERVICES'].append({
                     'desc': c_item.get('nombre', ''),
                     'qty': qty,
-                    'unit': 'UN',
+                    'unit': unit_label,
                     'price': price,
-                    'amount': qty * price
+                    'amount': price if forma_c == 'lumpsum' else (qty * price)
                 })
         print(f"DEBUG grupos after custom items: {grupos}")
     except Exception as e:
@@ -530,6 +567,14 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
             cat = "GENERAL"
             desc = f"Item #{det.articulo_id}"
             unit = format_unit("u", lang)
+            
+        forma_c = getattr(det, 'forma_cotizacion', None)
+        if forma_c == 'hora_hombre':
+            unit = 'hrs'
+        elif forma_c == 'dias':
+            unit = 'days'
+        elif forma_c == 'lumpsum':
+            unit = 'Lumpsum'
             
         cat = cat.upper()
         if cat not in grupos:
@@ -810,9 +855,17 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     return buffer.getvalue()
 
 
-def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0):
-    if isinstance(notes, str) and '{{notas}}' in notes:
-        notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
+def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0, ubicacion="", lugar_entrega="", otros_gastos="", expensas="[]"):
+    if isinstance(notes, str):
+        if '{{notas}}' in notes:
+            notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
+        if '{{ubicacion}}' in notes:
+            notes = notes.replace('{{ubicacion}}', ubicacion)
+    
+    if isinstance(scope_includes, str) and '{{ubicacion}}' in scope_includes:
+        scope_includes = scope_includes.replace('{{ubicacion}}', ubicacion)
+    if isinstance(scope_excludes, str) and '{{ubicacion}}' in scope_excludes:
+        scope_excludes = scope_excludes.replace('{{ubicacion}}', ubicacion)
         
     import os
     import io
@@ -943,6 +996,14 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             desc = f"Item #{det.articulo_id}"
             unit = format_unit("u", lang)
             
+        forma_c = getattr(det, 'forma_cotizacion', None)
+        if forma_c == 'hora_hombre':
+            unit = 'hrs'
+        elif forma_c == 'dias':
+            unit = 'days'
+        elif forma_c == 'lumpsum':
+            unit = 'Lumpsum'
+            
         cat = cat.upper()
         if cat not in grupos:
             grupos[cat] = []
@@ -970,12 +1031,22 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                 
                 qty = float(qty)
                 price = float(price)
+
+                forma_c = c_item.get('forma_cotizacion', None)
+                unit_label = 'UN'
+                if forma_c == 'hora_hombre':
+                    unit_label = 'hrs'
+                elif forma_c == 'dias':
+                    unit_label = 'days'
+                elif forma_c == 'lumpsum':
+                    unit_label = 'Lumpsum'
+
                 grupos['SERVICIOS'].append({
                     'desc': c_item.get('nombre', ''),
                     'qty': qty,
-                    'unit': 'UN',
+                    'unit': unit_label,
                     'price': price,
-                    'amount': qty * price
+                    'amount': price if forma_c == 'lumpsum' else (qty * price)
                 })
     except Exception as e:
         import traceback

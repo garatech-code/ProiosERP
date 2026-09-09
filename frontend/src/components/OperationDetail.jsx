@@ -293,10 +293,7 @@ export default function OperationDetail() {
       setDamageAreaTitle(isEs ? 'Área L x H (mm)' : 'Area L x H (mm)');
       setCotizacionAttn(isEs ? 'Departamento de Operaciones / Técnico' : 'Operations / Technical Department');
 
-      if (operation?.tipo_operacion === 'servicios') {
-        setServiceFormaOverride(operation.forma_cotizacion_servicio || 'lumpsum');
-        setServiceValueOverride(operation.valor_servicio || '');
-      }
+
 
     }
   }, [showCotizacionWordModal, operation, cotizacionLang]);
@@ -306,24 +303,24 @@ export default function OperationDetail() {
   const [damageAreaTitle, setDamageAreaTitle] = useState('Area L x H (mm)');
   const [customItems, setCustomItems] = useState([]);
 
-  const [serviceFormaOverride, setServiceFormaOverride] = useState('lumpsum');
-
-  const [serviceQuantityOverride, setServiceQuantityOverride] = useState(1);
-  const [serviceUnitPriceOverride, setServiceUnitPriceOverride] = useState('');
-
-  const [serviceValueOverride, setServiceValueOverride] = useState('');
-
   useEffect(() => {
     if (operation?.tipo_operacion === 'servicios') {
-      setServiceFormaOverride(operation.forma_cotizacion_servicio || 'lumpsum');
-      setServiceValueOverride(operation.valor_servicio || '');
-      if (operation.detalle_servicio) {
+      if (operation.items_cotizacion_servicio && operation.items_cotizacion_servicio.length > 0) {
+        setCustomItems(operation.items_cotizacion_servicio);
+      } else if (operation.detalle_servicio) {
         const lines = operation.detalle_servicio.split('\n').filter(l => l.trim());
         if (lines.length > 0) {
-          setCustomItems(lines.map(l => ({ nombre: l })));
+          setCustomItems(lines.map(l => ({ 
+            nombre: l, 
+            forma_cotizacion: operation.forma_cotizacion_servicio || 'lumpsum',
+            cantidad: 1,
+            precio_unitario: operation.forma_cotizacion_servicio === 'lumpsum' ? operation.valor_servicio : 0
+          })));
         } else {
           setCustomItems([]);
         }
+      } else {
+        setCustomItems([]);
       }
     }
   }, [operation]);
@@ -704,10 +701,7 @@ export default function OperationDetail() {
 
       if (operation?.tipo_operacion === 'servicios') {
         payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
-        payload.service_forma_override = serviceFormaOverride;
-        payload.service_value_override = serviceValueOverride;
-        payload.service_qty_override = serviceQuantityOverride;
-        payload.service_unit_price_override = serviceUnitPriceOverride;
+        
       }
 
       const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
@@ -754,10 +748,7 @@ export default function OperationDetail() {
 
       if (operation?.tipo_operacion === 'servicios') {
         payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
-        payload.service_forma_override = serviceFormaOverride;
-        payload.service_value_override = serviceValueOverride;
-        payload.service_qty_override = serviceQuantityOverride;
-        payload.service_unit_price_override = serviceUnitPriceOverride;
+        
       }
 
       // Descargamos el PDF generado temporalmente
@@ -1327,9 +1318,8 @@ export default function OperationDetail() {
   const handleSaveServiceDetails = async () => {
     try {
       const payload = {
-        forma_cotizacion_servicio: serviceFormaOverride,
-        valor_servicio: serviceFormaOverride === 'lumpsum' ? (parseFloat(serviceValueOverride) || null) : (parseFloat(serviceValueOverride) || null),
-        detalle_servicio: customItems.map(i => i.nombre).join('\n')
+        detalle_servicio: customItems.map(i => i.nombre).join('\n'),
+        items_cotizacion_servicio: customItems
       };
       await axios.patch(`/operaciones/operations/${id}/`, payload);
       showToast('Detalles del servicio guardados con éxito', 'success');
@@ -2449,100 +2439,108 @@ export default function OperationDetail() {
                   <div>
                     <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo (aparecerá en la cotización)</label>
                     {customItems.map((item, index) => (
-                      <div key={index} className="flex gap-2 mb-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="Descripción"
-                          className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={item.nombre}
-                          onChange={(e) => {
-                            const newItems = [...customItems];
-                            newItems[index].nombre = e.target.value;
-                            setCustomItems(newItems);
-                          }}
-                        />
-                        <button
-                          onClick={() => {
-                            const newItems = customItems.filter((_, i) => i !== index);
-                            setCustomItems(newItems);
-                          }}
-                          className="text-red-500 hover:text-red-700 p-2 shrink-0"
-                          title="Eliminar ítem"
-                        >
-                          <i className="bi bi-trash-fill"></i>
-                        </button>
+                      <div key={index} className="flex flex-col gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            placeholder="Descripción"
+                            className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={item.nombre}
+                            onChange={(e) => {
+                              const newItems = [...customItems];
+                              newItems[index].nombre = e.target.value;
+                              setCustomItems(newItems);
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const newItems = customItems.filter((_, i) => i !== index);
+                              setCustomItems(newItems);
+                            }}
+                            className="text-red-500 hover:text-red-700 p-2 shrink-0"
+                            title="Eliminar ítem"
+                          >
+                            <i className="bi bi-trash-fill"></i>
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
+                            <select
+                              className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                              value={item.forma_cotizacion}
+                              onChange={(e) => {
+                                const newItems = [...customItems];
+                                newItems[index].forma_cotizacion = e.target.value;
+                                setCustomItems(newItems);
+                              }}
+                            >
+                              <option value="hora_hombre">Por Hora Hombre</option>
+                              <option value="dias">Por Días Trabajados</option>
+                              <option value="lumpsum">Lumpsum (Suma Global)</option>
+                            </select>
+                          </div>
+                          {item.forma_cotizacion !== 'lumpsum' && (
+                            <>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad ({item.forma_cotizacion === 'dias' ? 'Días' : 'Horas'})</label>
+                                <input
+                                  type="number"
+                                  className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                                  value={item.cantidad}
+                                  onChange={(e) => {
+                                    const newItems = [...customItems];
+                                    newItems[index].cantidad = e.target.value;
+                                    setCustomItems(newItems);
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                                  value={item.precio_unitario}
+                                  onChange={(e) => {
+                                    const newItems = [...customItems];
+                                    newItems[index].precio_unitario = e.target.value;
+                                    setCustomItems(newItems);
+                                  }}
+                                />
+                              </div>
+                            </>
+                          )}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Valor Total ($)</label>
+                            {item.forma_cotizacion === 'lumpsum' ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
+                                value={item.precio_unitario}
+                                onChange={(e) => {
+                                  const newItems = [...customItems];
+                                  newItems[index].precio_unitario = e.target.value;
+                                  setCustomItems(newItems);
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-600 dark:text-slate-400">
+                                {((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)).toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                     <div className="flex items-center gap-4 mt-2">
                       <button
-                        onClick={() => setCustomItems([...customItems, { nombre: '' }])}
+                        onClick={() => setCustomItems([...customItems, { nombre: '', forma_cotizacion: 'hora_hombre', cantidad: 1, precio_unitario: 0 }])}
                         className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
                       >
                         <i className="bi bi-plus-circle-fill"></i> Agregar ítem
                       </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="sm:col-span-2 lg:col-span-1">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Forma de Cotización</label>
-                        <select
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                          value={serviceFormaOverride}
-                          onChange={(e) => setServiceFormaOverride(e.target.value)}
-                        >
-                          <option value="hora_hombre">Por Hora Hombre</option>
-                          <option value="dias">Por Días Trabajados</option>
-                          <option value="lumpsum">Lumpsum (Suma Global)</option>
-                        </select>
-                      </div>
-
-                      {serviceFormaOverride !== 'lumpsum' && (
-                        <>
-                          <div className="sm:col-span-1 lg:col-span-1">
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Cantidad ({serviceFormaOverride === 'dias' ? 'Días' : 'Horas'})</label>
-                            <input
-                              type="number"
-                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                              value={serviceQuantityOverride}
-                              onChange={(e) => {
-                                setServiceQuantityOverride(e.target.value);
-                                if (serviceUnitPriceOverride) {
-                                  setServiceValueOverride((parseFloat(e.target.value || 0) * parseFloat(serviceUnitPriceOverride)).toFixed(2));
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="sm:col-span-1 lg:col-span-1">
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Precio Unitario ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
-                              value={serviceUnitPriceOverride}
-                              onChange={(e) => {
-                                setServiceUnitPriceOverride(e.target.value);
-                                if (serviceQuantityOverride) {
-                                  setServiceValueOverride((parseFloat(serviceQuantityOverride || 0) * parseFloat(e.target.value)).toFixed(2));
-                                }
-                              }}
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      <div className="sm:col-span-2 lg:col-span-1">
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Valor Total ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors bg-gray-50 dark:bg-slate-800"
-                          value={serviceValueOverride}
-                          onChange={(e) => setServiceValueOverride(e.target.value)}
-                          placeholder="Ej. 1500.00"
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -2829,6 +2827,18 @@ export default function OperationDetail() {
                         )}
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            {/* Removed PNA buttons from here based on user request */}
+                            <button
+                              onClick={() => handleAction('tramitar_permisos_pna', '¿Marcar permisos PNA como gestionados?')}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-shield-check"></i> Proceder a Permisos</>}
+                            </button>
+                          </div>
+                        )}
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'permisos_pna' && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button
                               onClick={openPnaModal}
                               disabled={actionLoading}
@@ -2836,17 +2846,6 @@ export default function OperationDetail() {
                             >
                               <i className="bi bi-file-earmark-pdf"></i> Generar Permiso PNA
                             </button>
-                            <button
-                              onClick={() => handleAction('tramitar_permisos_pna', '¿Marcar permisos PNA como gestionados?')}
-                              disabled={actionLoading}
-                              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                            >
-                              {actionLoading ? 'Procesando...' : <><i className="bi bi-shield-check"></i> Permisos Tramitados</>}
-                            </button>
-                          </div>
-                        )}
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'permisos_pna' && (
-                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button
                               onClick={() => handleAction('iniciar_ejecucion_servicio', '¿Iniciar la ejecución del servicio a bordo?')}
                               disabled={actionLoading}

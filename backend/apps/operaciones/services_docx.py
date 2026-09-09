@@ -36,8 +36,16 @@ def get_template_path(lang, tipo_operacion):
         return os.path.join(templates_dir, f'Proios_Quotation_{tipo}_TEMPLATE_EN.docx')
 
 def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None, ubicacion='', otros_gastos='', expensas='[]', lugar_entrega='FOB'):
-    if isinstance(notes, str) and '{{notas}}' in notes:
-        notes = notes.replace('{{notas}}', op.texto_cotizacion_adicional or 'N/A')
+    if isinstance(notes, str):
+        if '{{notas}}' in notes:
+            notes = notes.replace('{{notas}}', op.texto_cotizacion_adicional or 'N/A')
+        if '{{ubicacion}}' in notes:
+            notes = notes.replace('{{ubicacion}}', ubicacion)
+            
+    if isinstance(scope_includes, str) and '{{ubicacion}}' in scope_includes:
+        scope_includes = scope_includes.replace('{{ubicacion}}', ubicacion)
+    if isinstance(scope_excludes, str) and '{{ubicacion}}' in scope_excludes:
+        scope_excludes = scope_excludes.replace('{{ubicacion}}', ubicacion)
     
     template_path = get_template_path(lang, op.tipo_operacion)
     if not os.path.exists(template_path):
@@ -86,27 +94,37 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
             unidad = 'LS'
             
         if items_list:
+            importe_total = 0.0
             for idx, item in enumerate(items_list):
-                if idx == 0:
-                    items_context.append({
-                        'descripcion': item.get('nombre', ''),
-                        'scope_of_work': item.get('nombre', ''),
-                        'categoria': 'Service' if lang == 'en' else 'Servicio',
-                        'cantidad': cantidad_str,
-                        'unidad': unidad,
-                        'precio': precio_unit_str,
-                        'importe': format_num(importe_total)
-                    })
+                c_forma = item.get('forma_cotizacion', 'lumpsum')
+                try:
+                    c_qty = float(item.get('cantidad', 1))
+                except:
+                    c_qty = 1.0
+                try:
+                    c_price = float(item.get('precio_unitario', 0))
+                except:
+                    c_price = 0.0
+                
+                if c_forma == 'hora_hombre':
+                    c_unidad = 'Hr'
+                elif c_forma == 'dias':
+                    c_unidad = 'Day' if lang == 'en' else 'Día'
                 else:
-                    items_context.append({
-                        'descripcion': item.get('nombre', ''),
-                        'scope_of_work': item.get('nombre', ''),
-                        'categoria': '',
-                        'cantidad': '',
-                        'unidad': '',
-                        'precio': '',
-                        'importe': ''
-                    })
+                    c_unidad = 'LS'
+                
+                c_importe = c_price if c_forma == 'lumpsum' else (c_qty * c_price)
+                importe_total += c_importe
+                
+                items_context.append({
+                    'descripcion': item.get('nombre', ''),
+                    'scope_of_work': item.get('nombre', ''),
+                    'categoria': 'Service' if lang == 'en' else 'Servicio',
+                    'cantidad': str(int(c_qty) if c_qty.is_integer() else c_qty),
+                    'unidad': c_unidad,
+                    'precio': format_num(c_price),
+                    'importe': format_num(c_importe)
+                })
         else:
             items_context.append({
                 'descripcion': scope_of_work,

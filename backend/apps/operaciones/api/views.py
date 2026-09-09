@@ -1292,7 +1292,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         service_value_override = data.get('service_value_override', None)
         service_qty_override = data.get('service_qty_override', None)
         service_unit_price_override = data.get('service_unit_price_override', None)
-        ubicacion = data.get('ubicacion', op.port.name if hasattr(op, 'port') and op.port else '')
+        ubicacion = data.get('ubicacion')
+        if not ubicacion:
+            ubicacion = op.port.name if hasattr(op, 'port') and op.port else ''
         otros_gastos = data.get('otros_gastos', '')
         expensas_json = data.get('expensas', '[]')
 
@@ -1357,7 +1359,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
         service_value_override = data.get('service_value_override', None)
         service_qty_override = data.get('service_qty_override', None)
         service_unit_price_override = data.get('service_unit_price_override', None)
-        ubicacion = data.get('ubicacion', '')
+        ubicacion = data.get('ubicacion')
+        if not ubicacion:
+            ubicacion = op.port.name if hasattr(op, 'port') and op.port else ''
         otros_gastos = data.get('otros_gastos', '')
         expensas_json = data.get('expensas', '[]')
         

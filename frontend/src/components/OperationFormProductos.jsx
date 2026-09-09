@@ -47,7 +47,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
             { name: 'stock_minimo', label: 'Stock Mínimo', type: 'number', required: false },
             { name: 'stock_maximo', label: 'Stock Máximo', type: 'number', required: false },
             { name: 'costo', label: 'Costo ($)', type: 'number', required: false },
-            { name: 'precio_venta', label: 'Precio Unit. ($)', type: 'number', required: false },
+            { name: 'precio_venta', label: 'Precio Unit. (USD)', type: 'number', required: false },
           ]}
           extraCreateData={{ categoria: 'otros' }}
           nameField="nombre"
@@ -97,7 +97,7 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
       </div>
 
       <div className="sm:col-span-3">
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Unit. ($)</label>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Unit. (USD)</label>
         <input
           type="number"
           min="0"
@@ -566,223 +566,225 @@ export default function OperationFormProductos({ id: propId, onClose, onSuccess,
 
         <div className="flex flex-1 overflow-hidden">
           <div className={`p-6 overflow-y-auto flex-1 custom-scrollbar ${showEmails ? 'border-r border-slate-200 dark:border-slate-700' : ''}`}>
-          {error && (
-            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
-              <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
-            </div>
-          )}
-
-          {!id && (
-            <div className="mb-8 bg-indigo-50 dark:bg-indigo-900/20/50 border border-indigo-100 rounded-xl p-5">
-              <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Ej: 9432658"
-                  value={imoNumber}
-                  onChange={(e) => setImoNumber(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleImoSearch();
-                    }
-                  }}
-                  className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-slate-800"
-                />
-                <button
-                  type="button"
-                  onClick={handleImoSearch}
-                  disabled={searchingImo}
-                  className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  {searchingImo ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                  )}
-                  Buscar
-                </button>
+            {error && (
+              <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg">
+                <p className="text-red-700 text-sm font-medium whitespace-pre-wrap">{error}</p>
               </div>
-              {imoSuccess && <p className="text-green-600 text-xs font-semibold mt-2">¡Datos del buque y puerto encontrados y cargados!</p>}
-              <p className="text-xs text-indigo-400 mt-2">Si ingresa un IMO válido, intentaremos autocompletar Buque, Puerto y ETA.</p>
-            </div>
-          )}
+            )}
 
-          <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Datos Generales</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nombre / Identificador de la Operación</label>
+            {!id && (
+              <div className="mb-8 bg-indigo-50 dark:bg-indigo-900/20/50 border border-indigo-100 rounded-xl p-5">
+                <label className="block text-sm font-bold text-indigo-900 mb-2">Búsqueda Automática por IMO (Opcional)</label>
+                <div className="flex gap-3">
                   <input
                     type="text"
-                    name="nombre"
-                    value={formData.nombre}
-                    onChange={handleChange}
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                    placeholder="Ej. Suministro mensual MV Test, Limpieza de tanques..."
-                  />
-                </div>
-                <AutocompleteCreate
-                  label="Cliente *"
-                  endpoint="/operaciones/clients/"
-                  value={formData.client}
-                  onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
-                  extraCreateData={{ email: 'default@email.com' }}
-                  createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
-                />
-                <AutocompleteCreate
-                  label="Agencia"
-                  endpoint="/operaciones/agencies/"
-                  value={formData.agency}
-                  onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
-                  createFields={[
-                    { name: 'contact_name', label: 'Nombre de Contacto', required: true },
-                    { name: 'email', label: 'Correo Electrónico', type: 'email', required: true },
-                    { name: 'phone', label: 'Teléfono', required: true }
-                  ]}
-                  nameField="name"
-                />
-                <div>
-                  <AutocompleteCreate
-                    label="Buque *"
-                    endpoint="/operaciones/ships/"
-                    value={formData.ship}
-                    onSelect={(i) => {
-                      setFormData(p => ({ ...p, ship: i?.id || '' }));
-                      if (i && i.flag) setAutoCompleteFlag(i.flag);
+                    placeholder="Ej: 9432658"
+                    value={imoNumber}
+                    onChange={(e) => setImoNumber(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleImoSearch();
+                      }
                     }}
-                    createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
+                    className="flex-1 block w-full py-2.5 px-4 border border-indigo-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-slate-800"
                   />
-                  <div className="mt-2">
-                    <label className="block text-xs font-medium text-gray-700">Bandera (autocompletada)</label>
+                  <button
+                    type="button"
+                    onClick={handleImoSearch}
+                    disabled={searchingImo}
+                    className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
+                  >
+                    {searchingImo ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    )}
+                    Buscar
+                  </button>
+                </div>
+                {imoSuccess && <p className="text-green-600 text-xs font-semibold mt-2">¡Datos del buque y puerto encontrados y cargados!</p>}
+                <p className="text-xs text-indigo-400 mt-2">Si ingresa un IMO válido, intentaremos autocompletar Buque, Puerto y ETA.</p>
+              </div>
+            )}
+
+            <form id="operation-form" onSubmit={handleSubmit} className="space-y-8">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider border-b dark:border-slate-600 pb-2 mb-4">Datos Generales</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nombre / Identificador de la Operación</label>
                     <input
                       type="text"
-                      value={autoCompleteFlag}
-                      readOnly
-                      className="mt-1 block w-full py-1.5 px-3 border border-gray-300 rounded-md bg-gray-50 dark:bg-slate-900/50 text-gray-700 text-sm"
-                      placeholder="Se autocompletará al seleccionar un buque o buscar por IMO"
-                    />
-                  </div>
-                </div>
-                <AutocompleteCreate
-                  label="Puerto *"
-                  endpoint="/operaciones/ports/"
-                  value={formData.port}
-                  onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
-                  createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
-                />
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">ETA Estimado *</label>
-                  <input
-                    type="datetime-local"
-                    name="eta"
-                    value={formData.eta}
-                    onChange={handleChange}
-                    required
-                    className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
-                    <select
-                      name="delivery_method"
-                      value={formData.delivery_method}
+                      name="nombre"
+                      value={formData.nombre}
                       onChange={handleChange}
                       className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                    >
-                      <option value="muelle">Muelle</option>
-                      <option value="lancha">Lancha</option>
-                    </select>
+                      placeholder="Ej. Suministro mensual MV Test, Limpieza de tanques..."
+                    />
                   </div>
+                  <AutocompleteCreate
+                    label="Cliente *"
+                    endpoint="/operaciones/clients/"
+                    value={formData.client}
+                    onSelect={(i) => setFormData(p => ({ ...p, client: i?.id || '' }))}
+                    extraCreateData={{ email: 'default@email.com' }}
+                    createFields={[{ name: 'contact_person', label: 'Contacto' }, { name: 'phone', label: 'Teléfono' }]}
+                  />
+                  <AutocompleteCreate
+                    label="Agencia"
+                    endpoint="/operaciones/agencies/"
+                    value={formData.agency}
+                    onSelect={(i) => setFormData(p => ({ ...p, agency: i?.id || '' }))}
+                    createFields={[
+                      { name: 'contact_name', label: 'Nombre de Contacto', required: true },
+                      { name: 'email', label: 'Correo Electrónico', type: 'email', required: true },
+                      { name: 'phone', label: 'Teléfono', required: true }
+                    ]}
+                    nameField="name"
+                  />
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Detalle (Lugar)</label>
-                    <input type="text" name="detalle_lugar_entrega" value={formData.detalle_lugar_entrega} onChange={handleChange}
-                      placeholder="Ej. Terminal 4"
+                    <AutocompleteCreate
+                      label="Buque *"
+                      endpoint="/operaciones/ships/"
+                      value={formData.ship}
+                      onSelect={(i) => {
+                        setFormData(p => ({ ...p, ship: i?.id || '' }));
+                        if (i && i.flag) setAutoCompleteFlag(i.flag);
+                      }}
+                      createFields={[{ name: 'imo', label: 'IMO (opcional)', required: false }, { name: 'flag', label: 'Bandera (opcional)', required: false }]}
+                    />
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-700">Bandera (autocompletada)</label>
+                      <input
+                        type="text"
+                        value={autoCompleteFlag}
+                        readOnly
+                        className="mt-1 block w-full py-1.5 px-3 border border-gray-300 rounded-md bg-gray-50 dark:bg-slate-900/50 text-gray-700 text-sm"
+                        placeholder="Se autocompletará al seleccionar un buque o buscar por IMO"
+                      />
+                    </div>
+                  </div>
+                  <AutocompleteCreate
+                    label="Puerto *"
+                    endpoint="/operaciones/ports/"
+                    value={formData.port}
+                    onSelect={(i) => setFormData(p => ({ ...p, port: i?.id || '' }))}
+                    createFields={[{ name: 'country', label: 'País *', required: true }, { name: 'code', label: 'Código' }]}
+                  />
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">ETA Estimado *</label>
+                    <input
+                      type="datetime-local"
+                      name="eta"
+                      value={formData.eta}
+                      onChange={handleChange}
+                      required
                       className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                     />
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">
-                <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Carga (Productos)</h3>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={addProduct}
-                    className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    + Fila Manual
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowMultiSelectModal(true)}
-                    className="text-sm font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    Añadir items
-                  </button>
-                </div>
-              </div>
-
-              {formData.products.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-gray-300">
-                  <p className="text-gray-500 text-sm">No hay productos en esta operación.</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {formData.products.map((p, i) => (
-                    <ProductRow key={i} product={p} index={i} onUpdate={handleProductUpdate} onRemove={removeProduct} />
-                  ))}
-                </div>
-              )}
-
-              {formData.products.length > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <div className="bg-slate-800 text-white px-6 py-3 rounded-xl shadow-md flex items-center gap-4">
-                    <span className="text-sm font-medium text-slate-300 uppercase tracking-wider">Total Estimado</span>
-                    <span className="text-xl font-bold">${calculateTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
+                      <select
+                        name="delivery_method"
+                        value={formData.delivery_method}
+                        onChange={handleChange}
+                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                      >
+                        <option value="muelle">Muelle</option>
+                        <option value="lancha">Lancha</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Detalle (Lugar)</label>
+                      <input type="text" name="detalle_lugar_entrega" value={formData.detalle_lugar_entrega} onChange={handleChange}
+                        placeholder="Ej. Terminal 4"
+                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
 
-            
+              <div>
+                <div className="flex justify-between items-end border-b dark:border-slate-600 pb-2 mb-4">
+                  <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Carga (Productos)</h3>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={addProduct}
+                      className="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      + Fila Manual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMultiSelectModal(true)}
+                      className="text-sm font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      Añadir items
+                    </button>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2 mt-4 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl">
-              <input
-                type="checkbox"
-                id="dificil_conseguir"
-                name="dificil_conseguir"
-                checked={formData.dificil_conseguir}
-                onChange={(e) => setFormData({ ...formData,
-        agency: formData.agency || null, dificil_conseguir: e.target.checked })}
-                className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 dark:focus:ring-amber-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label htmlFor="dificil_conseguir" className="text-sm font-medium text-amber-900 dark:text-amber-200 cursor-pointer">
-                El producto es difícil de conseguir (Exime de alerta de 48hs)
-              </label>
-            </div>
+                {formData.products.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-gray-300">
+                    <p className="text-gray-500 text-sm">No hay productos en esta operación.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {formData.products.map((p, i) => (
+                      <ProductRow key={i} product={p} index={i} onUpdate={handleProductUpdate} onRemove={removeProduct} />
+                    ))}
+                  </div>
+                )}
 
-            
-          </form>
-        </div>
-        
-        {showEmails && (
-          <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <i className="bi bi-envelope-paper text-indigo-500"></i> Historial de Correos
-              </h3>
-            </div>
-            <div className="p-4 flex-1">
-              <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
-            </div>
+                {formData.products.length > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <div className="bg-slate-800 text-white px-6 py-3 rounded-xl shadow-md flex items-center gap-4">
+                      <span className="text-sm font-medium text-slate-300 uppercase tracking-wider">Total Estimado</span>
+                      <span className="text-xl font-bold">${calculateTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
+
+              <div className="flex items-center gap-2 mt-4 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="dificil_conseguir"
+                  name="dificil_conseguir"
+                  checked={formData.dificil_conseguir}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    agency: formData.agency || null, dificil_conseguir: e.target.checked
+                  })}
+                  className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 dark:focus:ring-amber-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <label htmlFor="dificil_conseguir" className="text-sm font-medium text-amber-900 dark:text-amber-200 cursor-pointer">
+                  El producto es difícil de conseguir (Exime de alerta de 48hs)
+                </label>
+              </div>
+
+
+            </form>
           </div>
-        )}
+
+          {showEmails && (
+            <div className="w-1/2 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/40 relative flex flex-col">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 sticky top-0 z-10 flex justify-between items-center shrink-0">
+                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <i className="bi bi-envelope-paper text-indigo-500"></i> Historial de Correos
+                </h3>
+              </div>
+              <div className="p-4 flex-1">
+                <OperationEmails operacionId={id} initialEmailData={initialEmailData} openPreview={() => window.alert('Para ver o descargar adjuntos, cierra el modo edición y ábrelos desde el visor principal de la operación.')} />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex justify-end gap-3 rounded-b-2xl shrink-0">

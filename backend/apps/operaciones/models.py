@@ -135,6 +135,7 @@ class Operacion(models.Model):
         (TIPO_COTIZACION_LUMPSUM, 'Lumpsum (Suma Global)'),
     )
     detalle_servicio = models.TextField(blank=True, null=True, help_text="Descripción detallada para operaciones de tipo Servicio.")
+    items_cotizacion_servicio = models.JSONField(blank=True, null=True, default=list, help_text="Items estructurados de servicio para cotizacion")
     valor_servicio = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Valor monetario del trabajo a realizar")
     subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
@@ -337,6 +338,7 @@ class OperacionDetalle(models.Model):
     articulo_id = models.IntegerField()
     cantidad = models.IntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    forma_cotizacion = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
         return f'Detalle OP-{self.operacion_id} Art-{self.articulo_id}'

@@ -35,7 +35,7 @@ function ProductRow({ product, index, onUpdate, onRemove, canEdit }) {
             createFields={[
               { name: 'presentacion', label: 'Presentación', required: true },
               { name: 'peso_kg', label: 'Peso unitario (kg)', type: 'number', required: true },
-              { name: 'precio_venta', label: 'Precio Unit. ($)', type: 'number', required: false },
+              { name: 'precio_venta', label: 'Precio Unit. (USD)', type: 'number', required: false },
             ]}
             extraCreateData={{ categoria: 'otros' }}
             nameField="nombre"
@@ -80,7 +80,7 @@ function ProductRow({ product, index, onUpdate, onRemove, canEdit }) {
       </div>
 
       <div className="sm:col-span-3">
-        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Unit. ($)</label>
+        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Unit. (USD)</label>
         <FormattedNumberInput
           value={product.unit_price || 0}
           onChange={(val) => onUpdate(index, 'unit_price', val || 0)}
@@ -160,7 +160,7 @@ export default function DetalleCargaEditor({ operationId, initialProducts, canEd
 
   const handleSave = async () => {
     if (!canEdit) return;
-    
+
     // Validate
     if (products.some(p => !p.product)) {
       alert("Todos los items deben tener un producto seleccionado.");
@@ -199,12 +199,12 @@ export default function DetalleCargaEditor({ operationId, initialProducts, canEd
       ) : (
         <div className="space-y-1">
           {products.map((prod, idx) => (
-            <ProductRow 
-              key={idx} 
-              index={idx} 
-              product={prod} 
-              onUpdate={updateProduct} 
-              onRemove={removeProduct} 
+            <ProductRow
+              key={idx}
+              index={idx}
+              product={prod}
+              onUpdate={updateProduct}
+              onRemove={removeProduct}
               canEdit={canEdit}
             />
           ))}
@@ -229,7 +229,7 @@ export default function DetalleCargaEditor({ operationId, initialProducts, canEd
               <i className="bi bi-ui-checks-grid"></i> Añadir items
             </button>
           </div>
-          
+
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
               Total: <span className="text-indigo-600 text-lg">${total.toFixed(2)}</span>

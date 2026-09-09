@@ -42,7 +42,7 @@ class OperacionDetalleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperacionDetalle
-        fields = ['id', 'operacion', 'articulo_id', 'cantidad', 'precio_unitario',
+        fields = ['id', 'operacion', 'articulo_id', 'cantidad', 'precio_unitario', 'forma_cotizacion',
                   'articulo_nombre', 'articulo_presentacion', 'stock_disponible', 'suficiente']
         read_only_fields = ['id', 'operacion']
 
@@ -142,7 +142,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
-            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio',
+            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
             'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional',
             'creado_por'
@@ -338,7 +338,8 @@ class OperacionSerializer(serializers.ModelSerializer):
                 operacion=operation,
                 articulo_id=articulo_id,
                 cantidad=cantidad,
-                precio_unitario=prod.get('unit_price', 0)
+                precio_unitario=prod.get('unit_price', 0),
+                forma_cotizacion=prod.get('forma_cotizacion', 'unidad')
             )
 
     def _update_plantel_snapshot(self, operation):
