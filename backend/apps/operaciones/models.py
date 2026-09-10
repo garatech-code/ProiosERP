@@ -142,6 +142,7 @@ class Operacion(models.Model):
     herramientas_solicitud_particular = models.TextField(blank=True, null=True, help_text="Listado de herramientas a subir/bajar para la Solicitud Particular.")
     texto_permiso_pna = models.TextField(blank=True, null=True, help_text="Texto personalizado para el PDF de Permiso PNA.")
     texto_cotizacion_adicional = models.TextField(blank=True, null=True, help_text="Texto adicional o condiciones para la Cotización.")
+    materiales_a_bordo = models.BooleanField(default=False, help_text="Indica si se dejarán materiales a bordo en un servicio")
 
     packing_list_file = models.FileField(upload_to='packing_lists/', null=True, blank=True)
     remito_file = models.FileField(upload_to='remitos/', null=True, blank=True)

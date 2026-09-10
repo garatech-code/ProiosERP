@@ -144,7 +144,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
-            'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional',
+            'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional', 'materiales_a_bordo',
             'creado_por'
         ]
         extra_kwargs = {
@@ -290,7 +290,7 @@ class OperacionSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         products_data = validated_data.pop('products', None)
         if products_data is None:
-            products_data = self.initial_data.get('products', [])
+            products_data = self.initial_data.get('products', None)
 
         if isinstance(products_data, str):
             try:

@@ -266,7 +266,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'notas': clean_notes,
         'lugar_entrega': lugar_entrega,  
         'medida': "",
-        'atencion': (op.cliente.contact_person if (op.cliente and hasattr(op.cliente, 'contact_person') and op.cliente.contact_person) else (op.cliente.name if op.cliente else "")),
+        'atencion': attn if attn else (op.cliente.contact_person if (op.cliente and hasattr(op.cliente, 'contact_person') and op.cliente.contact_person) else (op.cliente.name if op.cliente else "")),
         'ref': f"OP-{op.id:04d}", 
         'iva': format_num(iva) if include_vat else "0,00",
         'impuestos': impuestos_label,

@@ -204,11 +204,18 @@ export default function OperadorDashboard() {
     };
 
     const calculateTotal = (op) => {
-        if (op.tipo_operacion === 'servicios') {
-            return parseFloat(op.valor_servicio) || 0;
+        let total = 0;
+        if (op.products && op.products.length > 0) {
+            total += op.products.reduce((sum, p) => sum + ((p.quantity || 0) * (p.unit_price || 0)), 0);
         }
-        if (!op.products) return 0;
-        return op.products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
+        if (op.tipo_operacion === 'servicios') {
+            if (op.items_cotizacion_servicio && op.items_cotizacion_servicio.length > 0) {
+                total += op.items_cotizacion_servicio.reduce((sum, item) => sum + ((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)), 0);
+            } else {
+                total += (parseFloat(op.valor_servicio) || 0);
+            }
+        }
+        return total;
     };
 
     const getStatusBadge = (status) => {

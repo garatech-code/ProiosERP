@@ -145,7 +145,7 @@ export default function OperationDetail() {
   const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
   const [deliveryTime, setDeliveryTime] = useState('5');
   const [lugarEntrega, setLugarEntrega] = useState('FOB');
-  const [cotizacionAttn, setCotizacionAttn] = useState('Operations / Technical Department');
+  const [cotizacionAttn, setCotizacionAttn] = useState('');
 
   const defaultScopeIncEn = '[detail what the supply / service comprises]';
   const defaultScopeIncEs = '[detallar qué comprende el suministro / servicio]';
@@ -291,7 +291,6 @@ export default function OperationDetail() {
       }
       setDamageFramesTitle(isEs ? 'Cuaderna(s)' : 'Frame(s)');
       setDamageAreaTitle(isEs ? 'Área L x H (mm)' : 'Area L x H (mm)');
-      setCotizacionAttn(isEs ? 'Departamento de Operaciones / Técnico' : 'Operations / Technical Department');
 
 
 
@@ -310,8 +309,8 @@ export default function OperationDetail() {
       } else if (operation.detalle_servicio) {
         const lines = operation.detalle_servicio.split('\n').filter(l => l.trim());
         if (lines.length > 0) {
-          setCustomItems(lines.map(l => ({ 
-            nombre: l, 
+          setCustomItems(lines.map(l => ({
+            nombre: l,
             forma_cotizacion: operation.forma_cotizacion_servicio || 'lumpsum',
             cantidad: 1,
             precio_unitario: operation.forma_cotizacion_servicio === 'lumpsum' ? operation.valor_servicio : 0
@@ -498,6 +497,7 @@ export default function OperationDetail() {
     try {
       const res = await axios.get(`/operaciones/operations/${id}/`);
       setOperation(res.data);
+      setLeaveMaterials(res.data.materiales_a_bordo || false);
       setDocumentos(res.data.documentos_adjuntos || []);
 
       // Auto-populate customItems for services if not already populated
@@ -701,7 +701,7 @@ export default function OperationDetail() {
 
       if (operation?.tipo_operacion === 'servicios') {
         payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
-        
+
       }
 
       const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
@@ -748,7 +748,7 @@ export default function OperationDetail() {
 
       if (operation?.tipo_operacion === 'servicios') {
         payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
-        
+
       }
 
       // Descargamos el PDF generado temporalmente
@@ -1396,11 +1396,29 @@ export default function OperationDetail() {
     });
   };
 
-  const handleRemoveEditRow = (idx) => {
-    setEditPackingProducts(prev => prev.filter((_, i) => i !== idx));
+  const handleRemoveEditRow = async (idx) => {
+    const updatedProducts = editPackingProducts.filter((_, i) => i !== idx);
+    setEditPackingProducts(updatedProducts);
+
+    // Auto-guardado
+    try {
+      const payload = {
+        products: updatedProducts.map(p => ({
+          product: p.product,
+          quantity: p.quantity,
+          unit_price: p.unit_price
+        }))
+      };
+      const res = await axios.patch(`/operaciones/operations/${id}/`, payload);
+      setOperation(res.data);
+      showToast('Producto eliminado y guardado automáticamente', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Error al guardar automáticamente', 'error');
+    }
   };
 
-  const handleAddProductToPacking = (item) => {
+  const handleAddProductToPacking = async (item) => {
     if (!item) return;
     if (editPackingProducts.some(p => String(p.product) === String(item.id))) {
       showToast('El producto ya está en la lista', 'error');
@@ -1419,7 +1437,25 @@ export default function OperationDetail() {
       subtotal: 0
     };
 
-    setEditPackingProducts(prev => [...prev, newProduct]);
+    const updatedProducts = [...editPackingProducts, newProduct];
+    setEditPackingProducts(updatedProducts);
+
+    // Auto-guardado
+    try {
+      const payload = {
+        products: updatedProducts.map(p => ({
+          product: p.product,
+          quantity: p.quantity,
+          unit_price: p.unit_price
+        }))
+      };
+      const res = await axios.patch(`/operaciones/operations/${id}/`, payload);
+      setOperation(res.data);
+      showToast('Producto agregado y guardado automáticamente', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Error al guardar automáticamente', 'error');
+    }
   };
 
   const handleSavePacking = async () => {
@@ -1542,129 +1578,129 @@ export default function OperationDetail() {
   // --- LAYOUT BLOCKS ---
   const nodeDetalleCarga = (
     <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-        {!isOperario ? (
-          <>
-            <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
-                </h3>
-                <div className="flex items-center gap-2">
-                  {canEdit && !isEditingCarga && (
-                    <button onClick={() => setIsEditingCarga(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
-                      <i className="bi bi-pencil-fill"></i> Editar Carga
-                    </button>
-                  )}
-                  {isEditingCarga && (
-                    <button onClick={() => setIsEditingCarga(false)} className="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 bg-white dark:bg-slate-800">
-                      Cancelar
-                    </button>
-                  )}
-                  {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-                    <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
-                      {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
-                      Verificar Stock
-                    </button>
-                  )}
-                </div>
+      {!isOperario ? (
+        <>
+          <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <i className="bi bi-box-seam text-indigo-500"></i> Detalle de Carga
+              </h3>
+              <div className="flex items-center gap-2">
+                {canEdit && !isEditingCarga && (
+                  <button onClick={() => setIsEditingCarga(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
+                    <i className="bi bi-pencil-fill"></i> Editar Carga
+                  </button>
+                )}
+                {isEditingCarga && (
+                  <button onClick={() => setIsEditingCarga(false)} className="text-xs font-bold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 bg-white dark:bg-slate-800">
+                    Cancelar
+                  </button>
+                )}
+                {(operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+                  <button onClick={checkStock} disabled={checkingStock} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 border border-indigo-100 bg-white dark:bg-slate-800">
+                    {checkingStock ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div> : <i className="bi bi-arrow-repeat"></i>}
+                    Verificar Stock
+                  </button>
+                )}
               </div>
             </div>
+          </div>
 
-            {isEditingCarga ? (
-              <div className="p-4 bg-slate-50 dark:bg-slate-900/50">
-                <DetalleCargaEditor
-                  operationId={operation.id}
-                  initialProducts={operation.products || []}
-                  canEdit={canEdit}
-                  onSaved={() => {
-                    setIsEditingCarga(false);
-                    fetchOperation();
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                  <thead>
-                    <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
-                      <th className="px-6 py-4 text-left">Producto</th>
-                      <th className="px-6 py-4 text-center">Cant.</th>
-                      <th className="px-6 py-4 text-center">Disponibilidad</th>
-                      <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
-                    {operation.products?.map((prod, idx) => {
-                      const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
-                      return (
-                        <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
-                          </td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
-                          <td className="px-6 py-4 text-center">
-                            {isSuficiente ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
-                                <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
-                                <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
-                            ${(prod.quantity * prod.unit_price).toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
-                      <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
-                      <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
-              <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl flex items-start gap-3">
-                <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
-                <div>
-                  <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
-                  <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
-                    {stockVerification.errores?.map((err, idx) => (
-                      <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
-                        <div>
-                          • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
-                        </div>
-                        {err.formula_shortage && err.formula_shortage.length > 0 && (
-                          <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
-                            <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
-                              <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
+          {isEditingCarga ? (
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/50">
+              <DetalleCargaEditor
+                operationId={operation.id}
+                initialProducts={operation.products || []}
+                canEdit={canEdit}
+                onSaved={() => {
+                  setIsEditingCarga(false);
+                  fetchOperation();
+                }}
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead>
+                  <tr className="bg-white dark:bg-slate-700 uppercase tracking-wider text-[10px] font-black text-slate-400 dark:text-slate-400">
+                    <th className="px-6 py-4 text-left">Producto</th>
+                    <th className="px-6 py-4 text-center">Cant.</th>
+                    <th className="px-6 py-4 text-center">Disponibilidad</th>
+                    <th className="px-6 py-4 text-right text-indigo-400">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+                  {operation.products?.map((prod, idx) => {
+                    const isSuficiente = prod.suficiente !== undefined ? prod.suficiente : true;
+                    return (
+                      <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${!isSuficiente ? 'bg-red-50/50 dark:bg-red-900/20' : ''}`}>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-bold text-slate-800 dark:text-white">{prod.product_name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">${prod.unit_price} / unidad</p>
+                        </td>
+                        <td className="px-6 py-4 text-center text-sm text-slate-700 dark:text-slate-300 font-black">{prod.quantity}</td>
+                        <td className="px-6 py-4 text-center">
+                          {isSuficiente ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 uppercase">
+                              <i className="bi bi-check-circle-fill"></i> OK {prod.controlar_stock !== false ? `(${prod.stock_actual?.toFixed(0)})` : '(BAJO PEDIDO)'}
                             </span>
-                            <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
-                              {err.formula_shortage.map((fS, fIdx) => (
-                                <li key={fIdx}>
-                                  <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-200 uppercase">
+                              <i className="bi bi-x-circle-fill"></i> Faltan ({prod.stock_actual?.toFixed(0) || '0'})
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm font-black text-indigo-700">
+                          ${(prod.quantity * prod.unit_price).toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-indigo-50/30 dark:bg-indigo-900/20">
+                    <td colSpan="3" className="px-6 py-4 text-right text-xs font-black text-indigo-400 uppercase tracking-widest">Total Operación</td>
+                    <td className="px-6 py-4 text-right text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">${calculateTotal().toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {stockVerification && !stockVerification.todo_suficiente && (operation.status === 'pending' || operation.estado === 'solicitada' || operation.estado === 'armado_packing') && (
+            <div className="m-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl flex items-start gap-3">
+              <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg mt-0.5"></i>
+              <div>
+                <h4 className="text-sm font-bold text-red-800">No se puede avanzar: Stock insuficiente</h4>
+                <ul className="mt-2 text-xs font-medium text-red-700 space-y-2">
+                  {stockVerification.errores?.map((err, idx) => (
+                    <li key={idx} className="border-b border-red-100 dark:border-slate-700/50 pb-2 last:pb-0 last:border-0">
+                      <div>
+                        • <span className="font-bold">{err.nombre}</span>: Piden <span className="font-black">{parseFloat(err.necesario).toFixed(2)} {err.unidad || 'L'}</span>, pero hay <span className="font-black">{parseFloat(err.disponible).toFixed(2)} {err.unidad || 'L'}</span>.
+                      </div>
+                      {err.formula_shortage && err.formula_shortage.length > 0 && (
+                        <div className="ml-4 mt-2 bg-red-100/50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-red-200/50 dark:border-slate-700/50">
+                          <span className="font-bold text-[10px] text-red-900 dark:text-red-400 uppercase tracking-wider block mb-1">
+                            <i className="bi bi-funnel mr-1"></i>Ingredientes faltantes para fabricar este compuesto:
+                          </span>
+                          <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-red-800 dark:text-slate-300">
+                            {err.formula_shortage.map((fS, fIdx) => (
+                              <li key={fIdx}>
+                                <span className="font-semibold">{fS.nombre}</span> ({fS.presentacion}): Falta <span className="font-bold text-red-600 dark:text-red-400">{parseFloat(fS.falta).toFixed(2)} {fS.unidad}</span> (Necesario: {parseFloat(fS.necesario).toFixed(2)}, Disponible: {parseFloat(fS.disponible).toFixed(2)})
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            )}
-          </>
-        ) : (
-          <OperarioActionPanel products={operation.products} />
-        )}
-      </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <OperarioActionPanel products={operation.products} />
+      )}
+    </div>
   );
 
   const nodeOrdersAndPedido = (
@@ -1775,7 +1811,17 @@ export default function OperationDetail() {
           </p>
         </div>
         <button
-          onClick={() => setLeaveMaterials(!leaveMaterials)}
+          onClick={async () => {
+            const newVal = !leaveMaterials;
+            setLeaveMaterials(newVal);
+            try {
+              await axios.patch(`/operaciones/operations/${id}/`, { materiales_a_bordo: newVal });
+            } catch (err) {
+              console.error("Error saving materiales_a_bordo", err);
+              showToast('Error al guardar el estado', 'error');
+              setLeaveMaterials(!newVal); // revert on error
+            }
+          }}
           className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${leaveMaterials ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
           role="switch"
           aria-checked={leaveMaterials}
@@ -2008,15 +2054,15 @@ export default function OperationDetail() {
       )}
 
       <div className="bg-white dark:bg-slate-800 shadow-sm sm:rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-          <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-            <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
-            </h3>
-          </div>
-          <div className="p-4 sm:p-6 space-y-3">
-            {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                <div>
+        <div className="px-4 py-5 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+          <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <i className="bi bi-folder-fill text-indigo-500"></i> Documentación
+          </h3>
+        </div>
+        <div className="p-4 sm:p-6 space-y-3">
+          {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+              <div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-white">Packing List</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Listado detallado de mercadería para aduana y remito.</p>
                 {operation.packing_list_file && (
@@ -2053,9 +2099,9 @@ export default function OperationDetail() {
                 </label>
               </div>
             </div>
-            )}
+          )}
 
-            {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+          {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-white">Remito Firmado</h4>
@@ -2074,9 +2120,9 @@ export default function OperationDetail() {
                 <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
               </label>
             </div>
-            )}
+          )}
 
-            {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
+          {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-white">Rancho / Permiso Aduanero</h4>
@@ -2095,74 +2141,53 @@ export default function OperationDetail() {
                 <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
               </label>
             </div>
-            )}
+          )}
 
-            {/* Lista de Ingredientes (Solo para Químicos) */}
-            {operation.tipo_operacion === 'quimicos' && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-white">Lista de Ingredientes</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Detalle de fórmulas y cantidades a fabricar.</p>
-                  {operation.lista_ingredientes_file && (
-                    <button
-                      onClick={() => openPreview(getMediaUrl(operation.lista_ingredientes_file), 'Lista de Ingredientes Subida')}
-                      className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                    >
-                      <i className="bi bi-eye-fill"></i> Ver Documento Subido
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
-                  <button
-                    onClick={previewListaIngredientesExcel}
-                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <i className="bi bi-eye-fill"></i> Vista Previa
-                  </button>
-                  <button
-                    onClick={downloadListaIngredientesExcel}
-                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
-                  </button>
-                  <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Reporte (NUEVO CAMPO - EXCLUSIVO SERVICIOS) */}
-            {operation.tipo_operacion === 'servicios' && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-white">Reporte</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Reporte final de la operación.</p>
-                  {operation.reporte_file && (
-                    <button
-                      onClick={() => openPreview(getMediaUrl(operation.reporte_file), 'Reporte')}
-                      className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
-                    >
-                      <i className="bi bi-eye-fill"></i> Ver Documento
-                    </button>
-                  )}
-                </div>
-                <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir Reporte
-                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_reporte', '¿Subir reporte?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                </label>
-              </div>
-            )}
-
-            {/* Factura */}
+          {/* Lista de Ingredientes (Solo para Químicos) */}
+          {operation.tipo_operacion === 'quimicos' && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
-                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Factura de Operación</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Documento de facturación obligatoria.</p>
-                {operation.factura_file && (
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Lista de Ingredientes</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Detalle de fórmulas y cantidades a fabricar.</p>
+                {operation.lista_ingredientes_file && (
                   <button
-                    onClick={() => openPreview(getMediaUrl(operation.factura_file), 'Factura')}
+                    onClick={() => openPreview(getMediaUrl(operation.lista_ingredientes_file), 'Lista de Ingredientes Subida')}
+                    className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                  >
+                    <i className="bi bi-eye-fill"></i> Ver Documento Subido
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap gap-2 shrink-0 w-full sm:w-auto">
+                <button
+                  onClick={previewListaIngredientesExcel}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <i className="bi bi-eye-fill"></i> Vista Previa
+                </button>
+                <button
+                  onClick={downloadListaIngredientesExcel}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 dark:bg-slate-900/30 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
+                </button>
+                <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Reporte (NUEVO CAMPO - EXCLUSIVO SERVICIOS) */}
+          {operation.tipo_operacion === 'servicios' && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Reporte</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Reporte final de la operación.</p>
+                {operation.reporte_file && (
+                  <button
+                    onClick={() => openPreview(getMediaUrl(operation.reporte_file), 'Reporte')}
                     className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
                   >
                     <i className="bi bi-eye-fill"></i> Ver Documento
@@ -2170,12 +2195,33 @@ export default function OperationDetail() {
                 )}
               </div>
               <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
-                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Reporte
+                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_reporte', '¿Subir reporte?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
               </label>
             </div>
+          )}
+
+          {/* Factura */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-white">Factura de Operación</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Documento de facturación obligatoria.</p>
+              {operation.factura_file && (
+                <button
+                  onClick={() => openPreview(getMediaUrl(operation.factura_file), 'Factura')}
+                  className="inline-flex mt-2 text-indigo-600 hover:text-indigo-800 text-xs font-bold items-center gap-1 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded"
+                >
+                  <i className="bi bi-eye-fill"></i> Ver Documento
+                </button>
+              )}
+            </div>
+            <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+              <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
+              <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+            </label>
           </div>
         </div>
+      </div>
     </>
   );
 
@@ -2716,13 +2762,13 @@ export default function OperationDetail() {
                           disabled={actionLoading}
                           className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
                         >
-                          <i className="bi bi-check-circle-fill"></i> Confirmada
+                          <i className="bi bi-check-circle-fill"></i> Ganada
                         </button>
                         <button
                           onClick={() => setShowRechazoModal(true)}
                           className="w-full sm:w-auto px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
                         >
-                          <i className="bi bi-x-circle-fill"></i> Rechazada
+                          <i className="bi bi-x-circle-fill"></i> Perdida
                         </button>
                       </>
                     ) : (
@@ -2745,11 +2791,26 @@ export default function OperationDetail() {
 
                     {operation.tipo_operacion !== 'servicios' ? (
                       <>
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'recibida' || operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
+                              <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
+                              <input type="file" className="hidden" onChange={handleUploadCotizacionCustom} disabled={uploading} />
+                            </label>
+                            <button
+                              onClick={() => setShowCotizacionWordModal(true)}
+                              disabled={actionLoading}
+                              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
+                            </button>
+                          </div>
+                        )}
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.can_confirm && !isOperario && (
                           <button
                             onClick={() => handleAction('confirm_operation', '¿Confirmar etapa de Preparación y pasar al estado de Suministros (Armado de Packing List)?')}
                             disabled={actionLoading}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 text-white hover:bg-indigo-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                           >
                             {actionLoading ? 'Procesando...' : <><i className="bi bi-box-seam"></i> Armar Packing List</>}
                           </button>
@@ -3493,6 +3554,18 @@ Saludos cordiales.`
                     </h4>
 
                     <div className="space-y-5 flex-1">
+                      {/* Attn */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Attn</label>
+                        <input
+                          type="text"
+                          className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
+                          value={cotizacionAttn}
+                          onChange={(e) => setCotizacionAttn(e.target.value)}
+                          placeholder="Completa Attn"
+                        />
+                      </div>
+
                       {/* Offer Validity */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Validez' : 'Offer Validity'}</label>
@@ -3509,9 +3582,9 @@ Saludos cordiales.`
                               }
                             }}
                           >
-                            <option value="15 days">15 days</option>
-                            <option value="30 days">30 days</option>
-                            <option value="manual">Otro (Manual)...</option>
+                            <option value={cotizacionLang === 'es' ? '15 días' : '15 days'}>{cotizacionLang === 'es' ? '15 días' : '15 days'}</option>
+                            <option value={cotizacionLang === 'es' ? '30 días' : '30 days'}>{cotizacionLang === 'es' ? '30 días' : '30 days'}</option>
+                            <option value="manual">{cotizacionLang === 'es' ? 'Otro (Manual)...' : 'Other (Manual)...'}</option>
                           </select>
                         ) : (
                           <div className="flex gap-2">
@@ -3545,10 +3618,10 @@ Saludos cordiales.`
                               }
                             }}
                           >
-                            <option value="30 days from invoice date">30 days from invoice date</option>
-                            <option value="In advance">In advance</option>
-                            <option value="On delivery">On delivery</option>
-                            <option value="manual">Otro (Manual)...</option>
+                            <option value={cotizacionLang === 'es' ? '30 días fecha de factura' : '30 days from invoice date'}>{cotizacionLang === 'es' ? '30 días fecha de factura' : '30 days from invoice date'}</option>
+                            <option value={cotizacionLang === 'es' ? 'Por adelantado' : 'In advance'}>{cotizacionLang === 'es' ? 'Por adelantado' : 'In advance'}</option>
+                            <option value={cotizacionLang === 'es' ? 'Contra entrega' : 'On delivery'}>{cotizacionLang === 'es' ? 'Contra entrega' : 'On delivery'}</option>
+                            <option value="manual">{cotizacionLang === 'es' ? 'Otro (Manual)...' : 'Other (Manual)...'}</option>
                           </select>
                         ) : (
                           <div className="flex gap-2">
@@ -3699,7 +3772,7 @@ Saludos cordiales.`
             <div className="relative transform overflow-hidden rounded-2xl bg-white dark:bg-slate-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200 dark:border-slate-700">
               <div className="bg-red-500 px-6 py-4 flex items-center justify-between">
                 <h3 className="text-lg font-black text-white flex items-center gap-2">
-                  <i className="bi bi-x-circle-fill"></i> Rechazar Cotización
+                  <i className="bi bi-x-circle-fill"></i> Rechazo de Cotización
                 </h3>
                 <button onClick={() => setShowRechazoModal(false)} className="text-white hover:text-red-200 transition-colors">
                   <i className="bi bi-x-lg"></i>
