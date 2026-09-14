@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto
+from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto, MotivoRechazoCatalogo
 from apps.inventario.models import Articulo
 from apps.usuarios.models import User, PersonalPlantel
 import json
@@ -72,10 +72,22 @@ class OperacionDetalleSerializer(serializers.ModelSerializer):
 
 
 class DocumentoAdjuntoSerializer(serializers.ModelSerializer):
+    subido_por_nombre = serializers.SerializerMethodField()
+
     class Meta:
         model = DocumentoAdjunto
-        fields = ['id', 'tipo', 'nombre_personalizado', 'archivo', 'descripcion', 'fecha_subida', 'subido_por']
-        read_only_fields = ['id', 'fecha_subida', 'subido_por']
+        fields = ['id', 'tipo', 'nombre_personalizado', 'archivo', 'descripcion', 'fecha_subida', 'subido_por', 'subido_por_nombre']
+
+    def get_subido_por_nombre(self, obj):
+        if obj.subido_por:
+            return f"{obj.subido_por.first_name} {obj.subido_por.last_name}".strip() or obj.subido_por.username
+        return "Desconocido"
+
+
+class MotivoRechazoCatalogoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MotivoRechazoCatalogo
+        fields = '__all__'
 
 
 class OperacionSerializer(serializers.ModelSerializer):
@@ -88,7 +100,8 @@ class OperacionSerializer(serializers.ModelSerializer):
     agency_name = serializers.CharField(source='agency.name', read_only=True)
     agency_email = serializers.CharField(source='agency.email', read_only=True)
 
-    # Nombres de operarios
+    # Nombres de operarios y operadores
+    operadores_nombres = serializers.SerializerMethodField()
     operarios_nombres = serializers.SerializerMethodField()
     operarios_usuarios_nombres = serializers.SerializerMethodField()
 
@@ -139,7 +152,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'packing_list_file', 'remito_file', 'rancho_file', 'solicitud_particular_file',
             'factura_file', 'reporte_file', 'lista_ingredientes_file',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
-            'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
+            'operadores_nombres', 'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio',
@@ -161,6 +174,12 @@ class OperacionSerializer(serializers.ModelSerializer):
         read_only_fields = ['estado_revision', 'mensaje_revision', 'creado_por']
 
     # Métodos auxiliares
+    def get_operadores_nombres(self, obj):
+        return [
+            f"{u.first_name} {u.last_name}".strip() if u.first_name or u.last_name else u.username
+            for u in obj.operadores_asignados.all()
+        ]
+
     def get_operarios_nombres(self, obj):
         return [f"{s.apellidos}, {s.nombres}" for s in obj.operarios_asignados.all()]
 

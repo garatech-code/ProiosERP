@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from django_fsm import FSMField, transition
+from django_fsm import FSMField, transition, RETURN_VALUE
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
@@ -168,6 +168,9 @@ class Operacion(models.Model):
     estado_revision = models.CharField(max_length=20, choices=REVISION_CHOICES, default=ESTADO_REVISION_NONE)
     mensaje_revision = models.TextField(blank=True, null=True, help_text="Comentarios del operador (al solicitar) o del owner (al aprobar/rechazar).")
 
+    oculta = models.BooleanField(default=False, help_text="Oculta la operación de la interfaz")
+    estado_anterior = models.CharField(max_length=50, blank=True, null=True, help_text="Estado previo a la cancelación")
+
     estado = FSMField(default=ESTADO_RECIBIDA, choices=ESTADOS_CHOICES, protected=True)
 
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='operaciones_creadas')
@@ -258,6 +261,10 @@ class Operacion(models.Model):
     @transition(field=estado, source='*', target=ESTADO_CANCELADA)
     def cancel(self):
         self.restituir_stock()
+
+    @transition(field=estado, source=ESTADO_CANCELADA, target=RETURN_VALUE())
+    def reanudar_cancelada(self, target_state):
+        return target_state
 
     def restituir_stock(self):
         from apps.inventario.models import Articulo, MovimientoStock
@@ -397,3 +404,11 @@ class DocumentoAdjunto(models.Model):
         if self.tipo == self.TIPO_OTROS:
             return f"{self.nombre_personalizado or 'Otro'} - OP{self.operacion.id}"
         return f"{self.get_tipo_display()} - OP{self.operacion.id}"
+
+
+class MotivoRechazoCatalogo(models.Model):
+    motivo = models.CharField(max_length=255, unique=True, help_text="Texto del motivo de rechazo de cotización")
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.motivo

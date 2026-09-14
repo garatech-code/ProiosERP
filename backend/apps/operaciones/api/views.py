@@ -12,7 +12,7 @@ from openpyxl.utils import get_column_letter
 import io
 import logging
 
-from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto
+from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto, MotivoRechazoCatalogo
 from apps.usuarios.models import User
 from apps.operaciones.services import get_or_create_ship_from_imo, get_or_create_port_from_name
 from apps.produccion.models import OrdenFabricacion
@@ -22,7 +22,7 @@ from apps.usuarios.permissions import IsOwnerOrCreatorSenior
 from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
     PortSerializer, AgencySerializer, OperacionDetalleSerializer,
-    AgendaEventSerializer, DocumentoAdjuntoSerializer
+    AgendaEventSerializer, DocumentoAdjuntoSerializer, MotivoRechazoCatalogoSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         print(f"🔍 [BACKEND] Usuario: {user.username} (role: {user.role})")
-        qs = Operacion.objects.all().select_related('cliente', 'ship', 'port', 'agency').prefetch_related('detalles', 'documentos_adjuntos')
+        qs = Operacion.objects.filter(oculta=False).select_related('cliente', 'ship', 'port', 'agency').prefetch_related('detalles', 'documentos_adjuntos')
 
         if user.role in [User.Role.OWNER, User.Role.CONTABLE]:
             print("✅ Owner/Contable -> todas las operaciones")
@@ -218,10 +218,45 @@ class OperacionViewSet(viewsets.ModelViewSet):
         op = self.get_object()
         try:
             with transaction.atomic():
+                op.estado_anterior = op.estado
                 op.cancel()
                 op.save()
             return Response({'status': 'cancelled'})
         except Exception as e:
+            return Response({'error': str(e)}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def hide_operation(self, request, pk=None):
+        from apps.usuarios.models import User
+        if request.user.role != User.Role.OWNER:
+            return Response({'error': 'Solo el Owner puede eliminar operaciones de la interfaz.'}, status=403)
+        op = self.get_object()
+        op.oculta = True
+        op.save()
+        return Response({'status': 'hidden'})
+
+    @action(detail=True, methods=['post'])
+    def resume_cancelled_operation(self, request, pk=None):
+        from apps.usuarios.models import User
+        if request.user.role != User.Role.OWNER:
+            return Response({'error': 'Solo el Owner puede reanudar operaciones canceladas.'}, status=403)
+        op = self.get_object()
+        if op.estado != Operacion.ESTADO_CANCELADA:
+            return Response({'error': 'La operación no está cancelada.'}, status=400)
+            
+        resume_mode = request.data.get('resume_mode', 'inicio')
+        target_state = Operacion.ESTADO_RECIBIDA
+        if resume_mode == 'anterior' and op.estado_anterior:
+            target_state = op.estado_anterior
+
+        try:
+            with transaction.atomic():
+                op.reanudar_cancelada(target_state)
+                op.save()
+            return Response({'status': 'resumed', 'new_state': target_state})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response({'error': str(e)}, status=400)
 
 
@@ -1603,3 +1638,10 @@ class TvDashboardView(APIView):
             })
             
         return Response({'operaciones': data})
+
+
+class MotivoRechazoCatalogoViewSet(viewsets.ModelViewSet):
+    queryset = MotivoRechazoCatalogo.objects.all().order_by('-creado_en')
+    serializer_class = MotivoRechazoCatalogoSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None

@@ -254,60 +254,127 @@ def generar_solicitud_particular_pdf(operacion):
     story = []
     styles = getSampleStyleSheet()
     
-    story = build_pdf_headers(doc, story, operacion, "Solicitud Particular (Herramientas a bordo)")
+    tahoma_normal = ParagraphStyle('TahomaNormal', parent=styles['Normal'], fontName=DEFAULT_FONT, fontSize=9, leading=12)
+    tahoma_bold = ParagraphStyle('TahomaBold', parent=styles['Normal'], fontName=DEFAULT_FONT_BOLD, fontSize=9, leading=12)
+    tahoma_title = ParagraphStyle('TahomaTitle', parent=styles['Title'], fontName=DEFAULT_FONT_BOLD, fontSize=24, leading=28, alignment=0, textColor=colors.black)
+    
+    # Header Logo (Top Right)
+    logo_path = get_logo()
+    if logo_path:
+        img = RLImage(logo_path, width=6*cm, height=3*cm, kind='proportional')
+        t_logo = Table([['', img]], colWidths=[11*cm, 6*cm])
+        t_logo.setStyle(TableStyle([
+            ('ALIGN', (1,0), (1,0), 'RIGHT'),
+            ('VALIGN', (1,0), (1,0), 'MIDDLE'),
+        ]))
+        story.append(t_logo)
+        
+    # Blue Line Separator
+    story.append(Spacer(1, 0.2*cm))
+    t_line = Table([['']], colWidths=[17*cm])
+    t_line.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,-1), 1.5, colors.HexColor('#00a5c2')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(t_line)
+    story.append(Spacer(1, 0.5*cm))
+    
+    # Title
+    story.append(Paragraph("SOLICITUD PARTICULAR", tahoma_title))
+    story.append(Spacer(1, 0.3*cm))
+    
+    # Info 2 Columns (removed client info as requested)
+    col1 = "<b>FROM</b><br/>Proios S.A.<br/>Buenos Aires, Argentina<br/>Comodoro Pedro Zanni 351,<br/>5th Fl. - 503 LN"
+    from datetime import datetime
+    fecha = datetime.today().strftime('%Y-%m-%d')
+    col3 = f"<b>SOLICITUD PARTICULAR</b><br/>No. OP-{operacion.id:05d}<br/>Date: {fecha}"
+
+    t_info = Table([[Paragraph(col1, tahoma_normal), Paragraph(col3, tahoma_normal)]], colWidths=[8.5*cm, 8.5*cm])
+    t_info.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,0), 1, colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+    ]))
+    story.append(t_info)
+    story.append(Spacer(1, 0.5*cm))
     
     texto = """
     A continuación se detalla el listado de herramientas y equipos que serán ingresados a bordo para la ejecución 
     del servicio, los cuales serán retirados una vez finalizadas las tareas:
     """
-    story.append(Paragraph(texto, styles['Normal']))
-    story.append(Spacer(1, 1*cm))
+    story.append(Paragraph(texto, tahoma_normal))
+    story.append(Spacer(1, 0.5*cm))
     
-    # Parsear herramientas_solicitud_particular (puede ser JSON o texto plano viejo)
     import json
     herramientas = []
     if operacion.herramientas_solicitud_particular:
         try:
-            # Intentar parsear como JSON
             parsed = json.loads(operacion.herramientas_solicitud_particular)
             if isinstance(parsed, list):
                 herramientas = parsed
             else:
                 raise ValueError("No es una lista")
         except Exception:
-            # Si falla, tratar como texto plano separado por líneas
             lineas = [h.strip() for h in operacion.herramientas_solicitud_particular.split('\n') if h.strip()]
-            herramientas = [{'descripcion': h, 'cantidad': 1, 'serie': ''} for h in lineas]
+            herramientas = [{'descripcion': h, 'cantidad': 1, 'serie': '', 'peso': 0} for h in lineas]
     
-    data = [['Ítem', 'Descripción de Herramienta/Equipo', 'Cant.', 'Nº Serie']]
+    data = [['Ítem', 'Descripción de Herramienta/Equipo', 'Cant.', 'Nº Serie', 'Peso Ind.', 'Peso Tot.']]
     
+    total_general_peso = 0
     if herramientas:
         for i, h in enumerate(herramientas, 1):
             desc = h.get('descripcion', '')
-            cant = str(h.get('cantidad', ''))
+            cant = float(h.get('cantidad', 1) or 1)
             serie = h.get('serie', '')
-            data.append([str(i), Paragraph(desc, styles['Normal']), cant, serie])
+            peso_ind = float(h.get('peso', 0) or 0)
+            peso_tot = cant * peso_ind
+            total_general_peso += peso_tot
+            
+            data.append([str(i), Paragraph(desc, tahoma_normal), str(h.get('cantidad', 1)), serie, format_num(peso_ind) + ' kg', format_num(peso_tot) + ' kg'])
+        
+        data.append(['', Paragraph('<b>TOTAL GENERAL</b>', tahoma_normal), '', '', '', Paragraph(f'<b>{format_num(total_general_peso)} kg</b>', tahoma_normal)])
     else:
         for i in range(1, 10):
-            data.append([str(i), '', '', ''])
+            data.append([str(i), '', '', '', '', ''])
         
-    t = Table(data, colWidths=[1.5*cm, 9*cm, 1.5*cm, 4*cm])
+    t = Table(data, colWidths=[1.2*cm, 7.3*cm, 1.5*cm, 3*cm, 2*cm, 2*cm])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#002b5e')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f0f0f0')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
         ('FONTNAME', (0,0), (-1,0), DEFAULT_FONT_BOLD),
-        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('FONTSIZE', (0,0), (-1,0), 9),
+        ('FONTNAME', (0,1), (-1,-1), DEFAULT_FONT),
+        ('FONTSIZE', (0,1), (-1,-1), 9),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('GRID', (0,0), (-1,-1), 1, colors.black),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
         ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
         ('BOX', (0,0), (-1,-1), 0.25, colors.black),
-        ('BOTTOMPADDING', (0,1), (-1,-1), 10),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 6),
     ]))
+    
+    if herramientas:
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
+            ('SPAN', (1, -1), (4, -1)),
+            ('ALIGN', (1, -1), (4, -1), 'RIGHT'),
+        ]))
+        
     story.append(t)
     
-    doc.build(story)
+    def draw_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont(DEFAULT_FONT, 8)
+        canvas.setFillColor(colors.grey)
+        footer_text = "Proios S.A. · Comodoro Pedro Zanni 351, 5th Fl. – 503 LN, Buenos Aires (C1104AAH)  ·  info@proios.com  ·  www.proios.com"
+        canvas.drawCentredString(A4[0] / 2.0, 1 * cm, footer_text)
+        canvas.restoreState()
+    
+    doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
     pdf = buffer.getvalue()
     buffer.close()
     return pdf

@@ -293,7 +293,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
 
   const hasStockIssues = () => {
     return formData.products.some(p =>
-      !p.product || (p.quantity || 0) > (p.stock_actual || 0)
+      !p.product
     );
   };
 
@@ -384,11 +384,7 @@ export default function OperationFormOtros({ id: propId, onClose, onSuccess, ini
         setLoading(false);
         return;
       }
-      if (p.quantity > (p.stock_actual || 0)) {
-        setError(`Fila ${i + 1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
-        setLoading(false);
-        return;
-      }
+
     }
 
     try {

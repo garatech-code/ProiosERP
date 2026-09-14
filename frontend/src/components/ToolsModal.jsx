@@ -17,12 +17,12 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
           } else {
             // Migración desde texto plano a JSON si existiera algo
             const lines = operation.herramientas_solicitud_particular.split('\n').filter(l => l.trim() !== '');
-            setTools(lines.map(l => ({ descripcion: l, cantidad: 1, serie: '' })));
+            setTools(lines.map(l => ({ descripcion: l, cantidad: 1, serie: '', peso: 0 })));
           }
         } catch (e) {
           // Si no es JSON válido, asume texto plano
           const lines = operation.herramientas_solicitud_particular.split('\n').filter(l => l.trim() !== '');
-          setTools(lines.map(l => ({ descripcion: l, cantidad: 1, serie: '' })));
+          setTools(lines.map(l => ({ descripcion: l, cantidad: 1, serie: '', peso: 0 })));
         }
       } else {
         setTools([]);
@@ -33,7 +33,7 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
   if (!isOpen) return null;
 
   const handleAddRow = () => {
-    setTools([...tools, { descripcion: '', cantidad: 1, serie: '' }]);
+    setTools([...tools, { descripcion: '', cantidad: 1, serie: '', peso: 0 }]);
   };
 
   const handleRemoveRow = (index) => {
@@ -70,7 +70,8 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
             newTools.push({
               descripcion: String(row[0] || ''),
               cantidad: Number(row[1]) || 1,
-              serie: String(row[2] || '')
+              serie: String(row[2] || ''),
+              peso: Number(row[3]) || 0
             });
           }
         }
@@ -158,7 +159,8 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
                   <th scope="col" className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-12">Nº</th>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Descripción del Equipo</th>
                   <th scope="col" className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-24">Cantidad</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-48">Nº Serie (Opcional)</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Nº Serie (Opcional)</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-28">Peso (kg)</th>
                   <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-16">Acción</th>
                 </tr>
               </thead>
@@ -191,6 +193,17 @@ const ToolsModal = ({ isOpen, onClose, operation, onSave, onPreview }) => {
                         onChange={(e) => handleChange(index, 'serie', e.target.value)}
                         className="w-full text-sm py-1.5 px-2 rounded bg-transparent border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:text-white transition-colors"
                         placeholder="SN-1234..."
+                      />
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <input 
+                        type="number" 
+                        min="0"
+                        step="0.1"
+                        value={tool.peso} 
+                        onChange={(e) => handleChange(index, 'peso', e.target.value)}
+                        className="w-full text-center text-sm py-1.5 px-2 rounded bg-transparent border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:text-white transition-colors"
+                        placeholder="0"
                       />
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-right">

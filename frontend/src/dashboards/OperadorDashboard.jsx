@@ -176,7 +176,8 @@ export default function OperadorDashboard() {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(op =>
                 op.client_name?.toLowerCase().includes(term) ||
-                op.ship_name?.toLowerCase().includes(term)
+                op.ship_name?.toLowerCase().includes(term) ||
+                (op.operadores_nombres && op.operadores_nombres.some(name => name.toLowerCase().includes(term)))
             );
         }
         setFilteredOps(filtered);

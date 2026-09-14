@@ -18,6 +18,7 @@ import OperationFormServicios from './OperationFormServicios';
 import FormattedNumberInput from './FormattedNumberInput';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+import CreatableSelect from 'react-select/creatable';
 
 const getMediaUrl = (url) => {
   if (!url) return '';
@@ -132,6 +133,23 @@ export default function OperationDetail() {
 
   const [showRechazoModal, setShowRechazoModal] = useState(false);
   const [rechazoMotivo, setRechazoMotivo] = useState('');
+  const [rechazoOpciones, setRechazoOpciones] = useState([]);
+
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [resumeMode, setResumeMode] = useState('inicio');
+
+  useEffect(() => {
+    if (showRechazoModal) {
+      axios.get('/operaciones/motivos-rechazo-catalogo/')
+        .then(res => {
+          if (res.data) {
+            const ops = res.data.map(item => ({ label: item.motivo, value: item.motivo }));
+            setRechazoOpciones(ops);
+          }
+        })
+        .catch(err => console.error("Error fetching motivos rechazo", err));
+    }
+  }, [showRechazoModal]);
 
   const [pnaText, setPnaText] = useState('');
 
@@ -775,12 +793,50 @@ export default function OperationDetail() {
   const handleRechazarCotizacion = async (motivo) => {
     try {
       setActionLoading(true);
+      if (motivo) {
+        try {
+          await axios.post(`/operaciones/motivos-rechazo-catalogo/`, { motivo: motivo });
+        } catch (catErr) {
+          // Ignorar error si ya existe en el catálogo
+        }
+      }
       await axios.post(`/operaciones/operations/${id}/rechazar_cotizacion/`, { motivo_rechazo: motivo });
       showToast('Operación pausada (rechazada)', 'success');
+      setShowRechazoModal(false);
       fetchOperation();
     } catch (error) {
       console.error("Error rechazando cotización:", error);
       showToast('Error al pausar la operación', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleHideOperation = async () => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta operación de la interfaz? (No se borrará de la base de datos)')) return;
+    setActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/hide_operation/`);
+      showToast('Operación eliminada de la interfaz', 'success');
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al ocultar operación', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResumeOperation = async () => {
+    setActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/resume_cancelled_operation/`, { resume_mode: resumeMode });
+      showToast('Operación reanudada con éxito', 'success');
+      setShowResumeModal(false);
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al reanudar operación', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -2007,6 +2063,72 @@ export default function OperationDetail() {
           </div>
         </div>
       )}
+
+      {showResumeModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                <i className="bi bi-play-fill text-emerald-500"></i> Reanudar Operación Cancelada
+              </h3>
+              <button onClick={() => setShowResumeModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                ¿A qué estado deseas que vuelva la operación tras reanudarla?
+              </p>
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <input
+                    type="radio"
+                    name="resumeMode"
+                    value="inicio"
+                    checked={resumeMode === 'inicio'}
+                    onChange={() => setResumeMode('inicio')}
+                    className="w-4 h-4 text-emerald-500 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Comenzar desde el inicio</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Volverá al estado "Recibida".</span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <input
+                    type="radio"
+                    name="resumeMode"
+                    value="anterior"
+                    checked={resumeMode === 'anterior'}
+                    onChange={() => setResumeMode('anterior')}
+                    className="w-4 h-4 text-emerald-500 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Restaurar estado anterior</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Volverá al estado previo antes de su cancelación.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
+              <button
+                onClick={() => setShowResumeModal(false)}
+                className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResumeOperation}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                {actionLoading ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-play-fill"></i>}
+                Reanudar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -2734,6 +2856,25 @@ export default function OperationDetail() {
                           className="w-full sm:w-auto px-4 py-2 border-2 border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                           <i className="bi bi-arrow-counterclockwise"></i> Solicitar Recotización
+                        </button>
+                      </div>
+                    )}
+                    
+                    {isOwner && (operation.estado === 'cancelada' || operation.status === 'cancelled') && (
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => setShowResumeModal(true)}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-4 py-2 border-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <i className="bi bi-play-fill"></i> Reanudar Operación
+                        </button>
+                        <button
+                          onClick={() => handleHideOperation()}
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-4 py-2 border-2 border-slate-500/30 text-slate-400 hover:bg-slate-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <i className="bi bi-eye-slash-fill"></i> Eliminar de la interfaz
                         </button>
                       </div>
                     )}
@@ -3785,13 +3926,23 @@ Saludos cordiales.`
                 </p>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Motivo del rechazo</label>
-                  <textarea
-                    rows={4}
-                    value={rechazoMotivo}
-                    onChange={(e) => setRechazoMotivo(e.target.value)}
-                    className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:ring-red-500 focus:border-red-500 dark:text-white"
-                    placeholder="Ej: El cliente consideró que el precio es muy alto..."
-                  ></textarea>
+                  <CreatableSelect
+                    isClearable
+                    placeholder="Seleccionar o escribir nuevo motivo..."
+                    options={rechazoOpciones}
+                    value={rechazoMotivo ? { label: rechazoMotivo, value: rechazoMotivo } : null}
+                    onChange={(selected) => setRechazoMotivo(selected ? selected.value : '')}
+                    formatCreateLabel={(inputValue) => `Crear "${inputValue}"`}
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderRadius: '0.5rem',
+                        borderColor: '#cbd5e1',
+                        padding: '2px',
+                        fontSize: '0.875rem'
+                      })
+                    }}
+                  />
                 </div>
               </div>
 

@@ -317,7 +317,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
   // Verificar si algún producto tiene stock insuficiente o falta ID
   const hasStockIssues = () => {
     return formData.products.some(p =>
-      !p.product || (p.quantity || 0) > (p.stock_actual || 0)
+      !p.product
     );
   };
 
@@ -411,11 +411,7 @@ export default function OperationFormServicios({ id: propId, onClose, onSuccess,
         setLoading(false);
         return;
       }
-      if (p.quantity > (p.stock_actual || 0)) {
-        setError(`Fila ${i + 1}: stock insuficiente para "${p.product_name || p.product}". Disponible: ${p.stock_actual}`);
-        setLoading(false);
-        return;
-      }
+
     }
 
     try {
