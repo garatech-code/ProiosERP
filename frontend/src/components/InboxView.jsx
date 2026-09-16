@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 import ComposeEmailModal from './ComposeEmailModal';
 import EmailTemplateManager from './EmailTemplateManager';
 import LogoSpinner from './LogoSpinner';
+import logo from '../assets/logo.png';
 
 const getEmailPreview = (htmlOrText) => {
     if (!htmlOrText) return '(Sin contenido)';
@@ -309,18 +310,18 @@ export default function InboxView({ onCreateFromEmail }) {
             </div>
             <div className="p-6 overflow-y-auto flex-1 bg-white prose prose-sm max-w-none text-gray-900 border-y border-gray-100 dark:border-slate-700">
               {selectedEmail.body_html ? (
-                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedEmail.body_html) }} />
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedEmail.body_html.replace(/cid:(logo|header_institucional)[^"']*/gi, logo)) }} />
               ) : (
                 <div className="whitespace-pre-wrap font-sans">{selectedEmail.body_text}</div>
               )}
             </div>
-            {selectedEmail.adjuntos?.length > 0 && (
+            {selectedEmail.adjuntos?.length > 0 && selectedEmail.adjuntos.filter(a => a.filename !== 'logo.png' && a.filename !== 'header_institucional.png').length > 0 && (
               <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/30 flex gap-2 overflow-x-auto">
                 <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                   Adjuntos:
                 </span>
-                {selectedEmail.adjuntos.map(adj => (
+                {selectedEmail.adjuntos.filter(a => a.filename !== 'logo.png' && a.filename !== 'header_institucional.png').map(adj => (
                   <a key={adj.id} href={getMediaUrl(adj.file)} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded text-xs text-indigo-600 dark:text-indigo-400 font-medium whitespace-nowrap hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-1">
                     <i className="bi bi-download"></i> {adj.filename}
                   </a>

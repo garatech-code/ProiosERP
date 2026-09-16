@@ -198,10 +198,10 @@ def send_outlook_email(email_message_id, reply_to_msg_id=None):
             except Exception as e:
                 logger.error(f"Error attaching file {attachment.filename}: {e}")
 
-        # Inline logo (header_institucional)
-        if "cid:header_institucional" in html_body:
+        # Inline logo (logo.png)
+        if "cid:logo" in html_body:
             import os
-            logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'header_institucional.png')
+            logo_path = os.path.join(settings.BASE_DIR, 'static_local', 'logo.png')
             if os.path.exists(logo_path):
                 try:
                     with open(logo_path, 'rb') as f:
@@ -209,10 +209,10 @@ def send_outlook_email(email_message_id, reply_to_msg_id=None):
                     base64_logo = base64.b64encode(img_data).decode('utf-8')
                     attachments.append({
                         "@odata.type": "#microsoft.graph.fileAttachment",
-                        "name": "header_institucional.png",
+                        "name": "logo.png",
                         "contentType": "image/png",
                         "contentBytes": base64_logo,
-                        "contentId": "header_institucional",
+                        "contentId": "logo",
                         "isInline": True
                     })
                 except Exception as e:

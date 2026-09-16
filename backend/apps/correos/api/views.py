@@ -81,6 +81,45 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
         if not all([subject, body, recipient]):
             return Response({'error': 'Faltan campos obligatorios'}, status=status.HTTP_400_BAD_REQUEST)
             
+        # Determinar nombre e email del usuario para la firma
+        user = request.user
+        nombre_usuario = f"{user.first_name} {user.last_name}".strip()
+        if not nombre_usuario:
+            nombre_usuario = user.username
+            
+        if "eva" in nombre_usuario.lower() and "proios" in nombre_usuario.lower():
+            email_usuario = "eva@proios.com"
+            nombre_usuario = "Eva Proios"
+            phone_html = '<p style="margin: 0; text-align: center;">Tel: <a href="tel:+5491157265031" style="color: #0056b3; text-decoration: underline;">+549 11 57265031</a></p>'
+        else:
+            email_usuario = "operations@proios.com"
+            phone_html = ''
+
+        firma_html = f"""
+<br><br>
+<table style="font-family: 'Times New Roman', serif; color: #000; border-collapse: collapse;">
+  <tr>
+    <td style="text-align: center; vertical-align: middle; border-right: 1px solid #000; padding-right: 20px;">
+      <img src="cid:logo" alt="PROIOS S.A." style="width: 180px; display: block; margin: 0 auto;">
+    </td>
+    <td style="vertical-align: middle; padding-left: 20px; font-size: 11pt; line-height: 1.4;">
+      <p style="margin: 0; text-align: center;">{nombre_usuario}</p>
+      <p style="margin: 0; text-align: center;"><a href="https://maps.google.com/?q=Comodoro+Pedro+Zanni+351" style="color: #0056b3; text-decoration: underline;">Comodoro Pedro Zanni 351</a> floor 5th</p>
+      <p style="margin: 0; text-align: center;">503 LN. Buenos Aires (C1104AAH)</p>
+      <p style="margin: 0; text-align: center;">Argentina</p>
+      <p style="margin: 0; text-align: center;">Email: <a href="mailto:{email_usuario}" style="color: #000; text-decoration: underline;">{email_usuario}</a></p>
+      {phone_html}
+      <p style="margin: 0; text-align: center;"><a href="http://www.proios.com" style="color: #0056b3; text-decoration: underline; text-transform: uppercase;">WWW.PROIOS.COM</a></p>
+    </td>
+  </tr>
+</table>
+"""
+
+        if "<" not in body or ">" not in body:
+            html_body = body.replace("\n", "<br>") + firma_html
+        else:
+            html_body = body + firma_html
+
         attachments = request.FILES.getlist('attachments')
         
         import uuid
@@ -99,11 +138,11 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
             email_msg = EmailMessage.objects.create(
                 message_id=f"OUT-{uuid.uuid4()}",
                 subject=full_subject,
-                sender_address='demomailproios@gmail.com',
+                sender_address=email_usuario,
                 recipient_address=recipient,
                 date_received=timezone.now(),
                 body_text=body,
-                body_html=body,
+                body_html=html_body,
                 direction='outbound',
                 is_read=True,
                 operacion_id=operacion_id

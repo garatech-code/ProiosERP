@@ -70,27 +70,7 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  // Plantilla Institucional HTML + Firma
   const buildHtmlBody = () => {
-    // Firma dinámica según usuario
-    const firstName = user?.first_name || '';
-    const lastName = user?.last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim();
-    const senderName = fullName || formatUserName(user);
-
-    const signature = `
-      <div style="margin-top: 25px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #4b5563; border-left: 3px solid #13a6b8; padding-left: 12px; margin-left: 2px;">
-        <p style="margin: 0; font-weight: bold; color: #093641; font-size: 14px;">${senderName}</p>
-        <p style="margin: 2px 0; font-size: 12px; color: #6b7280;">Cargo / Rol: <strong style="color:#13a6b8;">${user?.role || 'Miembro de Proios'}</strong></p>
-        <p style="margin: 2px 0; font-size: 11px; color: #9ca3af;">Este mensaje fue enviado a través del portal Proios Manager.</p>
-      </div>
-    `;
-
-    // Si no quiere usar plantilla, mandamos el texto crudo + la firma básica
-    if (!formData.useTemplate) {
-      return formData.body.replace(/\n/g, '<br>') + signature;
-    }
-
     const replyMarker = '\n\n--- En respuesta a ---\n';
     const splitIndex = formData.body.indexOf(replyMarker);
     
@@ -102,42 +82,12 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
       quotedContent = formData.body.substring(splitIndex).replace(/\n/g, '<br>');
     }
 
-    // Plantilla Institucional Proios Manager
-    const logoUrl = "https://drive.google.com/uc?export=view&id=1XZPPHdHgJ-9n4PvO1cUTm_Vhb8skmFKh";
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; margin-top: 20px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-          <tr>
-            <td style="background-color: #093641; border-bottom: 4px solid #13a6b8; text-align: center; padding: 0;">
-              <img src="${logoUrl}" alt="Proios Manager" style="width: 100%; max-width: 600px; display: block; border: 0; height: auto;" />
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 30px 25px; color: #334155; font-size: 14px; line-height: 1.6;">
-              ${mainContent.replace(/\n/g, '<br>')}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 0 25px 30px 25px;">
-              ${signature}
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 15px; text-align: center; color: #94a3b8; font-size: 11px;">
-              © ${new Date().getFullYear()} Proios Manager. Todos los derechos reservados.<br>
-              Generado automáticamente por el Sistema de Gestión Integrado.
-            </td>
-          </tr>
-        </table>
-        ${quotedContent ? `<div style="max-width: 600px; margin: 20px auto; padding: 15px; color: #64748b; font-size: 12px; border-left: 3px solid #cbd5e1; background-color: #f1f5f9; border-radius: 4px;">${quotedContent}</div>` : ''}
-      </body>
-      </html>
-    `;
+    let html = mainContent.replace(/\n/g, '<br>');
+    if (quotedContent) {
+      html += `<br><div style="max-width: 600px; margin: 20px 0; padding: 15px; color: #64748b; font-size: 12px; border-left: 3px solid #cbd5e1; background-color: #f1f5f9; border-radius: 4px;">${quotedContent}</div>`;
+    }
+    
+    return html;
   };
 
   const handleSubmit = async (e) => {
@@ -246,10 +196,6 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
                   <i className="bi bi-file-earmark-text"></i>
                   Insertar Plantilla
                 </button>
-                <label className="flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-lg cursor-pointer border border-indigo-100 dark:border-indigo-800 transition-colors text-[10px] uppercase">
-                  <input type="checkbox" name="useTemplate" checked={formData.useTemplate} onChange={handleChange} className="rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800" />
-                  Firma ProIOS
-                </label>
               </div>
             </label>
             <textarea
