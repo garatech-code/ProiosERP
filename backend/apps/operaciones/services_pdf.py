@@ -922,7 +922,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
     return buffer.getvalue()
 
 
-def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0, ubicacion="", lugar_entrega="", otros_gastos="", expensas="[]"):
+def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_terms="30 days from invoice date", delivery_time="5", include_vat=True, scope_includes="[detail what the supply / service comprises]", scope_excludes="[freight, customs clearance, additional labour, parts not listed, etc.]", notes="[Other relevant note]", attn="Operations / Technical Department", lang="en", damage_location="", damage_frames="", damage_area="", custom_items="[]", damage_subject="DAMAGE DESCRIPTION", damage_location_title="Location and damage", damage_frames_title="Frame(s)", damage_area_title="Area L x H (mm)", vat_percentage="21", user=None, exp1=0.0, exp2=0.0, exp3=0.0, ubicacion="", lugar_entrega="", otros_gastos="", expensas="[]", include_discount=False, discount_type='percentage', discount_value=0.0):
     if isinstance(notes, str):
         if '{{notas}}' in notes:
             notes = notes.replace('{{notas}}', operacion.texto_cotizacion_adicional or 'N/A')
@@ -963,7 +963,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             'scope': 'SCOPE OF SUPPLY', 'includes': 'Includes:', 'excludes': 'Excludes:', 'notes': 'TECHNICAL NOTES',
             'faithfully': 'Yours faithfully,', 'attn': 'Attn:', 'days': 'days', 'not_included': 'Not included',
             'vat_word': 'VAT', 'page': 'Page', 'operations': 'Operations', 'on_board': 'on board',
-            'details': 'DETAILS', 'terms_title': 'TERMS &amp; CONDITIONS'
+            'details': 'DETAILS', 'terms_title': 'TERMS &amp; CONDITIONS', 'discount': 'Discount'
         },
         'es': {
             'cat_quimicos': 'Químicos', 'cat_productos': 'Productos', 'cat_servicios': 'Servicios', 'cat_general': 'General',
@@ -979,7 +979,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             'scope': 'ALCANCE DEL SUMINISTRO', 'includes': 'Incluye:', 'excludes': 'Excluye:', 'notes': 'NOTAS TÉCNICAS',
             'faithfully': 'Atentamente,', 'attn': 'Atención:', 'days': 'días', 'not_included': 'No incluidos',
             'vat_word': 'IVA', 'page': 'Página', 'operations': 'Operaciones', 'on_board': 'a bordo del',
-            'details': 'DETALLES', 'terms_title': 'TÉRMINOS Y CONDICIONES'
+            'details': 'DETALLES', 'terms_title': 'TÉRMINOS Y CONDICIONES', 'discount': 'Descuento'
         }
     }
     
@@ -1228,11 +1228,21 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         tot_final_label = ParagraphStyle('TotFL', parent=bold_style, alignment=TA_RIGHT, fontSize=12, textColor=HexColor('#003366'))
         tot_final_val = ParagraphStyle('TotFV', parent=bold_style, alignment=TA_RIGHT, fontSize=14, textColor=HexColor('#003366'))
         
+        descuento_monto = 0.0
+        if include_discount:
+            if discount_type == 'percentage':
+                descuento_monto = total_general * (float(discount_value) / 100.0)
+            else:
+                descuento_monto = float(discount_value)
+
         tot_data = []
         
         subtotal_base = total_general - (val_exp1 + val_exp2 + val_exp3)
         tot_data.append([Paragraph(f"{txt['subtotal']}:", tot_label_style), Paragraph(f"USD {subtotal_base:,.2f}", tot_val_style)])
         
+        if include_discount:
+            tot_data.append([Paragraph(f"{txt['discount']}:", tot_label_style), Paragraph(f"-USD {descuento_monto:,.2f}", tot_val_style)])
+
         if exp1:
             tot_data.append([Paragraph("Aduana y transporte:", tot_label_style), Paragraph(str(exp1), tot_val_style)])
         if exp2:
@@ -1240,13 +1250,16 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         if exp3:
             tot_data.append([Paragraph("Hs extra Aduana:", tot_label_style), Paragraph(str(exp3), tot_val_style)])
             
+        total_after_discount = total_general - descuento_monto
+            
         if str(include_vat).lower() == 'true' or include_vat is True:
+            iva_monto = total_after_discount * (float(vat_percentage) / 100.0)
             tot_data.extend([
-                [Paragraph(f"{txt['vat']} (21%):", tot_label_style), Paragraph(f"USD {(float(total_general) * 0.21):,.2f}", tot_val_style)],
-                [Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {(float(total_general) * 1.21):,.2f}", tot_final_val)]
+                [Paragraph(f"{txt['vat']} ({vat_percentage}%):", tot_label_style), Paragraph(f"USD {iva_monto:,.2f}", tot_val_style)],
+                [Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {(total_after_discount + iva_monto):,.2f}", tot_final_val)]
             ])
         else:
-            tot_data.append([Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {float(total_general):,.2f}", tot_final_val)])
+            tot_data.append([Paragraph(f"{txt['total']} USD:", tot_final_label), Paragraph(f"USD {total_after_discount:,.2f}", tot_final_val)])
             
         t_tot_inner = Table(tot_data, colWidths=[3.5*cm, 4*cm])
         t_tot_inner.setStyle(TableStyle([

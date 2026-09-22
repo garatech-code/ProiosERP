@@ -259,6 +259,32 @@ class OperacionViewSet(viewsets.ModelViewSet):
             traceback.print_exc()
             return Response({'error': str(e)}, status=400)
 
+    @action(detail=True, methods=['post'])
+    def force_state(self, request, pk=None):
+        from apps.usuarios.models import User
+        if request.user.role not in [User.Role.OWNER, User.Role.CONTABLE]:
+            return Response({'error': 'Solo el Owner puede forzar estados.'}, status=403)
+        
+        op = self.get_object()
+        new_state = request.data.get('estado')
+        
+        if not new_state:
+            return Response({'error': 'Estado no provisto'}, status=400)
+            
+        if new_state == Operacion.ESTADO_ENTREGADA:
+            return Response({'error': 'No se puede forzar el estado a Cerrada (Entregada). Debe usar el flujo normal con validaciones y documentación.'}, status=400)
+            
+        update_data = {'estado': new_state}
+        
+        if new_state == Operacion.ESTADO_COTIZACION_ENVIADA and not op.quotation_sent_date:
+            update_data['quotation_sent_date'] = timezone.now()
+        if new_state == Operacion.ESTADO_SOLICITADA and not op.client_confirmed_date:
+            update_data['client_confirmed_date'] = timezone.now()
+            
+        Operacion.objects.filter(pk=op.pk).update(**update_data)
+        return Response({'status': 'ok', 'new_state': new_state})
+
+
 
     @action(detail=True, methods=['post'])
     def confirm_operation(self, request, pk=None):
@@ -1307,6 +1333,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
         lugar_entrega = ''
         include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
         vat_percentage = data.get('vat_percentage', '21')
+        include_discount = str(data.get('include_discount', 'false')).lower() == 'true'
+        discount_type = data.get('discount_type', 'percentage')
+        try:
+            discount_value = float(data.get('discount_value', '0'))
+        except ValueError:
+            discount_value = 0.0
         scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
         scope_excludes = data.get('scope_excludes', '[freight, customs clearance, additional labour, parts not listed, etc.]')
         notes = data.get('notes', '[Other relevant note]')
@@ -1336,7 +1368,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         try:
             if template_type == 'eva':
                 from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
-                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
+                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value)
             else:
                 from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
                 pdf_content = generar_cotizacion_docx_pdf(
@@ -1348,7 +1380,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     service_qty_override=service_qty_override, 
                     service_unit_price_override=service_unit_price_override, 
                     ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json,
-                    lugar_entrega=lugar_entrega
+                    lugar_entrega=lugar_entrega, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value
                 )
 
             response = HttpResponse(
@@ -1371,6 +1403,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
         delivery_time = data.get('delivery_time', '5')
         include_vat = str(data.get('include_vat', 'true')).lower() == 'true'
         vat_percentage = data.get('vat_percentage', '21')
+        include_discount = str(data.get('include_discount', 'false')).lower() == 'true'
+        discount_type = data.get('discount_type', 'percentage')
+        try:
+            discount_value = float(data.get('discount_value', '0'))
+        except ValueError:
+            discount_value = 0.0
         scope_includes = data.get('scope_includes', '[detail what the supply / service comprises]')
         scope_excludes = data.get('scope_excludes', '[freight, customs clearance, additional labour, parts not listed, etc.]')
         notes = data.get('notes', '[Other relevant note]')
@@ -1406,7 +1444,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
         try:
             if template_type == 'eva':
                 from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
-                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user)
+                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value)
             else:
                 from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
                 pdf_content = generar_cotizacion_docx_pdf(
@@ -1417,7 +1455,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     service_value_override=service_value_override, 
                     service_qty_override=service_qty_override, 
                     service_unit_price_override=service_unit_price_override, 
-                    ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json
+                    ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json,
+                    lugar_entrega=lugar_entrega, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value
                 )
 
             import uuid

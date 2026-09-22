@@ -147,14 +147,17 @@ export default function ComposeEmailModal({ onClose, onSuccess, replyTo, user, d
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Para *</label>
               <input
-                type="email"
+                type="text"
                 name="recipient"
                 value={formData.recipient}
                 onChange={handleChange}
                 required
                 className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                placeholder="cliente@empresa.com"
+                placeholder="correo1@empresa.com, correo2@empresa.com"
               />
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                Puede ingresar múltiples correos separados por coma (,).
+              </p>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular a Operación (Opcional)</label>

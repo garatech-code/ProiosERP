@@ -138,6 +138,27 @@ export default function OperationDetail() {
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeMode, setResumeMode] = useState('inicio');
 
+  const [showForceStateModal, setShowForceStateModal] = useState(false);
+  const [forceStateSelection, setForceStateSelection] = useState('');
+
+  const handleForceState = async () => {
+    if (!forceStateSelection) return;
+    if (!window.confirm(`¿Estás seguro de forzar el estado de la operación? Esta acción ignorará las validaciones regulares y puede causar inconsistencias.`)) return;
+    
+    setActionLoading(true);
+    try {
+      await axios.post(`/operaciones/operations/${id}/force_state/`, { estado: forceStateSelection });
+      showToast('Estado forzado manualmente', 'success');
+      setShowForceStateModal(false);
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.error || 'Error al forzar estado', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (showRechazoModal) {
       axios.get('/operaciones/motivos-rechazo-catalogo/')
@@ -160,6 +181,9 @@ export default function OperationDetail() {
   const [paymentTerms, setPaymentTerms] = useState('30 days from invoice date');
   const [includeVat, setIncludeVat] = useState(false);
   const [vatPercentage, setVatPercentage] = useState('21');
+  const [includeDiscount, setIncludeDiscount] = useState(false);
+  const [discountType, setDiscountType] = useState('percentage');
+  const [discountValue, setDiscountValue] = useState(0);
   const [showCotizacionWordModal, setShowCotizacionWordModal] = useState(false);
   const [deliveryTime, setDeliveryTime] = useState('5');
   const [lugarEntrega, setLugarEntrega] = useState('FOB');
@@ -197,13 +221,11 @@ export default function OperationDetail() {
 
       // 1. Intentar cargar desde localStorage (borrador local sin guardar)
       const draft = localStorage.getItem(`expensas_draft_${id}`);
-      if (draft) {
+      if (draft !== null) {
         try {
           const parsed = JSON.parse(draft);
-          if (parsed && parsed.length > 0) {
-            setExpensas(parsed);
-            return; // Cargado desde localStorage
-          }
+          setExpensas(parsed);
+          return; // Cargado desde localStorage
         } catch (e) { }
       }
 
@@ -211,20 +233,16 @@ export default function OperationDetail() {
       if (operation.expensas) {
         try {
           const parsed = JSON.parse(operation.expensas);
-          if (parsed && parsed.length > 0) {
-            setExpensas(parsed);
-            return; // Cargado exitosamente desde DB
-          }
+          setExpensas(parsed);
+          return; // Cargado exitosamente desde DB
         } catch (e) { }
       }
 
       // 3. Fallback: cargar los defaults vacíos si no hay nada
-      if (expensas.length === 0) {
-        setExpensas([
-          { descripcion: isEs ? defaultAduanaEs : defaultAduanaEn, cantidad: '', unidad: '', precio: '', importe: '' },
-          { descripcion: isEs ? defaultHsEs : defaultHsEn, cantidad: '', unidad: '', precio: '', importe: '' }
-        ]);
-      }
+      setExpensas([
+        { descripcion: isEs ? defaultAduanaEs : defaultAduanaEn, cantidad: '', unidad: '', precio: '', importe: '' },
+        { descripcion: isEs ? defaultHsEs : defaultHsEn, cantidad: '', unidad: '', precio: '', importe: '' }
+      ]);
     }
   }, [operation, id]);
 
@@ -248,10 +266,53 @@ export default function OperationDetail() {
 
   // Auto-guardar en localStorage ante cada cambio
   useEffect(() => {
-    if (id && expensas.length > 0) {
+    if (id) {
       localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(expensas));
     }
   }, [expensas, id]);
+
+  // Persistir ajustes comerciales de cotizacion
+  useEffect(() => {
+    if (id) {
+      const settingsDraft = localStorage.getItem(`cotizacion_settings_${id}`);
+      if (settingsDraft) {
+        try {
+          const parsed = JSON.parse(settingsDraft);
+          if (parsed.offerValidity !== undefined) setOfferValidity(parsed.offerValidity);
+          if (parsed.paymentTerms !== undefined) setPaymentTerms(parsed.paymentTerms);
+          if (parsed.includeVat !== undefined) setIncludeVat(parsed.includeVat);
+          if (parsed.vatPercentage !== undefined) setVatPercentage(parsed.vatPercentage);
+          if (parsed.includeDiscount !== undefined) setIncludeDiscount(parsed.includeDiscount);
+          if (parsed.discountType !== undefined) setDiscountType(parsed.discountType);
+          if (parsed.discountValue !== undefined) setDiscountValue(parsed.discountValue);
+          if (parsed.deliveryTime !== undefined) setDeliveryTime(parsed.deliveryTime);
+          if (parsed.lugarEntrega !== undefined) setLugarEntrega(parsed.lugarEntrega);
+          if (parsed.cotizacionAttn !== undefined) setCotizacionAttn(parsed.cotizacionAttn);
+          if (parsed.scopeIncludes !== undefined) setScopeIncludes(parsed.scopeIncludes);
+          if (parsed.scopeExcludes !== undefined) setScopeExcludes(parsed.scopeExcludes);
+          if (parsed.cotizacionNotes !== undefined) setCotizacionNotes(parsed.cotizacionNotes);
+          if (parsed.cotizacionTemplate !== undefined) setCotizacionTemplate(parsed.cotizacionTemplate);
+          if (parsed.cotizacionLang !== undefined) setCotizacionLang(parsed.cotizacionLang);
+          if (parsed.otrosGastos !== undefined) setOtrosGastos(parsed.otrosGastos);
+        } catch (e) { }
+      } else {
+         if (operation?.cliente?.contact_person) {
+             setCotizacionAttn(operation.cliente.contact_person);
+         } else if (operation?.cliente?.name) {
+             setCotizacionAttn(operation.cliente.name);
+         }
+      }
+    }
+  }, [id, operation]);
+
+  useEffect(() => {
+    if (id) {
+      const settings = {
+        offerValidity, paymentTerms, includeVat, vatPercentage, includeDiscount, discountType, discountValue, deliveryTime, lugarEntrega, cotizacionAttn, scopeIncludes, scopeExcludes, cotizacionNotes, cotizacionTemplate, cotizacionLang, otrosGastos
+      };
+      localStorage.setItem(`cotizacion_settings_${id}`, JSON.stringify(settings));
+    }
+  }, [id, offerValidity, paymentTerms, includeVat, vatPercentage, includeDiscount, discountType, discountValue, deliveryTime, lugarEntrega, cotizacionAttn, scopeIncludes, scopeExcludes, cotizacionNotes, cotizacionTemplate, cotizacionLang, otrosGastos]);
 
   // Handler centralizado para cambios en expensas (con auto-cálculo)
   const handleExpensaChange = (index, field, value) => {
@@ -706,6 +767,9 @@ export default function OperationDetail() {
         lugar_entrega: lugarEntrega,
         include_vat: includeVat,
         vat_percentage: vatPercentage,
+        include_discount: includeDiscount,
+        discount_type: discountType,
+        discount_value: discountValue,
         scope_includes: scopeIncludes,
         scope_excludes: scopeExcludes,
         notes: cotizacionNotes,
@@ -753,6 +817,9 @@ export default function OperationDetail() {
         lugar_entrega: lugarEntrega,
         include_vat: includeVat,
         vat_percentage: vatPercentage,
+        include_discount: includeDiscount,
+        discount_type: discountType,
+        discount_value: discountValue,
         scope_includes: scopeIncludes,
         scope_excludes: scopeExcludes,
         notes: cotizacionNotes,
@@ -2064,71 +2131,7 @@ export default function OperationDetail() {
         </div>
       )}
 
-      {showResumeModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                <i className="bi bi-play-fill text-emerald-500"></i> Reanudar Operación Cancelada
-              </h3>
-              <button onClick={() => setShowResumeModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                <i className="bi bi-x-lg"></i>
-              </button>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                ¿A qué estado deseas que vuelva la operación tras reanudarla?
-              </p>
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <input
-                    type="radio"
-                    name="resumeMode"
-                    value="inicio"
-                    checked={resumeMode === 'inicio'}
-                    onChange={() => setResumeMode('inicio')}
-                    className="w-4 h-4 text-emerald-500 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Comenzar desde el inicio</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Volverá al estado "Recibida".</span>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <input
-                    type="radio"
-                    name="resumeMode"
-                    value="anterior"
-                    checked={resumeMode === 'anterior'}
-                    onChange={() => setResumeMode('anterior')}
-                    className="w-4 h-4 text-emerald-500 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Restaurar estado anterior</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Volverá al estado previo antes de su cancelación.</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
-              <button
-                onClick={() => setShowResumeModal(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleResumeOperation}
-                disabled={actionLoading}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
-              >
-                {actionLoading ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-play-fill"></i>}
-                Reanudar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </>
   );
 
@@ -2877,6 +2880,18 @@ export default function OperationDetail() {
                           <i className="bi bi-eye-slash-fill"></i> Eliminar de la interfaz
                         </button>
                       </div>
+                    )}
+
+                    {/* Botón de forzar estado manual para el Owner */}
+                    {isOwner && operation.estado !== 'entregada' && operation.estado !== 'cancelada' && (
+                      <button
+                        onClick={() => setShowForceStateModal(true)}
+                        disabled={actionLoading}
+                        className="w-full sm:w-auto px-4 py-2 border-2 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500 hover:text-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        title="Forzar Estado Manualmente (Ignora Validaciones)"
+                      >
+                        <i className="bi bi-magic"></i> Forzar Estado
+                      </button>
                     )}
 
                     {/* Botones Especiales de Seguimiento de Cotización */}
@@ -3830,6 +3845,51 @@ Saludos cordiales.`
                         </div>
                       </div>
 
+                      <div className="pt-2">
+                        <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{cotizacionLang === 'en' ? 'Discount' : 'Descuento'}</p>
+                              <p className="text-xs text-slate-500">Aplicar descuento al total</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIncludeDiscount(!includeDiscount)}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${includeDiscount ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                            >
+                              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-slate-800 shadow ring-0 transition duration-200 ease-in-out ${includeDiscount ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                          </div>
+                          {includeDiscount && (
+                            <div className="flex flex-col gap-2 mt-1 pt-2 border-t border-slate-200 dark:border-slate-700">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Tipo de descuento:</span>
+                                <select
+                                  className="w-24 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1 px-2 focus:ring-blue-500 focus:border-blue-500"
+                                  value={discountType}
+                                  onChange={(e) => setDiscountType(e.target.value)}
+                                >
+                                  <option value="percentage">%</option>
+                                  <option value="fixed">Fijo</option>
+                                </select>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Valor a descontar:</span>
+                                <div className="flex items-center relative w-24">
+                                  <input
+                                    type="number"
+                                    className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1 px-2 pr-6 focus:ring-blue-500 focus:border-blue-500 text-right"
+                                    value={discountValue}
+                                    onChange={(e) => setDiscountValue(e.target.value)}
+                                  />
+                                  <span className="absolute right-2 text-slate-400 text-sm">{discountType === 'percentage' ? '%' : '$'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>
@@ -4080,6 +4140,59 @@ Saludos cordiales.`
               </button>
               <button onClick={handleSaveStaff} disabled={updatingStaff} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2">
                 {updatingStaff ? 'Guardando...' : <><i className="bi bi-save"></i> Guardar Personal</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Forzar Estado */}
+      {showForceStateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100 dark:border-slate-700 animate-fadeIn">
+            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Forzar Estado Manualmente</h3>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-3 mb-6 rounded-r">
+                <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                    <i className="bi bi-exclamation-triangle-fill mr-1"></i>
+                    Atención: Mover la operación manualmente ignorará validaciones como cargar documentos. Si cierras la operación esto no aplicará.
+                </p>
+            </div>
+            
+            <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Seleccione el estado destino</label>
+                <select
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                    value={forceStateSelection}
+                    onChange={(e) => setForceStateSelection(e.target.value)}
+                >
+                    <option value="">Seleccione un estado...</option>
+                    <option value="recibida">Recibida</option>
+                    <option value="cotizacion_enviada">Cotización Enviada</option>
+                    <option value="solicitada">Solicitada (Preparación)</option>
+                    <option value="armado_packing">En Gestión (Packing List)</option>
+                    <option value="en_aduana">En Aduana</option>
+                    <option value="lista_para_envio">Logística / Lista para envío</option>
+                    <option value="remitada">Remitada / Entregada en Sitio</option>
+                    
+                    <option disabled>──────────</option>
+                    
+                    <option value="solicitud_servicio">Solicitud de Servicio</option>
+                    <option value="cotizado">Servicio Cotizado</option>
+                    <option value="permisos_pna">Permisos PNA</option>
+                    <option value="en_ejecucion">En Ejecución</option>
+                    <option value="reporte_firmado">Reporte Firmado</option>
+                    
+                    <option disabled>──────────</option>
+                    <option value="pausada">Pausada</option>
+                </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowForceStateModal(false)} className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 font-bold rounded-xl transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleForceState} disabled={!forceStateSelection || actionLoading} className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                Forzar <i className="bi bi-magic"></i>
               </button>
             </div>
           </div>

@@ -55,6 +55,7 @@ export default function OwnerDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [statusFilter, setStatusFilter] = useState('');
+    const [operatorFilter, setOperatorFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [metrics, setMetrics] = useState({ total: 0, en_proceso: 0, finalizadas: 0, usuarios_activos: 0 });
@@ -217,8 +218,8 @@ export default function OwnerDashboard() {
 
     useEffect(() => {
         let filtered = operations;
-        if (statusFilter) {
-            filtered = filtered.filter(op => op.status === statusFilter || op.estado === statusFilter);
+        if (operatorFilter) {
+            filtered = filtered.filter(op => op.operadores_id && op.operadores_id.includes(Number(operatorFilter)));
         }
         if (typeFilter) {
             filtered = filtered.filter(op => op.tipo_operacion === typeFilter);
@@ -232,7 +233,7 @@ export default function OwnerDashboard() {
             );
         }
         setFilteredOps(filtered);
-    }, [operations, statusFilter, typeFilter, searchTerm]);
+    }, [operations, operatorFilter, typeFilter, searchTerm]);
 
     const fetchData = async () => {
         try {
@@ -597,8 +598,42 @@ export default function OwnerDashboard() {
         </div>
     );
 
+    const renderOperatorSummary = () => {
+        if (!operators.length) return null;
+        
+        const operatorStats = operators.map(op => {
+            const opCount = operations.filter(o => 
+                o.operadores_id && o.operadores_id.includes(op.id) && 
+                o.estado !== 'entregada' && o.estado !== 'cancelada'
+            ).length;
+            return { ...op, opCount };
+        }).sort((a, b) => b.opCount - a.opCount);
+
+        return (
+            <div className="mb-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+                    <i className="bi bi-person-badge text-indigo-500"></i>
+                    Resumen por Operador (Activas)
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {operatorStats.map(op => (
+                        <div 
+                            key={op.id} 
+                            onClick={() => setOperatorFilter(operatorFilter === String(op.id) ? '' : String(op.id))}
+                            className={`cursor-pointer p-3 rounded-xl border flex justify-between items-center transition-all ${operatorFilter === String(op.id) ? 'bg-indigo-50 border-indigo-300 dark:bg-indigo-900/40 shadow-sm' : 'bg-slate-50 border-slate-100 dark:bg-slate-700/50 hover:bg-slate-100 dark:border-slate-600'}`}
+                        >
+                            <span className={`text-sm font-semibold ${operatorFilter === String(op.id) ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-slate-300'}`}>{formatUserName(op)}</span>
+                            <span className={`py-0.5 px-2 rounded-full text-xs font-black ${operatorFilter === String(op.id) ? 'bg-indigo-200 text-indigo-800' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'}`}>{op.opCount}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     const renderOperationsList = (opsToRender) => (
         <div className="animate-fadeIn">
+            {renderOperatorSummary()}
             <div className="tour-ops-search flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 hidden sm:block">Listado de Operaciones</h2>
 
@@ -630,15 +665,13 @@ export default function OwnerDashboard() {
 
                     <select
                         className="py-2 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
+                        value={operatorFilter}
+                        onChange={(e) => setOperatorFilter(e.target.value)}
                     >
-                        <option value="">Todos los Estados</option>
-                        <option value="solicitada">Solicitadas</option>
-                        <option value="presupuestada">Presupuestadas</option>
-                        <option value="en_produccion">En Producción</option>
-                        <option value="lista_para_envio">Listas Envío</option>
-                        <option value="remitada">Remitadas</option>
+                        <option value="">Todos los Operadores</option>
+                        {operators.map(op => (
+                            <option key={op.id} value={op.id}>{formatUserName(op)}</option>
+                        ))}
                     </select>
                 </div>
             </div>

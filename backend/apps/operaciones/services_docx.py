@@ -35,7 +35,7 @@ def get_template_path(lang, tipo_operacion):
     else:
         return os.path.join(templates_dir, f'Proios_Quotation_{tipo}_TEMPLATE_EN.docx')
 
-def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None, ubicacion='', otros_gastos='', expensas='[]', lugar_entrega='FOB'):
+def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang, custom_items, vat_percentage, user, service_forma_override=None, service_value_override=None, service_qty_override=None, service_unit_price_override=None, ubicacion='', otros_gastos='', expensas='[]', lugar_entrega='FOB', include_discount=False, discount_type='percentage', discount_value=0.0):
     if isinstance(notes, str):
         if '{{notas}}' in notes:
             notes = notes.replace('{{notas}}', op.texto_cotizacion_adicional or 'N/A')
@@ -193,8 +193,15 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
             
         scope_of_work = "\n".join(scope_lines) if scope_lines else "Provisión de repuestos/productos"
 
+    descuento_monto = 0.0
+    if include_discount:
+        if discount_type == 'percentage':
+            descuento_monto = importe_total * (float(discount_value) / 100.0)
+        else:
+            descuento_monto = float(discount_value)
+
     if include_vat:
-        iva = importe_total * (float(vat_percentage) / 100.0)
+        iva = (importe_total - descuento_monto) * (float(vat_percentage) / 100.0)
         impuestos_label = "VAT" if lang == 'en' else "IVA"
     else:
         iva = 0.0
@@ -249,7 +256,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
     val_otros_gastos = parse_exp(otros_gastos)
     total_expensas += val_otros_gastos
 
-    total = importe_total + iva + total_expensas
+    total = (importe_total - descuento_monto) + iva + total_expensas
 
     clean_notes = notes if notes and notes.strip() not in ['[Other relevant note]', '[Otra nota relevante]', 'N/A'] else ''
 
@@ -275,6 +282,8 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         'cargo': "Operations" if lang == 'en' else "Operaciones",
         'scope_of_work': scope_of_work,
         'importe': format_num(importe_total),
+        'off': format_num(descuento_monto) if include_discount else "0,00",
+        'has_discount': include_discount,
         'total': format_num(total),
         'buque': op.ship.name if op.ship else "",
         'cliente': op.cliente.name if op.cliente else "",
