@@ -469,12 +469,13 @@ class OperacionViewSet(viewsets.ModelViewSet):
             logger.exception("Error generando PDF de solicitud particular")
             return Response({'error': str(e)}, status=400)
 
-    @action(detail=True, methods=['get'], url_path='generate_remito_pdf')
+    @action(detail=True, methods=['get', 'post'], url_path='generate_remito_pdf')
     def generate_remito_pdf(self, request, pk=None):
         op = self.get_object()
         from apps.operaciones.services_pdf import generar_remito_pdf
         try:
-            pdf_bytes = generar_remito_pdf(op)
+            params = request.data if request.method == 'POST' else request.query_params
+            pdf_bytes = generar_remito_pdf(op, params=params)
             from django.http import HttpResponse
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="Remito_OP{op.id}.pdf"'

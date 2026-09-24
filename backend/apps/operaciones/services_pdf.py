@@ -1419,68 +1419,212 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
     doc.build(story, onFirstPage=add_proios_footer, onLaterPages=add_proios_footer)
     return buffer.getvalue()
 
-def generar_remito_pdf(operacion):
+def generar_remito_pdf(operacion, params=None):
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import mm
+    from datetime import datetime
+    import io
+
+    if params is None:
+        params = {}
+
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    story = []
-    styles = getSampleStyleSheet()
+    # Tamaño Carta (Letter)
+    c = canvas.Canvas(buffer, pagesize=letter)
     
-    story = build_pdf_headers(doc, story, operacion, "REMITO DE ENTREGA / DELIVERY NOTE")
+    # ---------------------------------------------------------
+    # CONFIGURACIÓN DE COORDENADAS (X, Y) desde abajo a la izquierda
+    # Hoja carta: 215.9 mm x 279.4 mm
+    # ---------------------------------------------------------
     
-    texto = "A continuación se detalla el listado de materiales/productos entregados para la operación referenciada:"
-    story.append(Paragraph(texto, styles['Normal']))
-    story.append(Spacer(1, 1*cm))
+    # Fuentes
+    FONT_NORMAL = DEFAULT_FONT
+    FONT_BOLD = DEFAULT_FONT_BOLD
+    FONT_SIZE = 10
     
+    # FECHA (Día, Mes, Año)
+    # Suponemos que hay 3 cajitas arriba a la derecha. Ajustar Y según el talonario.
+    Y_FECHA = 245 * mm
+    X_DIA = 150 * mm
+    X_MES = 165 * mm
+    X_ANIO = 180 * mm
+    
+    # DATOS CLIENTE
+    Y_CLIENTE = 210 * mm
+    X_CLIENTE = 30 * mm
+    
+    Y_DOMICILIO = 200 * mm
+    X_DOMICILIO = 30 * mm
+    
+    Y_REF = 190 * mm
+    X_REF = 25 * mm
+    X_RANCHO = 80 * mm
+    X_OC = 140 * mm
+    
+    # CONDICIONES Y CUIT
+    Y_CONDICIONES = 178 * mm
+    X_IVA_INSC = 45 * mm
+    X_IVA_NO_INSC = 45 * mm
+    X_IVA_MONO = 45 * mm
+    X_IVA_EXENTO = 45 * mm  # Ajustar según checkbox exacto
+    
+    X_COND_CONTADO = 105 * mm
+    X_COND_CTA_CTE = 105 * mm
+    
+    Y_CUIT = 140 * mm
+    X_CUIT = 178 * mm
+    
+    # ITEMS
+    Y_ITEMS_START = 150 * mm
+    Y_ITEMS_STEP = 6 * mm
+    X_ITEM_CANT = 15 * mm
+    X_ITEM_DESC = 35 * mm
+    X_ITEM_PESO = 160 * mm
+    X_ITEM_PESO_TOT = 180 * mm
+    
+    # TRANSPORTE
+    Y_TRANSPORTO = 45 * mm
+    X_TRANSPORTO = 30 * mm
+
+    # ---------------------------------------------------------
+    # DIBUJO DE DATOS
+    # ---------------------------------------------------------
+    c.setFont(FONT_BOLD, FONT_SIZE)
+    
+    # Fecha
+    fecha_str = params.get('fecha') or datetime.now().strftime("%d/%m/%Y")
+    try:
+        parts = fecha_str.split('/')
+        if len(parts) == 3:
+            c.drawString(X_DIA, Y_FECHA, parts[0])
+            c.drawString(X_MES, Y_FECHA, parts[1])
+            c.drawString(X_ANIO, Y_FECHA, parts[2][-2:]) # últimos 2 dígitos del año
+        else:
+            c.drawString(X_DIA, Y_FECHA, fecha_str)
+    except:
+        pass
+
+    # Cliente
+    cliente_nombre = operacion.cliente.name if operacion.cliente else ""
+    c.drawString(X_CLIENTE, Y_CLIENTE, cliente_nombre)
+    
+    # Domicilio
+    domicilio = params.get('domicilio', '')
+    if not domicilio and operacion.cliente:
+        domicilio = operacion.cliente.address or ''
+    c.drawString(X_DOMICILIO, Y_DOMICILIO, domicilio)
+    
+    # Referencia, Rancho, OC
+    c.drawString(X_REF, Y_REF, f"OP-{operacion.id:04d}")
+    if params.get('rancho'):
+        c.drawString(X_RANCHO, Y_REF, params.get('rancho'))
+    elif operacion.ship:
+        c.drawString(X_RANCHO, Y_REF, operacion.ship.name[:30])
+        
+    if params.get('oc'):
+        c.drawString(X_OC, Y_REF, params.get('oc'))
+
+    # CUIT
+    Y_CUIT = 178 * mm  # Corregido: antes estaba en 140
+    cuit = params.get('cuit', '')
+    if not cuit and operacion.cliente:
+        cuit = getattr(operacion.cliente, 'cuit', '') or getattr(operacion.cliente, 'tax_id', '') or ''
+    c.drawString(X_CUIT, Y_CUIT, cuit)
+
+    # Checkboxes IVA
+    iva = params.get('iva', '').lower()
+    # Las coordenadas Y de los checkboxes varían. Aquí se hace una aproximación vertical.
+    if 'inscripto' in iva and 'no' not in iva:
+        c.drawString(X_IVA_INSC, Y_CONDICIONES + 4*mm, "X")
+    elif 'no inscripto' in iva:
+        c.drawString(X_IVA_NO_INSC, Y_CONDICIONES, "X")
+    elif 'monotributo' in iva:
+        c.drawString(X_IVA_MONO, Y_CONDICIONES - 4*mm, "X")
+
+    # Checkboxes Venta
+    cond_venta = params.get('condicion_venta', '').lower()
+    if 'contado' in cond_venta:
+        c.drawString(X_COND_CONTADO, Y_CONDICIONES + 4*mm, "X")
+    elif 'cuenta' in cond_venta or 'cta' in cond_venta:
+        c.drawString(X_COND_CTA_CTE, Y_CONDICIONES, "X")
+
+    # Items (en formato Tabla Platypus)
+    from reportlab.platypus import Table, TableStyle, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.units import cm
     from apps.inventario.models import Articulo
     
-    data = [['Ítem', 'Descripción de Material', 'Cantidad', 'Unidad']]
+    styles = getSampleStyleSheet()
+    tahoma_normal = ParagraphStyle('TahomaNormal', parent=styles['Normal'], fontName=DEFAULT_FONT, fontSize=9)
+    
+    data = [['Ítem', 'Cant.', 'Descripción', 'Peso Ind.', 'Peso Tot.']]
+    total_peso = 0
     
     for i, detalle in enumerate(operacion.detalles.all(), 1):
         try:
             articulo = Articulo.objects.get(id=detalle.articulo_id)
             desc = articulo.nombre
-            unidad = articulo.presentacion or 'U'
+            peso_ind = float(getattr(articulo, 'peso_kg', 0) or 0)
         except Articulo.DoesNotExist:
-            desc = f"Artículo no encontrado (ID: {detalle.articulo_id})"
-            unidad = '-'
+            desc = f"Item {detalle.articulo_id}"
+            peso_ind = 0.0
+            
+        cant = float(detalle.cantidad)
+        cant_str = str(int(cant) if cant.is_integer() else cant)
+        peso_tot = cant * peso_ind
+        total_peso += peso_tot
         
-        cant = str(detalle.cantidad)
-        story_desc = Paragraph(desc, styles['Normal'])
-        data.append([str(i), story_desc, cant, unidad])
-        
-    t = Table(data, colWidths=[1.5*cm, 10.5*cm, 2.5*cm, 2.5*cm])
+        data.append([
+            str(i),
+            cant_str,
+            Paragraph(desc, tahoma_normal),
+            f"{peso_ind} kg" if peso_ind > 0 else "-",
+            f"{peso_tot} kg" if peso_ind > 0 else "-"
+        ])
+    
+    if total_peso > 0:
+        data.append(['', '', Paragraph('<b>TOTAL GENERAL</b>', tahoma_normal), '', f"{total_peso} kg"])
+
+    t = Table(data, colWidths=[1.2*cm, 1.5*cm, 10.3*cm, 2.5*cm, 2.5*cm])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#002b5e')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('BACKGROUND', (0,0), (-1,0), HexColor('#f0f0f0')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
         ('FONTNAME', (0,0), (-1,0), DEFAULT_FONT_BOLD),
-        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('FONTSIZE', (0,0), (-1,0), 9),
+        ('FONTNAME', (0,1), (-1,-1), DEFAULT_FONT),
+        ('FONTSIZE', (0,1), (-1,-1), 9),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('GRID', (0,0), (-1,-1), 1, colors.black),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
         ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
         ('BOX', (0,0), (-1,-1), 0.25, colors.black),
-        ('BOTTOMPADDING', (0,1), (-1,-1), 10),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
     ]))
-    story.append(t)
     
-    story.append(Spacer(1, 2.5*cm))
-    
-    # Firmas
-    signature_data = [
-        [Paragraph("<b>Entregado por (PROIOS SA):</b>", styles['Normal']), Paragraph("<b>Recibido por (Firma y Sello):</b>", styles['Normal'])],
-        ['', ''],
-        ['_________________________', '_________________________']
-    ]
-    sig_table = Table(signature_data, colWidths=[8.5*cm, 8.5*cm])
-    sig_table.setStyle(TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 20),
-    ]))
-    story.append(sig_table)
-    
-    doc.build(story)
+    if total_peso > 0:
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, -1), (-1, -1), HexColor('#f0f0f0')),
+            ('SPAN', (2, -1), (3, -1)),
+            ('ALIGN', (2, -1), (3, -1), 'RIGHT'),
+        ]))
+
+    w, h = t.wrap(letter[0], letter[1])
+    # Dibujar la tabla de items anclada en (X=15mm, Y=150mm - altura)
+    # Se recomienda revisar la posición de inicio (Y=150mm) en el talonario
+    t.drawOn(c, 15 * mm, 155 * mm - h)
+
+    # Transportó
+    transporto = params.get('transporto', '')
+    if transporto:
+        c.setFont(FONT_BOLD, FONT_SIZE)
+        c.drawString(X_TRANSPORTO, Y_TRANSPORTO, transporto)
+
+    c.save()
     pdf = buffer.getvalue()
     buffer.close()
     return pdf

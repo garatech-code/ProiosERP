@@ -16,6 +16,7 @@ import ToolsModal from './ToolsModal';
 import OperationFormProductos from './OperationFormProductos';
 import OperationFormServicios from './OperationFormServicios';
 import FormattedNumberInput from './FormattedNumberInput';
+import GenerateRemitoModal from './GenerateRemitoModal';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import CreatableSelect from 'react-select/creatable';
@@ -120,6 +121,7 @@ export default function OperationDetail() {
 
   const [showLogisticaEmailModal, setShowLogisticaEmailModal] = useState(false);
   const [logisticaEmailAttachments, setLogisticaEmailAttachments] = useState([]);
+  const [isRemitoModalOpen, setIsRemitoModalOpen] = useState(false);
 
   const [showStaffAssignmentModal, setShowStaffAssignmentModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
@@ -976,22 +978,8 @@ export default function OperationDetail() {
     showToast('Correo de Logística enviado exitosamente', 'success');
   };
 
-  const handleGenerateRemito = async () => {
-    try {
-      const response = await axios.get(`/operaciones/operations/${id}/generate_remito_pdf/`, {
-        responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Remito_OP${id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Error generando remito:", error);
-      showToast('Error al generar el remito. Verifique que exista la plantilla.', 'error');
-    }
+  const handleGenerateRemito = () => {
+    setIsRemitoModalOpen(true);
   };
 
   const downloadListaIngredientesExcel = async () => {
@@ -4213,6 +4201,13 @@ Saludos cordiales.`
           onSuccess={() => { fetchOperation(); setShowEditModal(false); }}
         />
       )}
+
+      <GenerateRemitoModal 
+        isOpen={isRemitoModalOpen} 
+        onClose={() => setIsRemitoModalOpen(false)} 
+        operationId={id} 
+        showToast={showToast}
+      />
 
     </div>
   );
