@@ -210,6 +210,30 @@ export default function OperationDetail() {
   const [expensas, setExpensas] = useState([]);
   const [otrosGastos, setOtrosGastos] = useState('');
 
+  const [isEditingNotas, setIsEditingNotas] = useState(false);
+  const [tempNotas, setTempNotas] = useState('');
+
+  useEffect(() => {
+    if (operation) {
+      setTempNotas(operation.notas || '');
+    }
+  }, [operation]);
+
+  const handleSaveNotas = async () => {
+    setActionLoading(true);
+    try {
+        await axios.patch(`/operaciones/operations/${id}/`, { notes: tempNotas });
+        showToast('Notas internas actualizadas', 'success');
+        setIsEditingNotas(false);
+        fetchOperation();
+    } catch (error) {
+        console.error("Error al guardar notas:", error);
+        showToast('Error al guardar notas internas', 'error');
+    } finally {
+        setActionLoading(false);
+    }
+  };
+
   // -------------------------------------------------------------
   // Lógica de Expensas: Persistencia (localStorage/DB) y cálculo
   // -------------------------------------------------------------
@@ -338,8 +362,8 @@ export default function OperationDetail() {
     if (showCotizacionWordModal) {
       const isSrv = operation?.tipo_operacion === 'servicios';
       const isEs = cotizacionLang === 'es';
-      const defEn = isSrv ? defaultNotesSrvEn : (operation?.notas || '');
-      const defEs = isSrv ? defaultNotesSrvEs : (operation?.notas || '');
+      const defEn = isSrv ? defaultNotesSrvEn : '[Other relevant note]';
+      const defEs = isSrv ? defaultNotesSrvEs : '[Otra nota relevante]';
 
       if (
         cotizacionNotes === '' ||
@@ -3125,8 +3149,38 @@ export default function OperationDetail() {
 
             </div>
 
-            <div className="lg:col-span-1 sticky top-24 self-start">
+            <div className="lg:col-span-1 sticky top-24 self-start space-y-6">
               <OperationTracker currentState={operation.status || operation.estado} operationType={operation.tipo_operacion} />
+
+              {/* Notas Internas */}
+              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-2xl shadow-sm p-4 sm:p-5">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-sm font-black text-amber-800 dark:text-amber-500 flex items-center gap-2">
+                    <i className="bi bi-journal-text"></i> Notas Internas
+                  </h4>
+                  {isEditingNotas ? (
+                    <button onClick={handleSaveNotas} disabled={actionLoading} className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition-colors">
+                       {actionLoading ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  ) : (
+                    <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
+                      Editar
+                    </button>
+                  )}
+                </div>
+                {isEditingNotas ? (
+                  <textarea
+                    className="w-full text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-amber-300 dark:border-amber-700/50 rounded-xl p-3 focus:ring-amber-500 focus:border-amber-500 min-h-[120px]"
+                    value={tempNotas}
+                    onChange={(e) => setTempNotas(e.target.value)}
+                    placeholder="Escribe notas internas aquí..."
+                  />
+                ) : (
+                  <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                    {operation.notas ? operation.notas : <span className="text-slate-400 italic">No hay notas internas agregadas.</span>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -186,8 +186,15 @@ export default function OwnerDashboard() {
 
     const fetchOperators = async () => {
         try {
-            const res = await axios.get('/usuarios/users/?role=OPERADOR');
-            if (res.data) setOperators(res.data);
+            const res = await axios.get('/usuarios/users/');
+            if (res.data) {
+                let filtered = res.data.filter(u => u.role === 'OPERADOR');
+                if (user?.role === 'OWNER') {
+                    const owners = res.data.filter(u => u.role === 'OWNER');
+                    filtered = [...filtered, ...owners];
+                }
+                setOperators(filtered);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -224,6 +231,9 @@ export default function OwnerDashboard() {
         if (typeFilter) {
             filtered = filtered.filter(op => op.tipo_operacion === typeFilter);
         }
+        if (statusFilter) {
+            filtered = filtered.filter(op => op.status === statusFilter || op.estado === statusFilter);
+        }
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(op =>
@@ -233,7 +243,7 @@ export default function OwnerDashboard() {
             );
         }
         setFilteredOps(filtered);
-    }, [operations, operatorFilter, typeFilter, searchTerm]);
+    }, [operations, operatorFilter, typeFilter, statusFilter, searchTerm]);
 
     const fetchData = async () => {
         try {
@@ -633,7 +643,6 @@ export default function OwnerDashboard() {
 
     const renderOperationsList = (opsToRender) => (
         <div className="animate-fadeIn">
-            {renderOperatorSummary()}
             <div className="tour-ops-search flex flex-col sm:flex-row gap-3 mb-6 items-end justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 hidden sm:block">Listado de Operaciones</h2>
 
@@ -661,6 +670,19 @@ export default function OwnerDashboard() {
                         <option value="quimicos">■ Químicos</option>
                         <option value="servicios">■ Servicios</option>
                         <option value="otros">■ Otros</option>
+                    </select>
+
+                    <select
+                        className="py-2 pl-3 pr-8 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white bg-white rounded-xl text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="">Todos los Estados</option>
+                        <option value="solicitada">Solicitadas</option>
+                        <option value="presupuestada">Presupuestadas</option>
+                        <option value="en_produccion">En Producción</option>
+                        <option value="lista_para_envio">Listas Envío</option>
+                        <option value="remitada">Remitadas</option>
                     </select>
 
                     <select
@@ -727,7 +749,15 @@ export default function OwnerDashboard() {
                                         $<span className="text-lg">{calculateTotal(op).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                     <div className="flex gap-2 items-center">
-                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity mr-2">Ver Detalles <i className="bi bi-chevron-right"></i></span>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                window.open(`/operations/${op.id}`, '_blank');
+                                            }}
+                                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity mr-2"
+                                        >
+                                            Ver Detalles <i className="bi bi-chevron-right"></i>
+                                        </button>
                                         {op.estado !== 'entregada' && op.estado !== 'cancelada' && (
                                             <button onClick={(e) => cancelOperation(op.id, e)} className="text-xs font-semibold text-gray-400 hover:text-red-600 px-2 transition-colors">Anular</button>
                                         )}

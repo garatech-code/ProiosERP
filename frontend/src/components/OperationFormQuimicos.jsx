@@ -225,7 +225,7 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
             tipo_operacion: op.tipo_operacion || 'quimicos',
             delivery_method: op.delivery_method || 'muelle',
             detalle_lugar_entrega: op.detalle_lugar_entrega || '',
-            notes: op.notes || '',
+            notes: op.notas || '',
             texto_pedido: op.texto_pedido || '',
             products: productsWithStock,
             delivery_date: formatToDatetimeLocal(op.delivery_date),
@@ -619,6 +619,17 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
                         className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                       />
                     </div>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Notas Internas</label>
+                    <textarea
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleChange}
+                      rows="3"
+                      placeholder="Agrega notas o detalles internos de la operación..."
+                      className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors resize-y"
+                    ></textarea>
                   </div>
                 </div>
               </div>
