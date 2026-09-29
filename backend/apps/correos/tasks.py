@@ -88,7 +88,17 @@ def sync_outlook_inbox():
                 date_tuple = timezone.now()
                 
             body_html = msg.get('body', {}).get('content', '')
-            body_text = msg.get('bodyPreview', '')
+            try:
+                from bs4 import BeautifulSoup
+                # Convertir múltiples saltos de línea y limpiar espacios excesivos
+                raw_text = BeautifulSoup(body_html, "html.parser").get_text(separator='\n')
+                # Normalizar texto (evita saltos de línea masivos)
+                body_text = re.sub(r'\n\s*\n', '\n\n', raw_text).strip()
+            except Exception:
+                body_text = re.sub(r'<[^>]+>', '\n', body_html).strip()
+            
+            if not body_text:
+                body_text = msg.get('bodyPreview', '')
             
             # Rastrear Código Operativo [OP-XXX] en Asunto
             op_inst = None

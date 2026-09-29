@@ -96,6 +96,27 @@ export default function OperationDetail() {
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
 
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(true);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+      const windowSize = window.innerHeight;
+      const bodyHeight = document.documentElement.scrollHeight;
+      
+      setShowScrollTop(scrollPosition > 300);
+      setShowScrollBottom(scrollPosition + windowSize < bodyHeight - 100);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const scrollToBottom = () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+
   const [emails, setEmails] = useState([]);
   const [productionOrders, setProductionOrders] = useState([]);
   const [generatingProduction, setGeneratingProduction] = useState(false);
@@ -4263,6 +4284,23 @@ Saludos cordiales.`
         showToast={showToast}
       />
 
+      {/* Botones Flotantes Animados */}
+      <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
+        <button
+          onClick={scrollToTop}
+          className={`p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-xl shadow-indigo-600/30 transition-all duration-300 transform border border-indigo-500/50 flex items-center justify-center ${showScrollTop ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-50 pointer-events-none'}`}
+          title="Subir"
+        >
+          <i className="bi bi-arrow-up text-xl"></i>
+        </button>
+        <button
+          onClick={scrollToBottom}
+          className={`p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-xl shadow-indigo-600/30 transition-all duration-300 transform border border-indigo-500/50 flex items-center justify-center ${showScrollBottom ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-50 pointer-events-none'}`}
+          title="Bajar"
+        >
+          <i className="bi bi-arrow-down text-xl"></i>
+        </button>
+      </div>
     </div>
   );
 }
