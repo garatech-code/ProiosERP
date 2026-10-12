@@ -24,9 +24,14 @@ export default function UserManagement() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Form state
+    // Notification email state
+    const [notificationEmail, setNotificationEmail] = useState('');
+    const [savingEmail, setSavingEmail] = useState(false);
+    const [savedEmailSuccess, setSavedEmailSuccess] = useState(false);
+
+    // Create modal state
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
         username: '', // DNI
         first_name: '',
@@ -36,8 +41,22 @@ export default function UserManagement() {
     const [formError, setFormError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
+    // Edit modal state
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editFormData, setEditFormData] = useState({
+        id: null,
+        username: '',
+        first_name: '',
+        last_name: '',
+        role: 'OPERARIO',
+    });
+    const [editFormError, setEditFormError] = useState('');
+    const [editSubmitting, setEditSubmitting] = useState(false);
+    const [resettingPasswordId, setResettingPasswordId] = useState(null);
+
     useEffect(() => {
         fetchUsers();
+        fetchNotificationEmail();
     }, []);
 
     const fetchUsers = async () => {
@@ -54,9 +73,44 @@ export default function UserManagement() {
         }
     };
 
+    const fetchNotificationEmail = async () => {
+        try {
+            const res = await axios.get('/usuarios/users/config_notificaciones/');
+            if (res.data?.email) {
+                setNotificationEmail(res.data.email);
+            }
+        } catch (err) {
+            console.error('Error al cargar email de notificaciones:', err);
+        }
+    };
+
+    const handleSaveNotificationEmail = async () => {
+        setSavingEmail(true);
+        try {
+            await axios.post('/usuarios/users/config_notificaciones/', { email: notificationEmail });
+            setSavedEmailSuccess(true);
+            setSuccessMessage('Correo de avisos de supervisión guardado exitosamente.');
+            setTimeout(() => {
+                setSavedEmailSuccess(false);
+                setSuccessMessage('');
+            }, 4000);
+        } catch (err) {
+            console.error('Error al guardar email de notificaciones:', err);
+            setError(err.response?.data?.detail || 'Error al guardar el correo de avisos.');
+            setTimeout(() => setError(''), 4000);
+        } finally {
+            setSavingEmail(false);
+        }
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleEditInputChange = (e) => {
+        const { name, value } = e.target;
+        setEditFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleOpenModal = () => {
@@ -68,6 +122,18 @@ export default function UserManagement() {
         });
         setFormError('');
         setIsModalOpen(true);
+    };
+
+    const handleOpenEditModal = (user) => {
+        setEditFormData({
+            id: user.id,
+            username: user.username,
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            role: user.role || 'OPERARIO',
+        });
+        setEditFormError('');
+        setIsEditModalOpen(true);
     };
 
     const handleCreateUser = async (e) => {
@@ -96,6 +162,49 @@ export default function UserManagement() {
         }
     };
 
+    const handleUpdateUser = async (e) => {
+        e.preventDefault();
+        setEditSubmitting(true);
+        setEditFormError('');
+
+        try {
+            await axios.patch(`/usuarios/users/${editFormData.id}/`, {
+                first_name: editFormData.first_name,
+                last_name: editFormData.last_name,
+                role: editFormData.role,
+            });
+            setSuccessMessage(`Usuario ${editFormData.username} actualizado con éxito.`);
+            setIsEditModalOpen(false);
+            fetchUsers();
+            setTimeout(() => setSuccessMessage(''), 5000);
+        } catch (err) {
+            console.error(err);
+            setEditFormError(err.response?.data?.detail || 'Error al actualizar el usuario.');
+        } finally {
+            setEditSubmitting(false);
+        }
+    };
+
+    const handleResetPassword = async (userId, username, fullName) => {
+        const displayName = fullName || username;
+        if (!window.confirm(`¿Está seguro de resetear la contraseña del usuario ${displayName} (DNI: ${username})?\n\nLa contraseña volverá a ser su DNI y se le exigirá cambiarla la próxima vez que inicie sesión.`)) {
+            return;
+        }
+
+        setResettingPasswordId(userId);
+        try {
+            const res = await axios.post(`/usuarios/users/${userId}/reset_password/`);
+            setSuccessMessage(res.data?.detail || `Contraseña restablecida exitosamente para ${username}.`);
+            fetchUsers();
+            setTimeout(() => setSuccessMessage(''), 6000);
+        } catch (err) {
+            console.error('Error al resetear contraseña:', err);
+            alert(err.response?.data?.detail || 'No se pudo resetear la contraseña.');
+        } finally {
+            setResettingPasswordId(null);
+        }
+    };
+
     const handleDeleteUser = async (id, username) => {
         if (!window.confirm(`¿Está seguro de eliminar el usuario con DNI ${username}? Esta acción no se puede deshacer.`)) {
             return;
@@ -115,33 +224,93 @@ export default function UserManagement() {
     return (
         <div className="space-y-6 animate-fadeIn text-slate-800 dark:text-slate-100">
             {/* Cabecera de Sección */}
-            <div className="tour-users-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="tour-users-header flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Gestión de Usuarios del Sistema</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Crea y administra los accesos web para operadores, contables y personal directivo.
+                        Crea, edita y administra los accesos web para operadores, contables y personal directivo.
                     </p>
                 </div>
-                <button
-                    onClick={handleOpenModal}
-                    className="w-full sm:w-auto bg-proios-accent hover:opacity-90 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                >
-                    <i className="bi bi-person-plus-fill text-lg"></i>
-                    Crear Usuario
-                </button>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full xl:w-auto">
+                    {/* Casilla de configuración de correo de avisos para Juniors al lado de Crear Usuario */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-proios-accent/50 focus-within:border-proios-accent transition-all">
+                        <div className="p-1.5 bg-sky-50 dark:bg-sky-950/40 text-proios-accent rounded-lg shrink-0">
+                            <i className="bi bi-envelope-at-fill text-base"></i>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500 leading-tight">
+                                Mail de Avisos Junior
+                            </span>
+                            <input
+                                type="email"
+                                placeholder="supervisor@ejemplo.com"
+                                value={notificationEmail}
+                                onChange={(e) => setNotificationEmail(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNotificationEmail(); }}
+                                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none w-48 sm:w-60"
+                                title="Dirección de correo a la que se enviarán las alertas cuando usuarios juniors requieran supervisión o intenten cerrar operaciones"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSaveNotificationEmail}
+                            disabled={savingEmail}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm shrink-0 ${
+                                savedEmailSuccess
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+                            }`}
+                            title="Guardar correo de notificación"
+                        >
+                            {savingEmail ? (
+                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-proios-accent"></span>
+                            ) : savedEmailSuccess ? (
+                                <>
+                                    <i className="bi bi-check-lg text-sm"></i>
+                                    <span className="hidden sm:inline">Guardado</span>
+                                </>
+                            ) : (
+                                <>
+                                    <i className="bi bi-floppy"></i>
+                                    <span className="hidden sm:inline">Guardar</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Botón Crear Usuario */}
+                    <button
+                        onClick={handleOpenModal}
+                        className="w-full sm:w-auto bg-proios-accent hover:opacity-90 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
+                    >
+                        <i className="bi bi-person-plus-fill text-lg"></i>
+                        Crear Usuario
+                    </button>
+                </div>
             </div>
 
             {/* Toasts / Mensajes */}
             {successMessage && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-emerald-500 text-emerald-800 dark:text-emerald-200 text-sm font-semibold rounded-r-xl shadow-sm flex items-center gap-2 animate-fadeIn">
-                    <i className="bi bi-check-circle-fill text-emerald-500"></i>
-                    <span>{successMessage}</span>
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-emerald-500 text-emerald-800 dark:text-emerald-200 text-sm font-semibold rounded-r-xl shadow-sm flex items-center justify-between gap-2 animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                        <i className="bi bi-check-circle-fill text-emerald-500"></i>
+                        <span>{successMessage}</span>
+                    </div>
+                    <button onClick={() => setSuccessMessage('')} className="text-emerald-600 hover:text-emerald-800 p-1">
+                        <i className="bi bi-x-lg text-xs"></i>
+                    </button>
                 </div>
             )}
             {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500 text-red-800 dark:text-red-200 text-sm font-semibold rounded-r-xl shadow-sm flex items-center gap-2">
-                    <i className="bi bi-exclamation-triangle-fill text-red-500"></i>
-                    <span>{error}</span>
+                <div className="p-4 bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500 text-red-800 dark:text-red-200 text-sm font-semibold rounded-r-xl shadow-sm flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <i className="bi bi-exclamation-triangle-fill text-red-500"></i>
+                        <span>{error}</span>
+                    </div>
+                    <button onClick={() => setError('')} className="text-red-600 hover:text-red-800 p-1">
+                        <i className="bi bi-x-lg text-xs"></i>
+                    </button>
                 </div>
             )}
 
@@ -199,13 +368,39 @@ export default function UserManagement() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => handleDeleteUser(u.id, u.username)}
-                                                    className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-950/30 rounded-xl transition-colors"
-                                                    title="Eliminar usuario"
-                                                >
-                                                    <i className="bi bi-trash text-lg"></i>
-                                                </button>
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {/* Botón Editar Usuario */}
+                                                    <button
+                                                        onClick={() => handleOpenEditModal(u)}
+                                                        className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors"
+                                                        title="Editar nombre y rol"
+                                                    >
+                                                        <i className="bi bi-pencil-square text-lg"></i>
+                                                    </button>
+
+                                                    {/* Botón Resetear Contraseña a DNI */}
+                                                    <button
+                                                        onClick={() => handleResetPassword(u.id, u.username, formatUserName(u))}
+                                                        disabled={resettingPasswordId === u.id}
+                                                        className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 p-2 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-xl transition-colors disabled:opacity-50"
+                                                        title="Resetear contraseña (volver al DNI)"
+                                                    >
+                                                        {resettingPasswordId === u.id ? (
+                                                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-500 inline-block"></span>
+                                                        ) : (
+                                                            <i className="bi bi-key-fill text-lg"></i>
+                                                        )}
+                                                    </button>
+
+                                                    {/* Botón Eliminar Usuario */}
+                                                    <button
+                                                        onClick={() => handleDeleteUser(u.id, u.username)}
+                                                        className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-950/30 rounded-xl transition-colors"
+                                                        title="Eliminar usuario"
+                                                    >
+                                                        <i className="bi bi-trash text-lg"></i>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -232,12 +427,30 @@ export default function UserManagement() {
                                                 DNI: {u.username}
                                             </span>
                                         </div>
-                                        <button
-                                            onClick={() => handleDeleteUser(u.id, u.username)}
-                                            className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-2 hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-950/30 rounded-xl transition-colors"
-                                        >
-                                            <i className="bi bi-trash text-lg"></i>
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => handleOpenEditModal(u)}
+                                                className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                                title="Editar usuario"
+                                            >
+                                                <i className="bi bi-pencil-square text-base"></i>
+                                            </button>
+                                            <button
+                                                onClick={() => handleResetPassword(u.id, u.username, formatUserName(u))}
+                                                disabled={resettingPasswordId === u.id}
+                                                className="text-amber-600 hover:text-amber-800 dark:text-amber-400 p-1.5 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                                                title="Resetear contraseña"
+                                            >
+                                                <i className="bi bi-key-fill text-base"></i>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteUser(u.id, u.username)}
+                                                className="text-red-500 hover:text-red-700 dark:hover:text-red-400 p-1.5 hover:bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
+                                                title="Eliminar usuario"
+                                            >
+                                                <i className="bi bi-trash text-base"></i>
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="text-xs space-y-1 text-slate-600 dark:text-slate-400">
@@ -382,6 +595,148 @@ export default function UserManagement() {
                                         <>
                                             <i className="bi bi-send"></i>
                                             Crear Usuario
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Modal de Edición de Usuario */}
+            {isEditModalOpen && createPortal(
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 my-auto">
+                        {/* Cabecera Modal */}
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                <i className="bi bi-pencil-square text-proios-accent"></i>
+                                Editar Usuario
+                            </h3>
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 shadow-sm transition-colors"
+                            >
+                                <i className="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+
+                        {/* Formulario */}
+                        <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
+                            {editFormError && (
+                                <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-200 text-xs font-semibold rounded-lg flex items-center gap-2">
+                                    <i className="bi bi-exclamation-triangle-fill text-red-500"></i>
+                                    <span>{editFormError}</span>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    DNI (Usuario)
+                                </label>
+                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 font-mono text-sm font-bold">
+                                    <i className="bi bi-person-badge text-slate-400"></i>
+                                    <span>{editFormData.username}</span>
+                                    <span className="ml-auto text-[10px] text-slate-400 uppercase font-sans font-semibold">Identificador</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        Nombre *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="first_name"
+                                        value={editFormData.first_name}
+                                        onChange={handleEditInputChange}
+                                        required
+                                        className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
+                                        placeholder="Ej. Juan"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        Apellidos *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="last_name"
+                                        value={editFormData.last_name}
+                                        onChange={handleEditInputChange}
+                                        required
+                                        className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors"
+                                        placeholder="Ej. Pérez"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    Rol en el Sistema *
+                                </label>
+                                <select
+                                    name="role"
+                                    value={editFormData.role}
+                                    onChange={handleEditInputChange}
+                                    className="block w-full py-2 px-3 bg-white border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-proios-accent focus:border-proios-accent sm:text-sm font-medium transition-colors cursor-pointer"
+                                >
+                                    {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>
+                                            {label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Sección rápida de Reset de Contraseña dentro del modal */}
+                            <div className="pt-3 pb-1 border-t border-slate-200 dark:border-slate-700">
+                                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-3.5 rounded-xl flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <h5 className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                                            <i className="bi bi-key-fill text-amber-500"></i>
+                                            Restablecer Contraseña
+                                        </h5>
+                                        <p className="text-[11px] text-amber-700/80 dark:text-amber-400 mt-0.5">
+                                            Vuelve la contraseña al DNI ({editFormData.username}).
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleResetPassword(editFormData.id, editFormData.username, `${editFormData.first_name} ${editFormData.last_name}`)}
+                                        disabled={resettingPasswordId === editFormData.id}
+                                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition-colors shrink-0 disabled:opacity-50"
+                                    >
+                                        {resettingPasswordId === editFormData.id ? 'Reseteando...' : 'Resetear Clave'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={editSubmitting}
+                                    className="px-6 py-2 bg-proios-accent hover:opacity-90 text-white rounded-lg text-sm font-bold shadow-sm transition-opacity flex items-center gap-2"
+                                >
+                                    {editSubmitting ? (
+                                        <>
+                                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                                            Guardando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-check-lg"></i>
+                                            Guardar Cambios
                                         </>
                                     )}
                                 </button>

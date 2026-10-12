@@ -23,6 +23,9 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
   // Edit mode state
   const [editMode, setEditMode] = useState(defaultEditMode);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [showSaveAsNewModal, setShowSaveAsNewModal] = useState(false);
+  const [newTemplateTitle, setNewTemplateTitle] = useState('');
+  const [savingNew, setSavingNew] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -125,8 +128,8 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
   };
 
   // --- CRUD Functions for Owner ---
-  const saveTemplate = async (e) => {
-    e.preventDefault();
+  const handleSaveOverwrite = async (e) => {
+    if (e) e.preventDefault();
     try {
       if (editingTemplate.id) {
         await axios.put(`/correos/templates/${editingTemplate.id}/`, editingTemplate);
@@ -134,13 +137,43 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
         await axios.post('/correos/templates/', editingTemplate);
       }
       setEditingTemplate(null);
-      setEditMode(false);
       fetchTemplates();
     } catch (err) {
       console.error(err);
-      alert("Error al guardar la plantilla.");
+      alert("Error al sobreescribir la plantilla.");
     }
   };
+
+  const handleOpenSaveAsNew = (e) => {
+    if (e) e.preventDefault();
+    setNewTemplateTitle(`${editingTemplate?.titulo || ''} (Copia)`);
+    setShowSaveAsNewModal(true);
+  };
+
+  const handleConfirmSaveAsNew = async (e) => {
+    if (e) e.preventDefault();
+    if (!newTemplateTitle.trim()) return;
+
+    try {
+      setSavingNew(true);
+      await axios.post('/correos/templates/', {
+        titulo: newTemplateTitle.trim(),
+        idioma: editingTemplate.idioma,
+        asunto: editingTemplate.asunto,
+        cuerpo: editingTemplate.cuerpo
+      });
+      setShowSaveAsNewModal(false);
+      setEditingTemplate(null);
+      fetchTemplates();
+    } catch (err) {
+      console.error(err);
+      alert("Error al crear la nueva plantilla.");
+    } finally {
+      setSavingNew(false);
+    }
+  };
+
+
 
   const deleteTemplate = async (id) => {
     if (!window.confirm("¿Estás seguro de eliminar esta plantilla?")) return;
@@ -169,39 +202,67 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
         <div className="p-6 flex flex-col gap-6">
           {!editingTemplate ? (
             <>
-              <button 
-                onClick={() => setEditingTemplate({ titulo: '', asunto: '', cuerpo: '', idioma: 'ES' })}
-                className="self-start px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm"
-              >
-                + Nueva Plantilla
-              </button>
+              <div className="flex items-center justify-between gap-3">
+                <button 
+                  onClick={() => setEditingTemplate({ titulo: '', asunto: '', cuerpo: '', idioma: 'ES' })}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-1.5"
+                >
+                  <i className="bi bi-plus-lg"></i> Nueva Plantilla
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      await axios.post('/correos/templates/seed-defaults/');
+                      await fetchTemplates();
+                    } catch (err) {
+                      console.error(err);
+                      alert('Error al cargar las plantillas estándar.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600"
+                  title="Carga las plantillas estándar de Techship si falta alguna"
+                >
+                  <i className="bi bi-arrow-clockwise"></i> Cargar Plantillas Estándar
+                </button>
+              </div>
               
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                 <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-                  <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-300">
+                  <thead className="text-xs text-slate-700 dark:text-slate-200 uppercase bg-slate-100 dark:bg-slate-700/80">
                     <tr>
                       <th className="px-4 py-3">Idioma</th>
                       <th className="px-4 py-3">Título</th>
+                      <th className="px-4 py-3">Asunto</th>
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {templates.map(t => (
-                      <tr key={t.id} className="border-b dark:border-slate-700">
-                        <td className="px-4 py-3 font-bold">{t.idioma}</td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{t.titulo}</td>
+                      <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-750 transition">
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-black ${t.idioma === 'ES' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'}`}>
+                            {t.idioma}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-semibold">{t.titulo}</td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-xs">{t.asunto}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => setEditingTemplate(t)} className="text-blue-600 hover:underline mr-3"><i className="bi bi-pencil"></i></button>
-                          <button onClick={() => deleteTemplate(t.id)} className="text-red-600 hover:underline"><i className="bi bi-trash"></i></button>
+                          <button onClick={() => setEditingTemplate(t)} className="text-blue-600 dark:text-blue-400 hover:underline mr-3" title="Editar"><i className="bi bi-pencil"></i></button>
+                          <button onClick={() => deleteTemplate(t.id)} className="text-red-600 dark:text-red-400 hover:underline" title="Eliminar"><i className="bi bi-trash"></i></button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
             </>
           ) : (
-            <form onSubmit={saveTemplate} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveOverwrite} className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Idioma</label>
@@ -242,13 +303,125 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                   className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg" 
                 />
               </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => setEditingTemplate(null)} className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">Guardar</button>
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingTemplate(null)} 
+                  className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                >
+                  Cancelar
+                </button>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  {editingTemplate.id ? (
+                    <>
+                      <button 
+                        type="button" 
+                        onClick={handleOpenSaveAsNew} 
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-1.5"
+                        title="Crea una plantilla separada con estos cambios y le asigna un nombre nuevo"
+                      >
+                        <i className="bi bi-copy"></i> Guardar como Nueva
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-1.5"
+                        title="Sobreescribe esta misma plantilla"
+                      >
+                        <i className="bi bi-check2-circle"></i> Guardar y Sobreescribir
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      type="submit" 
+                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-1.5"
+                    >
+                      <i className="bi bi-plus-lg"></i> Crear Plantilla
+                    </button>
+                  )}
+                </div>
               </div>
             </form>
           )}
         </div>
+
+        {/* Modal Elegante: Guardar como Nueva Plantilla */}
+        {showSaveAsNewModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-slideUp">
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-base">
+                    <i className="bi bi-copy"></i>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Guardar como Nueva Plantilla
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Asignale un nombre distintivo a la copia
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSaveAsNewModal(false)}
+                  className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <form onSubmit={handleConfirmSaveAsNew} className="p-6 flex flex-col gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Título / Nombre de la Plantilla
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="Ej: Seguimiento de Cotización (Urgente)"
+                    value={newTemplateTitle}
+                    onChange={(e) => setNewTemplateTitle(e.target.value)}
+                    className="w-full text-sm px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 font-medium transition"
+                  />
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    Se creará una copia independiente manteniendo el asunto y contenido actual.
+                  </p>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveAsNewModal(false)}
+                    className="px-4 py-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingNew || !newTemplateTitle.trim()}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {savingNew ? (
+                      <>
+                        <i className="bi bi-arrow-repeat animate-spin"></i> Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check-lg"></i> Confirmar y Guardar
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

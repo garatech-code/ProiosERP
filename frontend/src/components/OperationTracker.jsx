@@ -1,78 +1,146 @@
 // src/components/OperationTracker.jsx
 import React from 'react';
 
+export const STEPS_PRODUCT = [
+    { num: 1, label: 'Recibida', shortLabel: 'Recibida', icon: 'bi-inbox', desc: 'Solicitud ingresada' },
+    { num: 2, label: 'Cotización', shortLabel: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
+    { num: 3, label: 'Preparación', shortLabel: 'Prep.', icon: 'bi-file-earmark-text', desc: 'Aprobada por cliente' },
+    { num: 4, label: 'Suministros', shortLabel: 'Packing', icon: 'bi-box-seam', desc: 'Armado Packing List' },
+    { num: 5, label: 'Aduanas', shortLabel: 'Aduana', icon: 'bi-building-check', desc: 'Esperando Rancho' },
+    { num: 6, label: 'Logística', shortLabel: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
+    { num: 7, label: 'Finalizada', shortLabel: 'Fin', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
+];
+
+export const STEPS_SERVICE = [
+    { num: 1, label: 'Solicitud Recibida', shortLabel: 'Recibida', icon: 'bi-file-earmark-text', desc: 'Análisis de servicio' },
+    { num: 2, label: 'Cotización', shortLabel: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
+    { num: 3, label: 'Permisos', shortLabel: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA/Aduana' },
+    { num: 4, label: 'Ejecución', shortLabel: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
+    { num: 5, label: 'Reporte Final', shortLabel: 'Reporte', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
+];
+
+export const getActiveTrackerStep = (state, isService) => {
+    if (state === 'cancelada' || state === 'cancelled') return -1;
+
+    if (isService) {
+        switch (state) {
+            case 'recibida':
+            case 'solicitud_servicio':
+            case 'solicitada': // Fallback si quedó con el estado viejo
+                return 1;
+            case 'cotizado':
+                return 2;
+            case 'permisos_pna':
+                return 3;
+            case 'en_ejecucion':
+                return 4;
+            case 'reporte_firmado':
+            case 'entregada':
+            case 'closed':
+                return 5;
+            default:
+                return 1;
+        }
+    } else {
+        switch (state) {
+            case 'recibida':
+                return 1;
+            case 'cotizacion_enviada':
+                return 2;
+            case 'solicitada':
+                return 3;
+            case 'armado_packing':
+                return 4;
+            case 'en_aduana':
+                return 5;
+            case 'lista_para_envio':
+            case 'remitada':
+                return 6;
+            case 'entregada':
+            case 'closed':
+                return 7;
+            default:
+                return 1;
+        }
+    }
+};
+
+export function QuickOperationTracker({ currentState, operationType }) {
+    const isService = operationType === 'servicios';
+    const activeStep = getActiveTrackerStep(currentState, isService);
+    const isCancelled = activeStep === -1;
+    const steps = isService ? STEPS_SERVICE : STEPS_PRODUCT;
+
+    if (isCancelled) {
+        return (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-xl text-xs font-bold border border-red-200 dark:border-red-800">
+                <i className="bi bi-x-octagon-fill text-red-500 text-sm"></i>
+                <span>Operación Anulada</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-100/90 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 px-2 sm:px-3 py-1 rounded-xl shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                <i className="bi bi-signpost-split text-indigo-500 text-sm"></i>
+                <span className="hidden xl:inline text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Flujo:
+                </span>
+                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200/50 dark:border-indigo-800/50">
+                    {activeStep}/{steps.length}
+                </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+                {steps.map((step, idx) => {
+                    const isCompleted = step.num < activeStep;
+                    const isCurrent = step.num === activeStep;
+
+                    return (
+                        <React.Fragment key={step.num}>
+                            {idx > 0 && (
+                                <div className={`h-0.5 w-1.5 sm:w-2 rounded-full transition-colors ${
+                                    isCompleted ? 'bg-emerald-500' : isCurrent ? 'bg-indigo-400' : 'bg-slate-200 dark:bg-slate-700'
+                                }`} />
+                            )}
+
+                            {isCurrent ? (
+                                <div
+                                    title={`Fase Actual (${step.num}/${steps.length}): ${step.label} - ${step.desc}`}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold shadow-sm shadow-indigo-500/25 ring-2 ring-indigo-400/40 animate-pulse cursor-help"
+                                >
+                                    <i className={`bi ${step.icon} text-xs`}></i>
+                                    <span className="whitespace-nowrap font-black">{step.label}</span>
+                                </div>
+                            ) : isCompleted ? (
+                                <div
+                                    title={`${step.num}. ${step.label} (Completado) - ${step.desc}`}
+                                    className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shadow-xs hover:scale-105 transition-transform cursor-help"
+                                >
+                                    <i className="bi bi-check-lg text-xs"></i>
+                                </div>
+                            ) : (
+                                <div
+                                    title={`${step.num}. ${step.label} (Pendiente) - ${step.desc}`}
+                                    className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold hover:scale-105 transition-transform cursor-help"
+                                >
+                                    {step.num}
+                                </div>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 export default function OperationTracker({ currentState, operationType }) {
     const isService = operationType === 'servicios';
-
-    // Mapeo robusto de estados (soporta los tuyos en español e inglés)
-    const getActiveStep = (state) => {
-        if (state === 'cancelada' || state === 'cancelled') return -1;
-
-        if (isService) {
-            switch (state) {
-                case 'recibida':
-                case 'solicitud_servicio':
-                case 'solicitada': // Fallback si quedó con el estado viejo
-                    return 1;
-                case 'cotizado':
-                    return 2;
-                case 'permisos_pna':
-                    return 3;
-                case 'en_ejecucion':
-                    return 4;
-                case 'reporte_firmado':
-                case 'entregada':
-                case 'closed':
-                    return 5;
-                default:
-                    return 1;
-            }
-        } else {
-            switch (state) {
-                case 'recibida':
-                    return 1;
-                case 'cotizacion_enviada':
-                    return 2;
-                case 'solicitada':
-                    return 3;
-                case 'armado_packing':
-                    return 4;
-                case 'en_aduana':
-                    return 5;
-                case 'lista_para_envio':
-                case 'remitada':
-                    return 6;
-                case 'entregada':
-                case 'closed':
-                    return 7;
-                default:
-                    return 1;
-            }
-        }
-    };
-
-    const activeStep = getActiveStep(currentState);
+    const activeStep = getActiveTrackerStep(currentState, isService);
     const isCancelled = activeStep === -1;
-
-    const stepsProduct = [
-        { num: 1, label: 'Recibida', icon: 'bi-inbox', desc: 'Solicitud ingresada' },
-        { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
-        { num: 3, label: 'Preparación', icon: 'bi-file-earmark-text', desc: 'Aprobada por cliente' },
-        { num: 4, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
-        { num: 5, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
-        { num: 6, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
-        { num: 7, label: 'Finalizada', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
-    ];
-
-    const stepsService = [
-        { num: 1, label: 'Solicitud Recibida', icon: 'bi-file-earmark-text', desc: 'Análisis de servicio' },
-        { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
-        { num: 3, label: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA/Aduana' },
-        { num: 4, label: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
-        { num: 5, label: 'Reporte Final', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
-    ];
-
-    const steps = isService ? stepsService : stepsProduct;
+    const steps = isService ? STEPS_SERVICE : STEPS_PRODUCT;
 
     if (isCancelled) {
         return (

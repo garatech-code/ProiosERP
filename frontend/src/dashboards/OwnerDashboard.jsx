@@ -21,6 +21,9 @@ import StockMovements from '../components/StockMovements'; // NUEVO
 import UserManagement from '../components/UserManagement';
 import SeguimientoOperadores from '../components/SeguimientoOperadores';
 import AppVersionInfo from '../components/AppVersionInfo';
+import TarifarioModal from '../components/TarifarioModal';
+import OperationHistoryModal from '../components/OperationHistoryModal';
+import NotificationMenu from '../components/NotificationMenu';
 
 // Calendar
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -79,6 +82,11 @@ export default function OwnerDashboard() {
         return { isOpen: false, type: null, id: null };
     });
     const [emailSource, setEmailSource] = useState(null);
+    const [showTarifarioModal, setShowTarifarioModal] = useState(false);
+    const [selectedHistoryOp, setSelectedHistoryOp] = useState(null);
+    const [notifCategoryFilter, setNotifCategoryFilter] = useState('all');
+    const [notifSearchTerm, setNotifSearchTerm] = useState('');
+
 
     const handleCreateFromEmail = (email) => {
         setEmailSource(email);
@@ -695,8 +703,19 @@ export default function OwnerDashboard() {
                             <option key={op.id} value={op.id}>{formatUserName(op)}</option>
                         ))}
                     </select>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowTarifarioModal(true)}
+                        className="py-2 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-sm flex items-center justify-center gap-2 shrink-0"
+                        title="Ver y editar precios de horas hombre (Mecánica, Caldera, Electricidad, etc.)"
+                    >
+                        <i className="bi bi-clock-history"></i>
+                        <span>Tarifario Horas Hombre</span>
+                    </button>
                 </div>
             </div>
+
 
             <div className="tour-ops-list grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
                 {opsToRender?.length === 0 ? (
@@ -713,8 +732,8 @@ export default function OwnerDashboard() {
                             <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : op.tipo_operacion === 'servicios' ? 'bg-amber-500' : op.tipo_operacion === 'otros' ? 'bg-gray-500' : 'bg-indigo-500'}`}></div>
                             <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex-1 flex flex-col">
                                 <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <div className="flex items-center gap-1.5 mb-1">
+                                    <div className="flex-1 mr-2">
+                                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                             {getTypeIcon(op.tipo_operacion)}
                                             <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500">#{getTypePrefix(op.tipo_operacion)}OP-{String(op.id).padStart(4, '0')}</span>
                                             {getStatusBadge(op.status || op.estado)}
@@ -726,6 +745,18 @@ export default function OwnerDashboard() {
                                             {op.nombre || op.ship_name || 'Operación sin nombre'}
                                         </h3>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedHistoryOp(op);
+                                        }}
+                                        className="p-1 px-2 rounded-lg bg-slate-100 hover:bg-indigo-50 dark:bg-slate-700/60 dark:hover:bg-indigo-950/50 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700 transition flex items-center gap-1 text-xs font-bold shrink-0 shadow-sm"
+                                        title="Ver historial de avances y creación"
+                                    >
+                                        <i className="bi bi-clock-history text-xs text-indigo-500"></i>
+                                        <span className="text-[10px]">Historial</span>
+                                    </button>
                                 </div>
 
                                 <div className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 mb-3 bg-slate-50 dark:bg-slate-700/50 p-2 sm:p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex-1">
@@ -774,6 +805,335 @@ export default function OwnerDashboard() {
     const renderInbox = () => (
         <InboxView onCreateFromEmail={handleCreateFromEmail} />
     );
+
+    const getOperacionPendingInfo = (op) => {
+        const tipo = op.tipo_operacion;
+        const estado = op.status || op.estado;
+        const prefijo = getTypePrefix(tipo);
+        const opTag = `#${prefijo}OP-${String(op.id).padStart(4, '0')}`;
+        const buque = op.ship_name || 'Buque N/D';
+
+        let usuarioStr = 'Operador no asignado';
+        if (op.operadores_nombres && op.operadores_nombres.length > 0) {
+            usuarioStr = op.operadores_nombres.join(', ');
+        } else if (op.creado_por_nombre) {
+            usuarioStr = op.creado_por_nombre;
+        }
+
+        let faseNombre = 'Operación en curso';
+        let accion = `gestionar la fase ${estado}`;
+        let icon = 'bi-bell';
+        let category = 'otras';
+
+        if (tipo === 'servicios') {
+            if (estado === 'solicitud_servicio' || estado === 'recibida') {
+                faseNombre = 'Cotización de Servicio';
+                accion = 'cotizar el servicio';
+                icon = 'bi-cash-coin';
+                category = 'cotizacion';
+            } else if (estado === 'cotizado') {
+                faseNombre = 'Aprobación de Cotización';
+                accion = 'el seguimiento y confirmación del cliente';
+                icon = 'bi-envelope-check';
+                category = 'cotizacion';
+            } else if (estado === 'permisos_pna') {
+                faseNombre = 'Permisos PNA';
+                accion = 'tramitar los permisos PNA';
+                icon = 'bi-shield-check';
+                category = 'ejecucion';
+            } else if (estado === 'en_ejecucion') {
+                faseNombre = 'Ejecución de Servicio';
+                accion = 'la ejecución y avance del servicio técnico';
+                icon = 'bi-tools';
+                category = 'ejecucion';
+            } else if (estado === 'reporte_firmado') {
+                faseNombre = 'Cierre Operativo';
+                accion = 'la firma de reporte y entrega final';
+                icon = 'bi-check2-circle';
+                category = 'logistica';
+            }
+        } else {
+            if (estado === 'recibida') {
+                faseNombre = 'Cotización Inicial';
+                accion = 'cotizar la operación';
+                icon = 'bi-cash-coin';
+                category = 'cotizacion';
+            } else if (estado === 'cotizacion_enviada') {
+                faseNombre = 'Confirmación de Cliente';
+                accion = 'el seguimiento y confirmación del cliente';
+                icon = 'bi-envelope-check';
+                category = 'cotizacion';
+            } else if (estado === 'solicitada') {
+                faseNombre = 'Armado de Packing List';
+                accion = 'el armado de Packing List';
+                icon = 'bi-box-seam';
+                category = 'ejecucion';
+            } else if (estado === 'armado_packing') {
+                faseNombre = 'Preparación de Suministros';
+                accion = 'la preparación y verificación de bultos';
+                icon = 'bi-boxes';
+                category = 'ejecucion';
+            } else if (estado === 'en_aduana') {
+                faseNombre = 'Trámite Aduanal';
+                accion = 'el trámite de Aduana y Rancho';
+                icon = 'bi-shield-check';
+                category = 'aduana';
+            } else if (estado === 'esperando_rancho') {
+                faseNombre = 'Confirmación de Rancho';
+                accion = 'la confirmación de Rancho en Aduana';
+                icon = 'bi-hourglass-split';
+                category = 'aduana';
+            } else if (estado === 'lista_para_envio') {
+                faseNombre = 'Logística y Despacho';
+                accion = 'la emisión de Remito y coordinación de logística';
+                icon = 'bi-truck';
+                category = 'logistica';
+            }
+        }
+
+        const isPendingReview = op.estado_revision === 'pending';
+        let mensaje = '';
+        if (isPendingReview) {
+            mensaje = `El usuario ${usuarioStr} tiene pendiente tu revisión y aprobación de Owner en la operación ${opTag} (${buque}).`;
+        } else {
+            mensaje = `El usuario ${usuarioStr} tiene pendiente ${accion} en la operación ${opTag} (${buque}).`;
+        }
+
+        return {
+            faseNombre,
+            accion,
+            usuarioStr,
+            opTag,
+            buque,
+            icon,
+            category,
+            isPendingReview,
+            mensaje
+        };
+    };
+
+    const renderNotificationsView = () => {
+        const pendingOps = (operations || []).filter(op => op.estado !== 'entregada' && op.estado !== 'cancelada');
+
+        const itemsWithInfo = pendingOps.map(op => ({
+            op,
+            info: getOperacionPendingInfo(op)
+        }));
+
+        const filteredNotifications = itemsWithInfo.filter(({ op, info }) => {
+            if (notifCategoryFilter === 'revision' && !info.isPendingReview) return false;
+            if (notifCategoryFilter === 'cotizacion' && info.category !== 'cotizacion') return false;
+            if (notifCategoryFilter === 'ejecucion' && info.category !== 'ejecucion') return false;
+            if (notifCategoryFilter === 'aduana_logistica' && info.category !== 'aduana' && info.category !== 'logistica') return false;
+
+            if (notifSearchTerm) {
+                const term = notifSearchTerm.toLowerCase();
+                const matchMsg = info.mensaje.toLowerCase().includes(term);
+                const matchUser = info.usuarioStr.toLowerCase().includes(term);
+                const matchShip = (op.ship_name || '').toLowerCase().includes(term);
+                const matchClient = (op.client_name || '').toLowerCase().includes(term);
+                if (!matchMsg && !matchUser && !matchShip && !matchClient) return false;
+            }
+            return true;
+        });
+
+        const totalPendientes = itemsWithInfo.length;
+        const totalRevision = itemsWithInfo.filter(x => x.info.isPendingReview).length;
+        const totalCotizacion = itemsWithInfo.filter(x => x.info.category === 'cotizacion').length;
+        const totalEjecucion = itemsWithInfo.filter(x => x.info.category === 'ejecucion').length;
+        const totalAduanaLog = itemsWithInfo.filter(x => x.info.category === 'aduana' || x.info.category === 'logistica').length;
+
+        return (
+            <div className="space-y-6 animate-fadeIn pb-12">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div 
+                        onClick={() => setNotifCategoryFilter('all')}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${notifCategoryFilter === 'all' ? 'bg-indigo-50 border-indigo-300 dark:bg-indigo-950/50 dark:border-indigo-800 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                    >
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase block mb-1">Total Pendientes</span>
+                        <div className="flex items-baseline justify-between">
+                            <span className="text-2xl font-black text-slate-900 dark:text-white">{totalPendientes}</span>
+                            <i className="bi bi-bell text-indigo-500 text-lg"></i>
+                        </div>
+                    </div>
+
+                    <div 
+                        onClick={() => setNotifCategoryFilter('cotizacion')}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${notifCategoryFilter === 'cotizacion' ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/50 dark:border-amber-800 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                    >
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase block mb-1">Cotizaciones</span>
+                        <div className="flex items-baseline justify-between">
+                            <span className="text-2xl font-black text-amber-600 dark:text-amber-400">{totalCotizacion}</span>
+                            <i className="bi bi-cash-coin text-amber-500 text-lg"></i>
+                        </div>
+                    </div>
+
+                    <div 
+                        onClick={() => setNotifCategoryFilter('ejecucion')}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${notifCategoryFilter === 'ejecucion' ? 'bg-cyan-50 border-cyan-300 dark:bg-cyan-950/50 dark:border-cyan-800 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                    >
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase block mb-1">En Ejecución</span>
+                        <div className="flex items-baseline justify-between">
+                            <span className="text-2xl font-black text-cyan-600 dark:text-cyan-400">{totalEjecucion}</span>
+                            <i className="bi bi-tools text-cyan-500 text-lg"></i>
+                        </div>
+                    </div>
+
+                    <div 
+                        onClick={() => setNotifCategoryFilter('revision')}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${notifCategoryFilter === 'revision' ? 'bg-red-50 border-red-300 dark:bg-red-950/50 dark:border-red-800 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                    >
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase block mb-1">Requiere Aprobación</span>
+                        <div className="flex items-baseline justify-between">
+                            <span className="text-2xl font-black text-red-600 dark:text-red-400">{totalRevision}</span>
+                            <i className="bi bi-shield-exclamation text-red-500 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-3 justify-between items-center">
+                    <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                        <button
+                            onClick={() => setNotifCategoryFilter('all')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${notifCategoryFilter === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        >
+                            Todas ({totalPendientes})
+                        </button>
+                        <button
+                            onClick={() => setNotifCategoryFilter('cotizacion')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${notifCategoryFilter === 'cotizacion' ? 'bg-amber-500 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        >
+                            Cotizaciones ({totalCotizacion})
+                        </button>
+                        <button
+                            onClick={() => setNotifCategoryFilter('ejecucion')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${notifCategoryFilter === 'ejecucion' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        >
+                            Ejecución & Packing ({totalEjecucion})
+                        </button>
+                        <button
+                            onClick={() => setNotifCategoryFilter('aduana_logistica')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${notifCategoryFilter === 'aduana_logistica' ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        >
+                            Aduana & Despacho ({totalAduanaLog})
+                        </button>
+                        {totalRevision > 0 && (
+                            <button
+                                onClick={() => setNotifCategoryFilter('revision')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${notifCategoryFilter === 'revision' ? 'bg-red-600 text-white shadow-sm' : 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-200'}`}
+                            >
+                                <i className="bi bi-shield-exclamation mr-1"></i> Requiere Aprobación ({totalRevision})
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="relative w-full md:w-72">
+                        <i className="bi bi-search absolute left-3.5 top-2.5 text-slate-400 text-xs"></i>
+                        <input
+                            type="text"
+                            value={notifSearchTerm}
+                            onChange={(e) => setNotifSearchTerm(e.target.value)}
+                            placeholder="Buscar operador, buque o acción..."
+                            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                        {notifSearchTerm && (
+                            <button onClick={() => setNotifSearchTerm('')} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs">
+                                <i className="bi bi-x-circle-fill"></i>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {filteredNotifications.length === 0 ? (
+                        <div className="py-16 text-center bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-700 p-6">
+                            <i className="bi bi-check-circle text-emerald-500 text-4xl block mb-2"></i>
+                            <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">No hay notificaciones pendientes</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                No se encontraron tareas pendientes con el filtro seleccionado.
+                            </p>
+                        </div>
+                    ) : (
+                        filteredNotifications.map(({ op, info }) => (
+                            <div
+                                key={op.id}
+                                onClick={() => navigate(`/operations/${op.id}`)}
+                                className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group relative overflow-hidden"
+                            >
+                                <div className={`absolute top-0 left-0 w-1.5 h-full ${op.tipo_operacion === 'servicios' ? 'bg-amber-500' : op.tipo_operacion === 'quimicos' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
+
+                                <div className="flex items-start gap-3.5 pl-2">
+                                    <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-slate-700/80 border border-indigo-100 dark:border-slate-600 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform shadow-sm">
+                                        <i className={`bi ${info.icon} text-lg`}></i>
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                                                {info.opTag}
+                                            </span>
+                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                                                {info.faseNombre}
+                                            </span>
+                                            {info.isPendingReview && (
+                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300 border border-red-200 animate-pulse">
+                                                    <i className="bi bi-shield-exclamation mr-1"></i> Requiere Aprobación Owner
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                                            {info.mensaje}
+                                        </h4>
+
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                            <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                                                <i className="bi bi-water text-indigo-500"></i> {op.ship_name || 'Buque N/D'}
+                                            </span>
+                                            <span>•</span>
+                                            <span><i className="bi bi-building"></i> {op.client_name || 'Cliente N/D'}</span>
+                                            <span>•</span>
+                                            <span><i className="bi bi-geo-alt"></i> {op.port_name || 'Puerto N/D'}</span>
+                                            {op.eta && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                                                        <i className="bi bi-clock"></i> ETA: {format(new Date(op.eta), 'dd/MM/yy HH:mm')}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 self-end md:self-center shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-750 w-full md:w-auto justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedHistoryOp(op);
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1.5"
+                                        title="Ver historial de la operación"
+                                    >
+                                        <i className="bi bi-clock-history text-xs text-indigo-500"></i> Historial
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/operations/${op.id}`)}
+                                        className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-200 dark:shadow-none"
+                                    >
+                                        Ver Operación <i className="bi bi-chevron-right text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200">
@@ -904,6 +1264,7 @@ export default function OwnerDashboard() {
                     <h1 className="font-black text-lg">TECHSHIP</h1>
                 </div>
                 <div className="flex items-center gap-2">
+                    <NotificationMenu />
                     <button
                         onClick={() => setShowDebugForm(true)}
                         className="bg-indigo-900/80 text-indigo-300 hover:bg-indigo-600 hover:text-white p-2 rounded-lg font-bold text-sm transition-colors border border-indigo-500/50"
@@ -1043,6 +1404,7 @@ export default function OwnerDashboard() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <NotificationMenu />
                         {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && activeTab !== 'seguimiento_operadores' && (
                             <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="tour-new-op-btn bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                                 <i className="bi bi-plus-lg text-lg"></i>
@@ -1068,7 +1430,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'overview' && renderOverview()}
                             {activeTab === 'calendar' && renderCalendar()}
                             {activeTab === 'operations' && renderOperationsList(filteredOps)}
-                            {activeTab === 'approvals' && renderOperationsList((operations || []).filter(op => op.estado_revision === 'pending'))}
+                            {activeTab === 'approvals' && renderNotificationsView()}
                             {activeTab === 'inbox' && renderInbox()}
                             {activeTab === 'inventory' && <InventoryManagement />}
                             {activeTab === 'staff' && <StaffManagement />}
@@ -1130,6 +1492,18 @@ export default function OwnerDashboard() {
                 eventToEdit={agendaEventModalState.eventToEdit}
                 onSave={fetchAgendaEvents}
             />
+
+            <TarifarioModal
+                isOpen={showTarifarioModal}
+                onClose={() => setShowTarifarioModal(false)}
+            />
+
+            <OperationHistoryModal
+                isOpen={!!selectedHistoryOp}
+                onClose={() => setSelectedHistoryOp(null)}
+                operation={selectedHistoryOp}
+            />
+
 
             <style dangerouslySetInnerHTML={{
                 __html: `

@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from apps.operaciones.models import Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto, MotivoRechazoCatalogo
+from apps.operaciones.models import (
+    Operacion, OperacionDetalle, Client, Ship, Port, Agency, AgendaEvent,
+    DocumentoAdjunto, MotivoRechazoCatalogo, TarifaHoraHombre, HistorialEstadoOperacion
+)
 from apps.inventario.models import Articulo
 from apps.usuarios.models import User, PersonalPlantel
 import json
@@ -90,6 +93,19 @@ class MotivoRechazoCatalogoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class HistorialEstadoOperacionSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HistorialEstadoOperacion
+        fields = ['id', 'estado_anterior', 'estado_nuevo', 'usuario', 'usuario_nombre', 'motivo', 'fecha']
+
+    def get_usuario_nombre(self, obj):
+        if not obj.usuario:
+            return "Sistema"
+        return f"{obj.usuario.first_name} {obj.usuario.last_name}".strip() or obj.usuario.username
+
+
 class OperacionSerializer(serializers.ModelSerializer):
     # Campos de solo lectura (relaciones)
     client_name = serializers.CharField(source='cliente.name', read_only=True)
@@ -118,6 +134,9 @@ class OperacionSerializer(serializers.ModelSerializer):
     # Relaciones anidadas (solo lectura)
     detalles = OperacionDetalleSerializer(many=True, read_only=True)
     documentos_adjuntos = DocumentoAdjuntoSerializer(many=True, read_only=True)
+    historial_estados = HistorialEstadoOperacionSerializer(many=True, read_only=True)
+    creado_por_nombre = serializers.SerializerMethodField()
+
 
     # Relaciones ManyToMany (escritura)
     operadores_id = serializers.PrimaryKeyRelatedField(
@@ -145,7 +164,7 @@ class OperacionSerializer(serializers.ModelSerializer):
         model = Operacion
         fields = [
             'id', 'client_name', 'client_email', 'ship_name', 'ship_flag', 'port_name', 'agency_name', 'agency_email', 'eta',
-            'delivery_method', 'detalle_lugar_entrega', 'status', 'estado', 'products', 'detalles', 'documentos_adjuntos',
+            'delivery_method', 'detalle_lugar_entrega', 'status', 'estado', 'products', 'detalles', 'documentos_adjuntos', 'historial_estados',
             'cliente', 'ship', 'port', 'agency', 'notas',
             'order_received_date', 'client_confirmed_date', 'quotation_sent_date', 'quoted_by', 'dificil_conseguir',
             'delivery_date', 'closed_date', 'closed_by', 'motivo_rechazo',
@@ -158,7 +177,7 @@ class OperacionSerializer(serializers.ModelSerializer):
             'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
             'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional', 'materiales_a_bordo',
-            'creado_por'
+            'creado_por', 'creado_por_nombre', 'fecha_creacion', 'fecha_actualizacion'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -171,9 +190,15 @@ class OperacionSerializer(serializers.ModelSerializer):
             'delivery_date': {'required': False, 'allow_null': True},
             'closed_date': {'required': False, 'allow_null': True},
         }
-        read_only_fields = ['estado_revision', 'mensaje_revision', 'creado_por']
+        read_only_fields = ['estado_revision', 'mensaje_revision', 'creado_por', 'creado_por_nombre', 'fecha_creacion', 'fecha_actualizacion']
 
     # Métodos auxiliares
+    def get_creado_por_nombre(self, obj):
+        if not obj.creado_por:
+            return None
+        u = obj.creado_por
+        return f"{u.first_name} {u.last_name}".strip() if (u.first_name or u.last_name) else u.username
+
     def get_operadores_nombres(self, obj):
         return [
             f"{u.first_name} {u.last_name}".strip() if u.first_name or u.last_name else u.username
@@ -189,8 +214,12 @@ class OperacionSerializer(serializers.ModelSerializer):
             for u in obj.operarios_usuarios_asignados.all()
         ]
 
+    def get_status(self, obj):
+        return obj.estado
+
     def get_can_confirm(self, obj):
         return obj.estado == Operacion.ESTADO_SOLICITADA
+
 
     def get_can_send_to_customs(self, obj):
         return obj.estado == Operacion.ESTADO_ARMADO_PACKING
@@ -400,3 +429,9 @@ class AgendaEventSerializer(serializers.ModelSerializer):
         if not obj.assigned_to:
             return ""
         return f"{obj.assigned_to.first_name} {obj.assigned_to.last_name}".strip() or obj.assigned_to.username
+
+
+class TarifaHoraHombreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TarifaHoraHombre
+        fields = ['id', 'categoria', 'categoria_es', 'categoria_en', 'rol', 'rol_es', 'rol_en', 'precio_usd', 'activo', 'orden']

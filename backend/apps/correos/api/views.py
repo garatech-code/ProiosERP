@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 # pyrefly: ignore [untyped-import]
 from django.db.models import Q
-from apps.correos.models import EmailMessage, EmailTemplate
+from apps.correos.models import EmailMessage, EmailTemplate, DeletedEmailMessageId
 from apps.correos.api.serializers import EmailMessageSerializer, EmailTemplateSerializer
 from rest_framework.pagination import PageNumberPagination
 
@@ -18,10 +18,102 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
             return True
         return request.user.is_authenticated and hasattr(request.user, 'role') and request.user.role == 'OWNER'
 
+DEFAULT_EMAIL_TEMPLATES = [
+    {
+        "idioma": "ES",
+        "titulo": "Envío de Cotización",
+        "asunto": "Cotización de Servicio - MV {{buque_nombre}} / {{cliente_nombre}}",
+        "cuerpo": "Estimados,\n\nAdjuntamos la cotización correspondiente a lo solicitado para el buque {{buque_nombre}}.\n\n• Cliente: {{cliente_nombre}}\n• Buque: {{buque_nombre}}\n\nQuedamos a su disposición por cualquier consulta y a la espera de su confirmación para coordinar las tareas.\n\nSaludos cordiales,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "EN",
+        "titulo": "Quotation Submission",
+        "asunto": "Quotation - MV {{buque_nombre}} / {{cliente_nombre}}",
+        "cuerpo": "Dear Sir/Madam,\n\nPlease find attached the quotation requested for the vessel {{buque_nombre}}.\n\n• Client: {{cliente_nombre}}\n• Vessel: {{buque_nombre}}\n\nWe remain at your disposal for any queries and look forward to your confirmation.\n\nBest regards,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "ES",
+        "titulo": "Seguimiento de Cotización",
+        "asunto": "Seguimiento Cotización - MV {{buque_nombre}}",
+        "cuerpo": "Estimados,\n\nLes escribimos para consultar si han tenido oportunidad de revisar la cotización enviada anteriormente para el buque {{buque_nombre}}.\n\nQuedamos a su entera disposición para aclarar cualquier duda o ajustar la propuesta según lo requieran.\n\nAguardamos sus comentarios.\n\nSaludos cordiales,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "EN",
+        "titulo": "Quotation Follow-up",
+        "asunto": "Quotation Follow-up - MV {{buque_nombre}}",
+        "cuerpo": "Dear Sir/Madam,\n\nWe are writing to inquire if you have had the opportunity to review the quotation previously sent for the vessel {{buque_nombre}}.\n\nWe remain at your disposal to clarify any doubts or adjust our proposal as needed.\n\nWe look forward to your comments.\n\nBest regards,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "ES",
+        "titulo": "Envío de Packing List",
+        "asunto": "Packing List - MV {{buque_nombre}}",
+        "cuerpo": "Estimados,\n\nAdjuntamos el Packing List correspondiente a la operación en curso:\n\n• Cliente: {{cliente_nombre}}\n• Buque: {{buque_nombre}}\n\nQuedamos a la espera de su confirmación para proceder con el despacho.\n\nSaludos cordiales,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "EN",
+        "titulo": "Packing List Dispatch",
+        "asunto": "Packing List - MV {{buque_nombre}}",
+        "cuerpo": "Dear Sir/Madam,\n\nPlease find attached the Packing List for the ongoing operation:\n\n• Client: {{cliente_nombre}}\n• Vessel: {{buque_nombre}}\n\nPlease confirm receipt to proceed with dispatch logistics.\n\nBest regards,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "ES",
+        "titulo": "Coordinación Logística y Entrega",
+        "asunto": "Coordinación Logística de Entrega - MV {{buque_nombre}}",
+        "cuerpo": "Estimados,\n\nRemitimos los detalles para la logística de entrega de la siguiente operación:\n\n• Cliente: {{cliente_nombre}}\n• Buque: {{buque_nombre}}\n\nFavor coordinar recepción a bordo.\n\nSaludos cordiales,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "EN",
+        "titulo": "Logistics & Delivery Coordination",
+        "asunto": "Delivery Logistics Coordination - MV {{buque_nombre}}",
+        "cuerpo": "Dear Sir/Madam,\n\nPlease find the delivery logistics details for the operation below:\n\n• Client: {{cliente_nombre}}\n• Vessel: {{buque_nombre}}\n\nPlease arrange onboard receipt accordingly.\n\nBest regards,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "ES",
+        "titulo": "Notificación de Finalización de Servicio",
+        "asunto": "Servicio Finalizado - MV {{buque_nombre}}",
+        "cuerpo": "Estimados,\n\nLes informamos que las tareas técnicas a bordo del buque {{buque_nombre}} han finalizado satisfactoriamente según el cronograma acordado.\n\nAdjuntamos el reporte técnico correspondiente.\n\nMuchas gracias por confiar en nosotros.\n\nSaludos cordiales,\nTechship / Proios S.A."
+    },
+    {
+        "idioma": "EN",
+        "titulo": "Service Completion Notice",
+        "asunto": "Service Completed - MV {{buque_nombre}}",
+        "cuerpo": "Dear Sir/Madam,\n\nWe are pleased to inform you that technical works onboard MV {{buque_nombre}} have been completed successfully in accordance with the agreed schedule.\n\nPlease find attached the service technical report.\n\nThank you for choosing our services.\n\nBest regards,\nTechship / Proios S.A."
+    }
+]
+
 class EmailTemplateViewSet(viewsets.ModelViewSet):
     queryset = EmailTemplate.objects.all().order_by('titulo')  # type: ignore
     serializer_class = EmailTemplateSerializer
     permission_classes = [IsOwnerOrReadOnly]
+
+    def list(self, request, *args, **kwargs):
+        # Si la base de datos no tiene plantillas o solo tiene muy pocas, aseguramos que las estándar existan
+        if not EmailTemplate.objects.filter(titulo="Envío de Cotización").exists():
+            for t in DEFAULT_EMAIL_TEMPLATES:
+                EmailTemplate.objects.get_or_create(
+                    titulo=t["titulo"],
+                    idioma=t["idioma"],
+                    defaults={"asunto": t["asunto"], "cuerpo": t["cuerpo"]}
+                )
+        return super().list(request, *args, **kwargs)
+
+    @action(detail=False, methods=['post'], url_path='seed-defaults')
+    def seed_defaults(self, request):
+        creados = 0
+        for t in DEFAULT_EMAIL_TEMPLATES:
+            _, created = EmailTemplate.objects.get_or_create(
+                titulo=t["titulo"],
+                idioma=t["idioma"],
+                defaults={"asunto": t["asunto"], "cuerpo": t["cuerpo"]}
+            )
+            if created:
+                creados += 1
+        return Response({
+            "message": "Plantillas estándar cargadas correctamente",
+            "creados": creados,
+            "total": EmailTemplate.objects.count()
+        }, status=status.HTTP_200_OK)
+
 
 
 class EmailMessageViewSet(viewsets.ModelViewSet):
@@ -58,6 +150,37 @@ class EmailMessageViewSet(viewsets.ModelViewSet):
         email.is_read = True
         email.save()
         return Response({'status': 'marked as read'})
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            msg_id = instance.message_id
+            if msg_id:
+                DeletedEmailMessageId.objects.get_or_create(message_id=msg_id)
+                try:
+                    import requests
+                    from django.conf import settings
+                    from apps.correos.tasks import get_msgraph_token
+                    token = get_msgraph_token()
+                    headers = {'Authorization': f'Bearer {token}'}
+                    user_email = getattr(settings, 'MS_GRAPH_USER_EMAIL', 'operations@proios.com')
+                    url = f"https://graph.microsoft.com/v1.0/users/{user_email}/messages?$filter=internetMessageId eq '{msg_id}'"
+                    res = requests.get(url, headers=headers)
+                    if res.status_code == 200:
+                        for gmsg in res.json().get('value', []):
+                            requests.delete(f"https://graph.microsoft.com/v1.0/users/{user_email}/messages/{gmsg['id']}", headers=headers)
+                except Exception:
+                    pass
+
+            for adj in instance.adjuntos.all():
+                try:
+                    adj.file.delete(save=False)
+                except Exception:
+                    pass
+            instance.delete()
+            return Response({'status': 'deleted'}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], url_path='sync_now')
     def sync_now(self, request):

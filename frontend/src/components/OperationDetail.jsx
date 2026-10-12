@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatUserName } from '../utils/formatters';
 import ComposeEmailModal from './ComposeEmailModal';
 import OperarioActionPanel from './OperarioActionPanel';
-import OperationTracker from './OperationTracker';
+import OperationTracker, { QuickOperationTracker } from './OperationTracker';
 import ProductSearchCards from './ProductSearchCards';
 import OperationEmails from './OperationEmails';
 import LogoSpinner from './LogoSpinner';
@@ -17,7 +17,9 @@ import OperationFormProductos from './OperationFormProductos';
 import OperationFormServicios from './OperationFormServicios';
 import FormattedNumberInput from './FormattedNumberInput';
 import GenerateRemitoModal from './GenerateRemitoModal';
+import TarifarioModal from './TarifarioModal';
 import * as XLSX from 'xlsx';
+
 import mammoth from 'mammoth';
 import CreatableSelect from 'react-select/creatable';
 
@@ -95,6 +97,7 @@ export default function OperationDetail() {
 
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
+  const [mainViewTab, setMainViewTab] = useState('detalles'); // 'detalles' | 'correos' | 'split'
 
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(true);
@@ -170,17 +173,22 @@ export default function OperationDetail() {
     
     setActionLoading(true);
     try {
-      await axios.post(`/operaciones/operations/${id}/force_state/`, { estado: forceStateSelection });
+      const res = await axios.post(`/operaciones/operations/${id}/force_state/`, { estado: forceStateSelection });
+      if (res.data?.operacion) {
+        setOperation(res.data.operacion);
+      }
       showToast('Estado forzado manualmente', 'success');
       setShowForceStateModal(false);
       fetchOperation();
     } catch (err) {
-      console.error(err);
-      showToast(err.response?.data?.error || 'Error al forzar estado', 'error');
+      console.error('Error al forzar estado:', err);
+      const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || 'Error al forzar estado';
+      showToast(errorMsg, 'error');
     } finally {
       setActionLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (showRechazoModal) {
@@ -381,13 +389,10 @@ export default function OperationDetail() {
 
   useEffect(() => {
     if (showCotizacionWordModal) {
-      const isSrv = operation?.tipo_operacion === 'servicios';
       const isEs = cotizacionLang === 'es';
-      const defEn = isSrv ? defaultNotesSrvEn : '[Other relevant note]';
-      const defEs = isSrv ? defaultNotesSrvEs : '[Otra nota relevante]';
 
+      // Si el campo tiene notas precargadas del sistema anterior, limpiarlas para que quede libre
       if (
-        cotizacionNotes === '' ||
         cotizacionNotes === defaultNotesSrvEn ||
         cotizacionNotes === defaultNotesSrvEs ||
         cotizacionNotes === '{{notas}}' ||
@@ -395,7 +400,7 @@ export default function OperationDetail() {
         cotizacionNotes === '[Otra nota relevante]' ||
         cotizacionNotes === `- This lump sum covers only the designated works listed in this quotation. Any additional steel, works or damage found after crop-out will be re-quoted and charged separately.\n- Repairs are subject to Classification Society approval and attendance.\n- Scaffolding and staging, mobilisation/demobilisation, painting, NDT, docking and port charges are NOT included in this lump sum and will be charged separately.`
       ) {
-        setCotizacionNotes(isEs ? defEs : defEn);
+        setCotizacionNotes('');
       }
 
       if (scopeIncludes === defaultScopeIncEn || scopeIncludes === defaultScopeIncEs) {
@@ -427,6 +432,32 @@ export default function OperationDetail() {
   const [damageFramesTitle, setDamageFramesTitle] = useState('Frame(s)');
   const [damageAreaTitle, setDamageAreaTitle] = useState('Area L x H (mm)');
   const [customItems, setCustomItems] = useState([]);
+  const [showTarifarioModal, setShowTarifarioModal] = useState(false);
+
+  const handleSelectTarifa = (tarifa) => {
+    const rolEs = tarifa.rol_es || tarifa.rol;
+    const rolEn = tarifa.rol_en || tarifa.rol;
+    const catEs = tarifa.categoria_es || tarifa.categoria;
+    const catEn = tarifa.categoria_en || tarifa.categoria;
+    const descEs = `${rolEs} (${catEs})`;
+    const descEn = `${rolEn} (${catEn})`;
+    setCustomItems(prev => [
+      ...prev,
+      {
+        nombre: cotizacionLang === 'en' ? descEn : descEs,
+        nombre_es: descEs,
+        nombre_en: descEn,
+        categoria: catEn,
+        categoria_es: catEs,
+        categoria_en: catEn,
+        forma_cotizacion: 'hora_hombre',
+        cantidad: 1,
+        precio_unitario: parseFloat(tarifa.precio_usd) || 0
+      }
+    ]);
+    setShowTarifarioModal(false);
+    showToast(`Tarifa "${rolEs}" agregada al servicio`, 'success');
+  };
 
   useEffect(() => {
     if (operation?.tipo_operacion === 'servicios') {
@@ -829,8 +860,20 @@ export default function OperationDetail() {
       };
 
       if (operation?.tipo_operacion === 'servicios') {
-        payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
-
+        const processed = customItems
+          .filter(i => (i.nombre || i.nombre_es || i.nombre_en || '').trim() !== '')
+          .map(i => {
+            const nEs = (i.nombre_es || i.nombre || '').trim();
+            const nEn = (i.nombre_en || i.nombre || '').trim();
+            const selectedName = cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn);
+            return {
+              ...i,
+              nombre: selectedName,
+              nombre_es: nEs || selectedName,
+              nombre_en: nEn || selectedName
+            };
+          });
+        payload.custom_items = JSON.stringify(processed);
       }
 
       const response = await axios.post(`/operaciones/operations/${id}/generate_cotizacion_pdf/`, payload, {
@@ -879,8 +922,20 @@ export default function OperationDetail() {
       };
 
       if (operation?.tipo_operacion === 'servicios') {
-        payload.custom_items = JSON.stringify(customItems.filter(i => i.nombre.trim() !== ''));
-
+        const processed = customItems
+          .filter(i => (i.nombre || i.nombre_es || i.nombre_en || '').trim() !== '')
+          .map(i => {
+            const nEs = (i.nombre_es || i.nombre || '').trim();
+            const nEn = (i.nombre_en || i.nombre || '').trim();
+            const selectedName = cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn);
+            return {
+              ...i,
+              nombre: selectedName,
+              nombre_es: nEs || selectedName,
+              nombre_en: nEn || selectedName
+            };
+          });
+        payload.custom_items = JSON.stringify(processed);
       }
 
       // Descargamos el PDF generado temporalmente
@@ -1473,9 +1528,20 @@ export default function OperationDetail() {
 
   const handleSaveServiceDetails = async () => {
     try {
+      const processedItems = customItems.map(i => {
+        const nEs = (i.nombre_es || i.nombre || '').trim();
+        const nEn = (i.nombre_en || i.nombre || '').trim();
+        const selName = cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn);
+        return {
+          ...i,
+          nombre: selName,
+          nombre_es: nEs || selName,
+          nombre_en: nEn || selName
+        };
+      });
       const payload = {
-        detalle_servicio: customItems.map(i => i.nombre).join('\n'),
-        items_cotizacion_servicio: customItems
+        detalle_servicio: processedItems.map(i => i.nombre).join('\n'),
+        items_cotizacion_servicio: processedItems
       };
       await axios.patch(`/operaciones/operations/${id}/`, payload);
       showToast('Detalles del servicio guardados con éxito', 'success');
@@ -1719,6 +1785,9 @@ export default function OperationDetail() {
 
   const isOperario = user?.role === 'OPERARIO';
   const isOwner = user?.role === 'OWNER';
+  const isSenior = user?.role === 'OPERADOR';
+  const isJunior = user?.role === 'OPERADOR_JR';
+  const canClose = isOwner || isSenior;
   const canEdit = isOwner || (isOperador && (
     operation?.creado_por === user?.id ||
     (operation?.operadores_id && operation.operadores_id.includes(user?.id))
@@ -2408,7 +2477,7 @@ export default function OperationDetail() {
                 </div>
               ) : (
                 <div className="flex flex-col justify-center group relative">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
                       {operation.nombre || `OP-${String(operation.id).padStart(4, '0')}`}
                     </h1>
@@ -2417,6 +2486,26 @@ export default function OperationDetail() {
                         <i className="bi bi-pencil-square"></i>
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        setMainViewTab(prev => prev === 'correos' ? 'detalles' : 'correos');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className={`ml-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all shadow-sm border ${
+                        mainViewTab === 'correos'
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-indigo-600/30'
+                          : 'bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                      }`}
+                      title={mainViewTab === 'correos' ? 'Volver a los detalles de la operación' : 'Ver cadena de correos vinculados'}
+                    >
+                      <i className={`bi ${mainViewTab === 'correos' ? 'bi-arrow-left-circle-fill' : 'bi-envelope-paper-fill'}`}></i>
+                      <span>{mainViewTab === 'correos' ? 'Ver Detalles' : 'Ver Cadena'}</span>
+                      {mainViewTab !== 'correos' && emails.length > 0 && (
+                        <span className="px-1.5 py-0.2 text-[10px] bg-indigo-200 dark:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 rounded-full font-black">
+                          {emails.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
                   {operation.nombre && (
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold tracking-widest uppercase mt-[-2px]">
@@ -2535,9 +2624,105 @@ export default function OperationDetail() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Barra de Navegación por Solapas: Detalles / Cadena de Correos / Vista Dividida */}
+          <div className="bg-white dark:bg-slate-800 p-2 sm:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3 sticky top-16 z-30 backdrop-blur-md bg-white/95 dark:bg-slate-800/95">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setMainViewTab('detalles')}
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                  mainViewTab === 'detalles'
+                    ? 'bg-slate-900 text-white dark:bg-indigo-600 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                }`}
+              >
+                <i className="bi bi-card-checklist text-base"></i>
+                <span>Detalles de Operación</span>
+              </button>
 
-            <div className="lg:col-span-2 space-y-6">
+              <button
+                type="button"
+                onClick={() => setMainViewTab('correos')}
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                  mainViewTab === 'correos'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                }`}
+              >
+                <i className="bi bi-envelope-paper-fill text-base"></i>
+                <span>Cadena de Correos</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                  mainViewTab === 'correos'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                }`}>
+                  {emails.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMainViewTab('split')}
+                className={`hidden lg:flex px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold items-center gap-2 transition-all ${
+                  mainViewTab === 'split'
+                    ? 'bg-slate-900 text-white dark:bg-indigo-600 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                }`}
+                title="Ver Detalles y Cadena de Correos en paralelo en pantallas grandes"
+              >
+                <i className="bi bi-layout-split text-base"></i>
+                <span>Vista Dividida</span>
+              </button>
+
+              {/* Estado de Flujo Rápido (solo visible cuando está activa la Vista Dividida) */}
+              {mainViewTab === 'split' && (
+                <div className="hidden lg:flex items-center pl-2 border-l border-slate-200 dark:border-slate-700 animate-fadeIn">
+                  <QuickOperationTracker
+                    currentState={operation.status || operation.estado}
+                    operationType={operation.tipo_operacion}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium px-2 hidden sm:block">
+              {mainViewTab === 'detalles' ? (
+                <span>Viendo información y suministros</span>
+              ) : mainViewTab === 'correos' ? (
+                <span>Viendo historial completo de correos sin scroll</span>
+              ) : (
+                <span className="hidden 2xl:inline">Detalles y Cadena simultáneos (50% / 50%)</span>
+              )}
+            </div>
+          </div>
+
+          <div className={`grid grid-cols-1 ${mainViewTab === 'split' ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6 items-start`}>
+
+            <div className={`${mainViewTab === 'split' ? 'lg:col-span-1' : 'lg:col-span-2'} space-y-6`}>
+              {mainViewTab === 'correos' ? (
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-envelope-paper-fill text-indigo-500"></i> Cadena de Comunicación
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Historial completo de correos enviados y recibidos para OP-{String(operation.id).padStart(4, '0')} ({operation.ship_name || 'Buque'}).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMainViewTab('detalles')}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm shrink-0"
+                    >
+                      <i className="bi bi-arrow-left"></i> Volver a Detalles
+                    </button>
+                  </div>
+
+                  <OperationEmails operacionId={id} openPreview={openPreview} />
+                </div>
+              ) : (
+                <>
 
 
 
@@ -2642,30 +2827,89 @@ export default function OperationDetail() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo (aparecerá en la cotización)</label>
-                    {customItems.map((item, index) => (
-                      <div key={index} className="flex flex-col gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                    {customItems.map((item, index) => {
+                      const valEs = item.nombre_es !== undefined ? item.nombre_es : (item.nombre || '');
+                      const valEn = item.nombre_en !== undefined ? item.nombre_en : (item.nombre || '');
+                      return (
+                      <div key={index} className="flex flex-col gap-2 mb-4 p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                         <div className="flex gap-2 items-center">
-                          <input
-                            type="text"
-                            placeholder="Descripción"
-                            className="flex-1 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                            value={item.nombre}
-                            onChange={(e) => {
-                              const newItems = [...customItems];
-                              newItems[index].nombre = e.target.value;
-                              setCustomItems(newItems);
-                            }}
-                          />
-                          <button
-                            onClick={() => {
-                              const newItems = customItems.filter((_, i) => i !== index);
-                              setCustomItems(newItems);
-                            }}
-                            className="text-red-500 hover:text-red-700 p-2 shrink-0"
-                            title="Eliminar ítem"
-                          >
-                            <i className="bi bi-trash-fill"></i>
-                          </button>
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">ES</span>
+                                  Nombre en Español (Cotizaciones en Español)
+                                </span>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Ej: SUPERVISOR DE ING. MECÁNICA"
+                                className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                value={valEs}
+                                onChange={(e) => {
+                                  const newItems = [...customItems];
+                                  newItems[index].nombre_es = e.target.value;
+                                  if (cotizacionLang === 'es' || !newItems[index].nombre) {
+                                    newItems[index].nombre = e.target.value;
+                                  }
+                                  setCustomItems(newItems);
+                                }}
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">EN</span>
+                                  Nombre en Inglés (Cotizaciones en Inglés)
+                                </span>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Ej: MECHANICAL ENG. SUPERVISOR"
+                                className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                value={valEn}
+                                onChange={(e) => {
+                                  const newItems = [...customItems];
+                                  newItems[index].nombre_en = e.target.value;
+                                  if (cotizacionLang === 'en') {
+                                    newItems[index].nombre = e.target.value;
+                                  }
+                                  setCustomItems(newItems);
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1 shrink-0 pt-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newItems = [...customItems];
+                                const curEs = newItems[index].nombre_es !== undefined ? newItems[index].nombre_es : (newItems[index].nombre || '');
+                                const curEn = newItems[index].nombre_en !== undefined ? newItems[index].nombre_en : (newItems[index].nombre || '');
+                                newItems[index].nombre_es = curEn;
+                                newItems[index].nombre_en = curEs;
+                                newItems[index].nombre = cotizacionLang === 'en' ? curEs : curEn;
+                                setCustomItems(newItems);
+                              }}
+                              className="p-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg transition"
+                              title="Intercambiar textos Español ⇄ Inglés"
+                            >
+                              <i className="bi bi-arrow-left-right text-xs"></i>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newItems = customItems.filter((_, i) => i !== index);
+                                setCustomItems(newItems);
+                              }}
+                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition"
+                              title="Eliminar ítem"
+                            >
+                              <i className="bi bi-trash-fill text-xs"></i>
+                            </button>
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
                           <div>
@@ -2679,15 +2923,15 @@ export default function OperationDetail() {
                                 setCustomItems(newItems);
                               }}
                             >
-                              <option value="hora_hombre">Por Hora Hombre</option>
-                              <option value="dias">Por Días Trabajados</option>
+                              <option value="hora_hombre">Por Horas Trabajadas</option>
                               <option value="lumpsum">Lumpsum (Suma Global)</option>
                             </select>
                           </div>
                           {item.forma_cotizacion !== 'lumpsum' && (
                             <>
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad ({item.forma_cotizacion === 'dias' ? 'Días' : 'Horas'})</label>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad (Horas)</label>
+
                                 <input
                                   type="number"
                                   className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
@@ -2737,18 +2981,28 @@ export default function OperationDetail() {
                           </div>
                         </div>
                       </div>
-                    ))}
-                    <div className="flex items-center gap-4 mt-2">
+                    );
+                    })}
+                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <button
+                        type="button"
                         onClick={() => setCustomItems([...customItems, { nombre: '', forma_cotizacion: 'hora_hombre', cantidad: 1, precio_unitario: 0 }])}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                        className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 transition"
                       >
-                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem
+                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem vacío
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTarifarioModal(true)}
+                        className="text-xs text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition shadow-sm"
+                      >
+                        <i className="bi bi-clock-history"></i> Cargar desde Tarifario Horas Hombre
                       </button>
                     </div>
                   </div>
                 </div>
               )}
+
 
 
               {/* === LAYOUT DINAMICO === */}
@@ -2856,11 +3110,15 @@ export default function OperationDetail() {
                 )}
               </div>
 
-              <div className="mt-8 mb-8">
-                <OperationEmails operacionId={id} openPreview={openPreview} />
-              </div>
+              {mainViewTab !== 'split' && (
+                <div className="mt-8 mb-8">
+                  <OperationEmails operacionId={id} openPreview={openPreview} />
+                </div>
+              )}
+            </>
+          )}
 
-              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col gap-6">
+          <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col gap-6">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
                   <div className="text-white w-full sm:w-auto text-center sm:text-left">
                     <h4 className="font-black text-lg">Controles Operativos</h4>
@@ -3041,10 +3299,27 @@ export default function OperationDetail() {
                             {actionLoading ? 'Procesando...' : <><i className="bi bi-clipboard-check"></i> Emitir Remito</>}
                           </button>
                         )}
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && isOwner && (
-                          <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
-                            {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
-                          </button>
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'remitada' && !isOperario && (
+                          canClose ? (
+                            <button onClick={() => handleAction('close_operation', '¿Finalizar la orden por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                              {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
+                            </button>
+                          ) : isJunior ? (
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
+                              <span className="px-3.5 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-xl flex items-center gap-1.5">
+                                <i className="bi bi-shield-lock-fill text-amber-400"></i>
+                                Cierre reservado a Senior / Dueño
+                              </span>
+                              <button
+                                onClick={() => handleAction('solicitar_cierre_junior', '¿Enviar aviso por correo a supervisión para el cierre de esta operación?')}
+                                disabled={actionLoading}
+                                className="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                                title="Notificar por correo a supervisión"
+                              >
+                                <i className="bi bi-envelope-check"></i> Avisar a Supervisión
+                              </button>
+                            </div>
+                          ) : null
                         )}
                       </>
                     ) : (
@@ -3061,17 +3336,6 @@ export default function OperationDetail() {
                               className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                             >
                               {actionLoading ? 'Procesando...' : <><i className="bi bi-envelope-paper"></i> Enviar Cotización</>}
-                            </button>
-                          </div>
-                        )}
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizacion_enviada' && (
-                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <button
-                              onClick={() => handleAction('cliente_confirma_producto', '¿El cliente ha confirmado la cotización?')}
-                              disabled={actionLoading}
-                              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                            >
-                              {actionLoading ? 'Procesando...' : <><i className="bi bi-check-circle"></i> Cliente Confirma</>}
                             </button>
                           </div>
                         )}
@@ -3123,10 +3387,27 @@ export default function OperationDetail() {
                             </button>
                           </div>
                         )}
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && isOwner && (
-                          <button onClick={() => handleAction('close_servicio', '¿Finalizar la operación de servicio por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
-                            {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
-                          </button>
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && operation.estado === 'reporte_firmado' && !isOperario && (
+                          canClose ? (
+                            <button onClick={() => handleAction('close_servicio', '¿Finalizar la operación de servicio por completo?')} disabled={actionLoading} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl shadow-lg transition-all text-center">
+                              {actionLoading ? 'Procesando...' : 'Cerrar Operación'}
+                            </button>
+                          ) : isJunior ? (
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
+                              <span className="px-3.5 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-xl flex items-center gap-1.5">
+                                <i className="bi bi-shield-lock-fill text-amber-400"></i>
+                                Cierre reservado a Senior / Dueño
+                              </span>
+                              <button
+                                onClick={() => handleAction('solicitar_cierre_junior', '¿Enviar aviso por correo a supervisión para el cierre de esta operación?')}
+                                disabled={actionLoading}
+                                className="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                                title="Notificar por correo a supervisión"
+                              >
+                                <i className="bi bi-envelope-check"></i> Avisar a Supervisión
+                              </button>
+                            </div>
+                          ) : null
                         )}
                       </>
                     )}
@@ -3168,40 +3449,97 @@ export default function OperationDetail() {
                 )}
               </div>
 
+              {/* En Vista Dividida: Notas Internas al final de los detalles (el Flujo está siempre visible arriba junto al botón) */}
+              {mainViewTab === 'split' && (
+                <div className="pt-6 border-t border-slate-200 dark:border-slate-700 space-y-6 animate-fadeIn">
+                  {/* Notas Internas */}
+                  <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-2xl shadow-sm p-4 sm:p-5">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-black text-amber-800 dark:text-amber-500 flex items-center gap-2">
+                        <i className="bi bi-journal-text"></i> Notas Internas
+                      </h4>
+                      {isEditingNotas ? (
+                        <button onClick={handleSaveNotas} disabled={actionLoading} className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition-colors">
+                           {actionLoading ? 'Guardando...' : 'Guardar'}
+                        </button>
+                      ) : (
+                        <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
+                          Editar
+                        </button>
+                      )}
+                    </div>
+                    {isEditingNotas ? (
+                      <textarea
+                        className="w-full text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-amber-300 dark:border-amber-700/50 rounded-xl p-3 focus:ring-amber-500 focus:border-amber-500 min-h-[120px]"
+                        value={tempNotas}
+                        onChange={(e) => setTempNotas(e.target.value)}
+                        placeholder="Escribe notas internas aquí..."
+                      />
+                    ) : (
+                      <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                        {operation.notas ? operation.notas : <span className="text-slate-400 italic">No hay notas internas agregadas.</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
             </div>
 
-            <div className="lg:col-span-1 sticky top-24 self-start space-y-6">
-              <OperationTracker currentState={operation.status || operation.estado} operationType={operation.tipo_operacion} />
-
-              {/* Notas Internas */}
-              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-2xl shadow-sm p-4 sm:p-5">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-sm font-black text-amber-800 dark:text-amber-500 flex items-center gap-2">
-                    <i className="bi bi-journal-text"></i> Notas Internas
-                  </h4>
-                  {isEditingNotas ? (
-                    <button onClick={handleSaveNotas} disabled={actionLoading} className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition-colors">
-                       {actionLoading ? 'Guardando...' : 'Guardar'}
-                    </button>
-                  ) : (
-                    <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
-                      Editar
-                    </button>
-                  )}
-                </div>
-                {isEditingNotas ? (
-                  <textarea
-                    className="w-full text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-amber-300 dark:border-amber-700/50 rounded-xl p-3 focus:ring-amber-500 focus:border-amber-500 min-h-[120px]"
-                    value={tempNotas}
-                    onChange={(e) => setTempNotas(e.target.value)}
-                    placeholder="Escribe notas internas aquí..."
-                  />
-                ) : (
-                  <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                    {operation.notas ? operation.notas : <span className="text-slate-400 italic">No hay notas internas agregadas.</span>}
+            <div className="lg:col-span-1 sticky top-20 self-start space-y-6">
+              {mainViewTab === 'split' ? (
+                /* Vista Dividida: Cadena de Correos ocupa el 100% de la columna derecha desde arriba */
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 space-y-4 animate-fadeIn">
+                  <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
+                    <div>
+                      <h4 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-envelope-paper-fill text-indigo-500"></i> Historial de Comunicación
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Cadena de correos de la operación en tiempo real
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                      {emails.length} {emails.length === 1 ? 'correo' : 'correos'}
+                    </span>
                   </div>
-                )}
-              </div>
+                  <OperationEmails operacionId={id} openPreview={openPreview} />
+                </div>
+              ) : (
+                <>
+                  <OperationTracker currentState={operation.status || operation.estado} operationType={operation.tipo_operacion} />
+
+                  {/* Notas Internas */}
+                  <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-2xl shadow-sm p-4 sm:p-5">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-black text-amber-800 dark:text-amber-500 flex items-center gap-2">
+                        <i className="bi bi-journal-text"></i> Notas Internas
+                      </h4>
+                      {isEditingNotas ? (
+                        <button onClick={handleSaveNotas} disabled={actionLoading} className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition-colors">
+                           {actionLoading ? 'Guardando...' : 'Guardar'}
+                        </button>
+                      ) : (
+                        <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
+                          Editar
+                        </button>
+                      )}
+                    </div>
+                    {isEditingNotas ? (
+                      <textarea
+                        className="w-full text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-amber-300 dark:border-amber-700/50 rounded-xl p-3 focus:ring-amber-500 focus:border-amber-500 min-h-[120px]"
+                        value={tempNotas}
+                        onChange={(e) => setTempNotas(e.target.value)}
+                        placeholder="Escribe notas internas aquí..."
+                      />
+                    ) : (
+                      <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                        {operation.notas ? operation.notas : <span className="text-slate-400 italic">No hay notas internas agregadas.</span>}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -3974,7 +4312,7 @@ Saludos cordiales.`
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
                           value={cotizacionNotes}
                           onChange={(e) => setCotizacionNotes(e.target.value)}
-                          placeholder="[Optional additional notes]"
+                          placeholder={cotizacionLang === 'es' ? 'Notas adicionales opcionales (dejar vacío si no aplica)...' : 'Optional additional notes (leave empty if not applicable)...'}
                         />
                       </div>
 
@@ -4284,7 +4622,14 @@ Saludos cordiales.`
         showToast={showToast}
       />
 
+      <TarifarioModal
+        isOpen={showTarifarioModal}
+        onClose={() => setShowTarifarioModal(false)}
+        onSelectTarifa={handleSelectTarifa}
+      />
+
       {/* Botones Flotantes Animados */}
+
       <div className="fixed bottom-6 right-6 z-[60] flex flex-col gap-3">
         <button
           onClick={scrollToTop}

@@ -127,11 +127,9 @@ class Operacion(models.Model):
     aprobacion_requerida_owner = models.BooleanField(default=False)
 
     TIPO_COTIZACION_HORA_HOMBRE = 'hora_hombre'
-    TIPO_COTIZACION_DIAS = 'dias'
     TIPO_COTIZACION_LUMPSUM = 'lumpsum'
     COTIZACION_CHOICES = (
-        (TIPO_COTIZACION_HORA_HOMBRE, 'Hora Hombre'),
-        (TIPO_COTIZACION_DIAS, 'Días'),
+        (TIPO_COTIZACION_HORA_HOMBRE, 'Por Horas Trabajadas'),
         (TIPO_COTIZACION_LUMPSUM, 'Lumpsum (Suma Global)'),
     )
     detalle_servicio = models.TextField(blank=True, null=True, help_text="Descripción detallada para operaciones de tipo Servicio.")
@@ -340,6 +338,31 @@ class Operacion(models.Model):
         self.stock_consumido = True
         self.save(update_fields=['stock_consumido'])
 
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_state = None
+        if not is_new:
+            try:
+                prev = Operacion.objects.filter(pk=self.pk).values('estado').first()
+                if prev:
+                    old_state = prev['estado']
+            except Exception:
+                pass
+
+        super().save(*args, **kwargs)
+
+        if not is_new and old_state and old_state != self.estado:
+            try:
+                HistorialEstadoOperacion.objects.create(
+                    operacion=self,
+                    estado_anterior=old_state,
+                    estado_nuevo=self.estado,
+                    motivo=f"Cambio de estado: {old_state} -> {self.estado}"
+                )
+            except Exception:
+                pass
+
+
 
 class OperacionDetalle(models.Model):
     operacion = models.ForeignKey(Operacion, on_delete=models.CASCADE, related_name='detalles')
@@ -411,4 +434,58 @@ class MotivoRechazoCatalogo(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.motivo
+        return self.motivo
+
+
+class TarifaHoraHombre(models.Model):
+    categoria = models.CharField(max_length=100, help_text="Ej: MECHANICAL SERVICES, WELDING SERVICES, etc.")
+    categoria_es = models.CharField(max_length=100, blank=True, default="", help_text="Categoría en Español (ej: SERVICIOS MECÁNICOS)")
+    categoria_en = models.CharField(max_length=100, blank=True, default="", help_text="Categoría en Inglés (ej: MECHANICAL SERVICES)")
+    rol = models.CharField(max_length=150, help_text="Ej: MECHANICAL ENG. SUPERVISOR, QUALIFIED WELDER, etc.")
+    rol_es = models.CharField(max_length=150, blank=True, default="", help_text="Nombre en Español (ej: SUPERVISOR DE ING. MECÁNICA)")
+    rol_en = models.CharField(max_length=150, blank=True, default="", help_text="Nombre en Inglés (ej: MECHANICAL ENG. SUPERVISOR)")
+    precio_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Precio por hora en USD")
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['orden', 'categoria', 'rol']
+        verbose_name = 'Tarifa Hora Hombre'
+        verbose_name_plural = 'Tarifas Horas Hombre'
+
+    def save(self, *args, **kwargs):
+        if not self.categoria:
+            self.categoria = self.categoria_es or self.categoria_en or "GENERAL"
+        if not self.categoria_es:
+            self.categoria_es = self.categoria
+        if not self.categoria_en:
+            self.categoria_en = self.categoria
+        if not self.rol:
+            self.rol = self.rol_es or self.rol_en or "SERVICIO"
+        if not self.rol_es:
+            self.rol_es = self.rol
+        if not self.rol_en:
+            self.rol_en = self.rol
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.rol} ({self.categoria}) - USD {self.precio_usd}"
+
+
+class HistorialEstadoOperacion(models.Model):
+    operacion = models.ForeignKey(Operacion, on_delete=models.CASCADE, related_name='historial_estados')
+    estado_anterior = models.CharField(max_length=50, blank=True, null=True)
+    estado_nuevo = models.CharField(max_length=50)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    motivo = models.CharField(max_length=255, blank=True, null=True, help_text="Razón o método de cambio (ej: Forzado, Flujo regular, etc.)")
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = 'Historial de Estado'
+        verbose_name_plural = 'Historiales de Estados'
+
+    def __str__(self):
+        return f"OP-{self.operacion_id}: {self.estado_anterior} -> {self.estado_nuevo} ({self.fecha})"
+
+

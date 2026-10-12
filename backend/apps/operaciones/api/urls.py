@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     OperacionViewSet, ClientViewSet, ShipViewSet, 
     PortViewSet, AgencyViewSet, AgendaEventViewSet, TvDashboardView,
-    MotivoRechazoCatalogoViewSet
+    MotivoRechazoCatalogoViewSet, TarifaHoraHombreViewSet
 )
 
 router = DefaultRouter()
@@ -14,6 +14,7 @@ router.register(r'ports', PortViewSet, basename='port')
 router.register(r'agencies', AgencyViewSet, basename='agency')
 router.register(r'events', AgendaEventViewSet, basename='event')
 router.register(r'motivos-rechazo-catalogo', MotivoRechazoCatalogoViewSet, basename='motivos-rechazo-catalogo')
+router.register(r'tarifas-hora-hombre', TarifaHoraHombreViewSet, basename='tarifas-hora-hombre')
 
 urlpatterns = [
     path('tv-dashboard/', TvDashboardView.as_view(), name='tv-dashboard'),

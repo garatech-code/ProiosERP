@@ -580,8 +580,12 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
                 elif forma_c == 'lumpsum':
                     unit_label = 'Lumpsum'
 
+                if lang == 'es':
+                    desc = c_item.get('nombre_es') or c_item.get('nombre') or c_item.get('nombre_en', '')
+                else:
+                    desc = c_item.get('nombre_en') or c_item.get('nombre') or c_item.get('nombre_es', '')
                 grupos['SERVICES'].append({
-                    'desc': c_item.get('nombre', ''),
+                    'desc': desc,
                     'qty': qty,
                     'unit': unit_label,
                     'price': price,
@@ -1108,8 +1112,12 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                 elif forma_c == 'lumpsum':
                     unit_label = 'Lumpsum'
 
+                if lang == 'es':
+                    desc = c_item.get('nombre_es') or c_item.get('nombre') or c_item.get('nombre_en', '')
+                else:
+                    desc = c_item.get('nombre_en') or c_item.get('nombre') or c_item.get('nombre_es', '')
                 grupos['SERVICIOS'].append({
-                    'desc': c_item.get('nombre', ''),
+                    'desc': desc,
                     'qty': qty,
                     'unit': unit_label,
                     'price': price,

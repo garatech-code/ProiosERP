@@ -50,6 +50,48 @@ export default function InboxView({ onCreateFromEmail }) {
   const [selectedOpIdToLink, setSelectedOpIdToLink] = useState('');
   const [isLinking, setIsLinking] = useState(false);
 
+  // Modo eliminación con 4 clics
+  const [deleteModeActive, setDeleteModeActive] = useState(false);
+  const [secretClickCount, setSecretClickCount] = useState(0);
+  const [deletingId, setDeletingId] = useState(null);
+  const [secretNotice, setSecretNotice] = useState('');
+
+  const handleSecretClick = (e) => {
+    if (e) e.stopPropagation();
+    setSecretClickCount(prev => {
+      const next = prev + 1;
+      if (next >= 4) {
+        setDeleteModeActive(true);
+        setSecretNotice('¡Modo de eliminación activado! Puedes borrar cualquier correo.');
+        setTimeout(() => setSecretNotice(''), 4500);
+        return 0;
+      } else {
+        setSecretNotice(`Presionaste ${next}/4 veces para habilitar eliminación`);
+        setTimeout(() => setSecretNotice(''), 2500);
+        return next;
+      }
+    });
+  };
+
+  const handleDeleteEmail = async (emailId, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este correo definitivamente? Esta acción no se puede deshacer.")) {
+      return;
+    }
+    setDeletingId(emailId);
+    try {
+      await axios.delete(`/correos/inbox/${emailId}/`);
+    } catch (err) {
+      console.warn("Correo eliminado o no encontrado:", err);
+    } finally {
+      setEmails(prev => prev.filter(e => e.id !== emailId));
+      if (selectedEmail?.id === emailId) {
+        setSelectedEmail(null);
+      }
+      setDeletingId(null);
+    }
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchQuery);
@@ -248,9 +290,24 @@ export default function InboxView({ onCreateFromEmail }) {
                   <span className="text-sm truncate pr-2 text-gray-900 dark:text-white">
                     {email.direction === 'inbound' ? (email.sender_name || email.sender_address) : email.recipient_address}
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-slate-400 shrink-0">
-                    {new Date(email.date_received).toLocaleDateString([], { month: 'short', day: 'numeric'})}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span 
+                      onClick={(e) => { e.stopPropagation(); handleSecretClick(e); }}
+                      className="text-xs text-gray-500 dark:text-slate-400 cursor-pointer select-none"
+                      title="Presiona 4 veces para habilitar eliminación"
+                    >
+                      {new Date(email.date_received).toLocaleDateString([], { month: 'short', day: 'numeric'})}
+                    </span>
+                    {deleteModeActive && (
+                      <button
+                        onClick={(e) => handleDeleteEmail(email.id, e)}
+                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
+                        title="Eliminar este correo"
+                      >
+                        <i className="bi bi-trash-fill text-xs"></i>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <h4 className="text-sm text-gray-800 dark:text-slate-200 truncate">{email.subject || '(Sin Asunto)'}</h4>
                 <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-1">
@@ -272,11 +329,30 @@ export default function InboxView({ onCreateFromEmail }) {
         {selectedEmail ? (
           <>
             <div className="p-4 md:p-6 border-b border-gray-100 dark:border-slate-700">
+              {secretNotice && (
+                <div className="mb-3 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 text-xs font-bold rounded-lg flex items-center justify-between animate-fadeIn">
+                  <span><i className="bi bi-info-circle-fill mr-1.5"></i>{secretNotice}</span>
+                  {deleteModeActive && (
+                    <button 
+                      onClick={() => setDeleteModeActive(false)} 
+                      className="text-[10px] underline ml-2 hover:text-amber-900"
+                    >
+                      Desactivar modo
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-4">
                 <button onClick={() => setSelectedEmail(null)} className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
                 </button>
-                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{selectedEmail.subject || '(Sin Asunto)'}</h2>
+                <h2 
+                  onClick={handleSecretClick}
+                  className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate flex-1 cursor-pointer select-none"
+                  title="Presiona 4 veces para habilitar eliminación"
+                >
+                  {selectedEmail.subject || '(Sin Asunto)'}
+                </h2>
                 {!selectedEmail.operacion && (
                   <>
                     <button onClick={() => {
@@ -297,6 +373,27 @@ export default function InboxView({ onCreateFromEmail }) {
                   <svg className="w-4 h-4 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                   Responder
                 </button>
+
+                {/* Botón de eliminación (visible con 4 clics) */}
+                {deleteModeActive ? (
+                  <button
+                    onClick={() => handleDeleteEmail(selectedEmail.id)}
+                    disabled={deletingId === selectedEmail.id}
+                    className="px-3 md:px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shrink-0 shadow-sm animate-fadeIn"
+                    title="Eliminar este correo definitivamente"
+                  >
+                    <i className="bi bi-trash-fill"></i>
+                    <span>{deletingId === selectedEmail.id ? 'Borrando...' : 'Eliminar Correo'}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSecretClick}
+                    className="p-2 text-gray-300 dark:text-slate-600 hover:text-gray-400 dark:hover:text-slate-500 rounded-lg transition-colors shrink-0 opacity-40 hover:opacity-80"
+                    title="Presiona 4 veces para habilitar eliminación"
+                  >
+                    <i className="bi bi-shield-lock text-sm"></i>
+                  </button>
+                )}
               </div>
               <div className="flex justify-between items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-700">
                 <div>

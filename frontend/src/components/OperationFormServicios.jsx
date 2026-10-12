@@ -57,10 +57,8 @@ function ProductRow({ product, index, onUpdate, onRemove }) {
           onChange={(e) => onUpdate(index, 'forma_cotizacion', e.target.value)}
           className="block w-full py-2 px-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         >
-          <option value="unidad">Por Unidad</option>
-          <option value="hora_hombre">Por Hora Hombre</option>
-          <option value="dias">Por Días Trabajados</option>
-          <option value="lumpsum">Lumpsum (Global)</option>
+          <option value="hora_hombre">Por Horas Trabajadas</option>
+          <option value="lumpsum">Lumpsum (Suma Global)</option>
         </select>
       </div>
 

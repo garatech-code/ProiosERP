@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.utils.dateparse import parse_datetime
 
-from apps.correos.models import EmailMessage, EmailAttachment
+from apps.correos.models import EmailMessage, EmailAttachment, DeletedEmailMessageId
 from apps.operaciones.models import Operacion
 
 logger = logging.getLogger(__name__)
@@ -66,8 +66,8 @@ def sync_outlook_inbox():
         for msg in messages:
             message_id = msg.get('internetMessageId', f"NO-ID-{msg.get('id')}")
             
-            # Evitar duplicados
-            if EmailMessage.objects.filter(message_id=message_id).exists():
+            # Evitar duplicados y correos que fueron eliminados explícitamente
+            if EmailMessage.objects.filter(message_id=message_id).exists() or DeletedEmailMessageId.objects.filter(message_id=message_id).exists():
                 continue
                 
             subject = msg.get('subject', '')

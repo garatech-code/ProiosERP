@@ -63,3 +63,15 @@ class EmailTemplate(models.Model):
 
     def __str__(self):
         return f"[{self.idioma}] {self.titulo}"
+
+
+class DeletedEmailMessageId(models.Model):
+    message_id = models.CharField(max_length=255, unique=True, db_index=True)
+    fecha_eliminado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ID de Correo Eliminado"
+        verbose_name_plural = "IDs de Correos Eliminados"
+
+    def __str__(self):
+        return f"Eliminado: {self.message_id}"

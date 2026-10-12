@@ -77,3 +77,25 @@ class Notificacion(models.Model):
     def __str__(self):
         return f"Notificación para {self.usuario_destino.username}: {self.mensaje[:50]}"
 
+
+class ConfiguracionSistema(models.Model):
+    clave = models.CharField(max_length=100, unique=True)
+    valor = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name = "Configuración del Sistema"
+        verbose_name_plural = "Configuraciones del Sistema"
+
+    def __str__(self):
+        return f"{self.clave}: {self.valor}"
+
+    @classmethod
+    def get_valor(cls, clave, default=''):
+        obj = cls.objects.filter(clave=clave).first()
+        return obj.valor if obj else default
+
+    @classmethod
+    def set_valor(cls, clave, valor):
+        obj, _ = cls.objects.update_or_create(clave=clave, defaults={'valor': valor})
+        return obj
+

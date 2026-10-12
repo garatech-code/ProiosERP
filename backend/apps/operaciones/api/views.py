@@ -12,7 +12,10 @@ from openpyxl.utils import get_column_letter
 import io
 import logging
 
-from apps.operaciones.models import Operacion, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto, MotivoRechazoCatalogo
+from apps.operaciones.models import (
+    Operacion, Client, Ship, Port, Agency, AgendaEvent, DocumentoAdjunto,
+    MotivoRechazoCatalogo, TarifaHoraHombre, HistorialEstadoOperacion
+)
 from apps.usuarios.models import User
 from apps.operaciones.services import get_or_create_ship_from_imo, get_or_create_port_from_name
 from apps.produccion.models import OrdenFabricacion
@@ -22,7 +25,8 @@ from apps.usuarios.permissions import IsOwnerOrCreatorSenior
 from .serializers import (
     OperacionSerializer, ClientSerializer, ShipSerializer,
     PortSerializer, AgencySerializer, OperacionDetalleSerializer,
-    AgendaEventSerializer, DocumentoAdjuntoSerializer, MotivoRechazoCatalogoSerializer
+    AgendaEventSerializer, DocumentoAdjuntoSerializer, MotivoRechazoCatalogoSerializer,
+    TarifaHoraHombreSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +52,66 @@ class AgencyViewSet(viewsets.ModelViewSet):
     serializer_class = AgencySerializer
 
 
+class TarifaHoraHombreViewSet(viewsets.ModelViewSet):
+    queryset = TarifaHoraHombre.objects.all()
+    serializer_class = TarifaHoraHombreSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['categoria', 'activo']
+    search_fields = ['categoria', 'rol']
+
+    @action(detail=False, methods=['post'], url_path='seed-defaults')
+    def seed_defaults(self, request):
+        """Carga o restaura los valores por defecto oficiales de Techship / Proios S.A."""
+        tarifas_base = [
+            # MECHANICAL SERVICES
+            {"categoria": "MECHANICAL SERVICES", "categoria_es": "SERVICIOS MECÁNICOS", "categoria_en": "MECHANICAL SERVICES", "rol": "MECHANICAL ENG. SUPERVISOR", "rol_es": "SUPERVISOR DE ING. MECÁNICA", "rol_en": "MECHANICAL ENG. SUPERVISOR", "precio_usd": 50.00, "orden": 1},
+            {"categoria": "MECHANICAL SERVICES", "categoria_es": "SERVICIOS MECÁNICOS", "categoria_en": "MECHANICAL SERVICES", "rol": "HYDRO-PNEUMATIC TECHNICIAN", "rol_es": "TÉCNICO HIDRONEUMÁTICO", "rol_en": "HYDRO-PNEUMATIC TECHNICIAN", "precio_usd": 48.00, "orden": 2},
+            {"categoria": "MECHANICAL SERVICES", "categoria_es": "SERVICIOS MECÁNICOS", "categoria_en": "MECHANICAL SERVICES", "rol": "MECHANICAL TECNICIAN", "rol_es": "TÉCNICO MECÁNICO", "rol_en": "MECHANICAL TECNICIAN", "precio_usd": 32.00, "orden": 3},
+            {"categoria": "MECHANICAL SERVICES", "categoria_es": "SERVICIOS MECÁNICOS", "categoria_en": "MECHANICAL SERVICES", "rol": "MECHANICAL ASSISTANT", "rol_es": "AYUDANTE MECÁNICO", "rol_en": "MECHANICAL ASSISTANT", "precio_usd": 24.00, "orden": 4},
+            # REEFER / AIR CONDT. SERVICE
+            {"categoria": "REEFER / AIR CONDT. SERVICE", "categoria_es": "SERVICIOS DE REFRIGERACIÓN Y AIRE ACONDICIONADO", "categoria_en": "REEFER / AIR CONDT. SERVICE", "rol": "REEFER TECHNICIAN", "rol_es": "TÉCNICO EN REFRIGERACIÓN", "rol_en": "REEFER TECHNICIAN", "precio_usd": 75.00, "orden": 5},
+            {"categoria": "REEFER / AIR CONDT. SERVICE", "categoria_es": "SERVICIOS DE REFRIGERACIÓN Y AIRE ACONDICIONADO", "categoria_en": "REEFER / AIR CONDT. SERVICE", "rol": "REEFER ASSISTANT", "rol_es": "AYUDANTE EN REFRIGERACIÓN", "rol_en": "REEFER ASSISTANT", "precio_usd": 42.00, "orden": 6},
+            # WELDING SERVICES
+            {"categoria": "WELDING SERVICES", "categoria_es": "SERVICIOS DE SOLDADURA", "categoria_en": "WELDING SERVICES", "rol": "MARINE ENG. SUPERVISOR", "rol_es": "SUPERVISOR DE ING. NAVAL", "rol_en": "MARINE ENG. SUPERVISOR", "precio_usd": 65.00, "orden": 7},
+            {"categoria": "WELDING SERVICES", "categoria_es": "SERVICIOS DE SOLDADURA", "categoria_en": "WELDING SERVICES", "rol": "NAVAL TECHNICIAN", "rol_es": "TÉCNICO NAVAL", "rol_en": "NAVAL TECHNICIAN", "precio_usd": 48.00, "orden": 8},
+            {"categoria": "WELDING SERVICES", "categoria_es": "SERVICIOS DE SOLDADURA", "categoria_en": "WELDING SERVICES", "rol": "QUALIFIED WELDER", "rol_es": "SOLDADOR CALIFICADO", "rol_en": "QUALIFIED WELDER", "precio_usd": 45.00, "orden": 9},
+            {"categoria": "WELDING SERVICES", "categoria_es": "SERVICIOS DE SOLDADURA", "categoria_en": "WELDING SERVICES", "rol": "FITTER", "rol_es": "ARMADOR / AJUSTADOR", "rol_en": "FITTER", "precio_usd": 32.00, "orden": 10},
+            # ELECTRICAL SERVICES
+            {"categoria": "ELECTRICAL SERVICES", "categoria_es": "SERVICIOS ELÉCTRICOS", "categoria_en": "ELECTRICAL SERVICES", "rol": "ENG. ELECTRICIAN", "rol_es": "INGENIERO ELECTRICISTA", "rol_en": "ENG. ELECTRICIAN", "precio_usd": 78.00, "orden": 11},
+            {"categoria": "ELECTRICAL SERVICES", "categoria_es": "SERVICIOS ELÉCTRICOS", "categoria_en": "ELECTRICAL SERVICES", "rol": "TECHINICAL ELECTRICIAN", "rol_es": "TÉCNICO ELECTRICISTA", "rol_en": "TECHNICAL ELECTRICIAN", "precio_usd": 63.00, "orden": 12},
+            {"categoria": "ELECTRICAL SERVICES", "categoria_es": "SERVICIOS ELÉCTRICOS", "categoria_en": "ELECTRICAL SERVICES", "rol": "ASSISTANT ELECTRICIAN", "rol_es": "AYUDANTE ELECTRICISTA", "rol_en": "ASSISTANT ELECTRICIAN", "precio_usd": 52.00, "orden": 13},
+            # ELECTRONICS / RADIO / RADAR SERVICES
+            {"categoria": "ELECTRONICS / RADIO / RADAR SERVICES", "categoria_es": "SERVICIOS DE ELECTRÓNICA / RADIO / RADAR", "categoria_en": "ELECTRONICS / RADIO / RADAR SERVICES", "rol": "ELECTRONIC TECHINICIAN", "rol_es": "TÉCNICO EN ELECTRÓNICA / RADAR", "rol_en": "ELECTRONIC TECHNICIAN", "precio_usd": 52.00, "orden": 14},
+            {"categoria": "ELECTRONICS / RADIO / RADAR SERVICES", "categoria_es": "SERVICIOS DE ELECTRÓNICA / RADIO / RADAR", "categoria_en": "ELECTRONICS / RADIO / RADAR SERVICES", "rol": "ELECTRONIC ASSISTANT", "rol_es": "AYUDANTE EN ELECTRÓNICA", "rol_en": "ELECTRONIC ASSISTANT", "precio_usd": 32.00, "orden": 15},
+        ]
+        creados = 0
+        actualizados = 0
+        for item in tarifas_base:
+            obj, created = TarifaHoraHombre.objects.update_or_create(
+                categoria=item["categoria"],
+                rol=item["rol"],
+                defaults={
+                    "categoria_es": item.get("categoria_es", item["categoria"]),
+                    "categoria_en": item.get("categoria_en", item["categoria"]),
+                    "rol_es": item.get("rol_es", item["rol"]),
+                    "rol_en": item.get("rol_en", item["rol"]),
+                    "precio_usd": item["precio_usd"],
+                    "orden": item["orden"],
+                    "activo": True
+                }
+            )
+            if created:
+                creados += 1
+            else:
+                actualizados += 1
+        return Response({
+            "message": "Tarifas precargadas con éxito",
+            "creados": creados,
+            "actualizados": actualizados
+        }, status=status.HTTP_200_OK)
+
+
+
 class OperacionViewSet(viewsets.ModelViewSet):
     serializer_class = OperacionSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrCreatorSenior]
@@ -55,7 +119,7 @@ class OperacionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         print(f"🔍 [BACKEND] Usuario: {user.username} (role: {user.role})")
-        qs = Operacion.objects.filter(oculta=False).select_related('cliente', 'ship', 'port', 'agency').prefetch_related('detalles', 'documentos_adjuntos')
+        qs = Operacion.objects.filter(oculta=False).select_related('cliente', 'ship', 'port', 'agency', 'creado_por').prefetch_related('detalles', 'documentos_adjuntos', 'historial_estados')
 
         if user.role in [User.Role.OWNER, User.Role.CONTABLE]:
             print("✅ Owner/Contable -> todas las operaciones")
@@ -211,6 +275,103 @@ class OperacionViewSet(viewsets.ModelViewSet):
                     operacion_id=operacion.id
                 )
 
+    def notificar_cierre_junior(self, operacion, motivo_accion="solicitó la revisión o cierre de la operación"):
+        from apps.usuarios.models import ConfiguracionSistema, Notificacion, User
+        from django.core.mail import EmailMultiAlternatives
+        from django.conf import settings
+        
+        user = self.request.user
+        nombre_junior = f"{user.first_name} {user.last_name}".strip() or user.username
+        dni_junior = user.username
+        
+        buque = operacion.ship.name if operacion.ship else "N/D"
+        cliente = operacion.cliente.name if operacion.cliente else "N/D"
+        tipo = operacion.get_tipo_operacion_display()
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost')
+        op_url = f"{frontend_url}/operaciones/{operacion.id}"
+        
+        # 1. Notificación en el sistema para Dueños
+        for dest in User.objects.filter(role=User.Role.OWNER):
+            Notificacion.objects.create(
+                usuario_destino=dest,
+                mensaje=f"Alerta Junior: {nombre_junior} {motivo_accion} en OP-{operacion.id:04d} ({buque}).",
+                operacion_id=operacion.id
+            )
+            
+        # 2. Correo electrónico al destinatario configurado en Gestión de Usuarios
+        email_destino = ConfiguracionSistema.get_valor('email_notificaciones_junior', '').strip()
+        if not email_destino:
+            logger.info("No hay casilla de email configurada para avisos de operaciones junior.")
+            return
+
+        asunto = f"[Supervisión Proios] Aviso Operación OP-{operacion.id:04d} - Junior: {nombre_junior}"
+        cuerpo_texto = f"""Aviso de Supervisión Operativa:
+
+El Operador Junior {nombre_junior} (DNI: {dni_junior}) {motivo_accion}.
+
+Detalles de la Operación:
+• Código: OP-{operacion.id:04d}
+• Tipo: {tipo}
+• Buque: {buque}
+• Cliente: {cliente}
+• Estado actual: {operacion.get_estado_display()}
+
+Los operadores junior no tienen permisos para cerrar operaciones en el sistema.
+Por favor revise la documentación y proceda al cierre correspondiente desde el siguiente enlace:
+{op_url}
+
+Sistema de Gestión Techship / Proios S.A.
+"""
+        cuerpo_html = f"""<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+    <div style="background-color: #0f172a; padding: 20px; text-align: center; color: #ffffff;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: bold; letter-spacing: 0.5px;">ALERTA DE SUPERVISIÓN OPERATIVA</h2>
+        <p style="margin: 5px 0 0 0; font-size: 12px; color: #94a3b8;">Sistema Proios - Control de Operadores Junior</p>
+    </div>
+    <div style="padding: 24px; background-color: #ffffff; color: #334155; font-size: 14px; line-height: 1.6;">
+        <p style="margin-top: 0;">
+            El <strong>Operador Junior {nombre_junior}</strong> (DNI: {dni_junior}) <strong>{motivo_accion}</strong>.
+        </p>
+        <div style="background-color: #f8fafc; border-left: 4px solid #0284c7; padding: 16px; border-radius: 6px; margin: 16px 0;">
+            <p style="margin: 0 0 6px 0;"><strong>Operación:</strong> OP-{operacion.id:04d}</p>
+            <p style="margin: 0 0 6px 0;"><strong>Tipo:</strong> {tipo}</p>
+            <p style="margin: 0 0 6px 0;"><strong>Buque:</strong> {buque}</p>
+            <p style="margin: 0 0 6px 0;"><strong>Cliente:</strong> {cliente}</p>
+            <p style="margin: 0;"><strong>Estado actual:</strong> {operacion.get_estado_display()}</p>
+        </div>
+        <p style="font-size: 13px; color: #64748b;">
+            <em>Recordatorio: Los operadores junior tienen restringido el cierre de operaciones. Se requiere que un Operador Senior o Dueño supervise la documentación y efectúe el cierre definitivo.</em>
+        </p>
+        <div style="text-align: center; margin-top: 24px;">
+            <a href="{op_url}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 14px;">
+                Ver Operación en el Sistema
+            </a>
+        </div>
+    </div>
+    <div style="background-color: #f1f5f9; padding: 12px; text-align: center; font-size: 11px; color: #64748b;">
+        Este es un correo automático generado por el Sistema de Gestión Techship / Proios S.A.
+    </div>
+</div>
+"""
+        try:
+            from_email = getattr(settings, 'EMAIL_HOST_USER', 'operations@proios.com') or 'operations@proios.com'
+            msg = EmailMultiAlternatives(
+                subject=asunto,
+                body=cuerpo_texto.strip(),
+                from_email=from_email,
+                to=[email_destino]
+            )
+            msg.attach_alternative(cuerpo_html, "text/html")
+            msg.send(fail_silently=True)
+            logger.info("Correo de aviso de supervisión junior enviado con éxito a %s", email_destino)
+        except Exception as e:
+            logger.warning("No se pudo enviar correo de aviso a %s: %s", email_destino, str(e))
+
+    @action(detail=True, methods=['post'], url_path='solicitar_cierre_junior')
+    def solicitar_cierre_junior(self, request, pk=None):
+        op = self.get_object()
+        self.notificar_cierre_junior(op, "solicitó el cierre y supervisión de la operación")
+        return Response({'status': 'ok', 'mensaje': 'Se ha enviado un aviso a supervisión por correo electrónico.'})
+
     @action(detail=True, methods=['post'])
     def cancel_operation(self, request, pk=None):
         if getattr(User.Role, 'OPERADOR_JR', None) and request.user.role == User.Role.OPERADOR_JR:
@@ -274,15 +435,36 @@ class OperacionViewSet(viewsets.ModelViewSet):
         if new_state == Operacion.ESTADO_ENTREGADA:
             return Response({'error': 'No se puede forzar el estado a Cerrada (Entregada). Debe usar el flujo normal con validaciones y documentación.'}, status=400)
             
-        update_data = {'estado': new_state}
+        estado_previo = op.estado
         
+        update_fields = {'estado': new_state}
         if new_state == Operacion.ESTADO_COTIZACION_ENVIADA and not op.quotation_sent_date:
-            update_data['quotation_sent_date'] = timezone.now()
+            update_fields['quotation_sent_date'] = timezone.now()
         if new_state == Operacion.ESTADO_SOLICITADA and not op.client_confirmed_date:
-            update_data['client_confirmed_date'] = timezone.now()
+            update_fields['client_confirmed_date'] = timezone.now()
             
-        Operacion.objects.filter(pk=op.pk).update(**update_data)
-        return Response({'status': 'ok', 'new_state': new_state})
+        try:
+            # Actualizamos directamente a nivel base de datos para omitir el FSMField(protected=True)
+            Operacion.objects.filter(pk=op.pk).update(**update_fields)
+            op = Operacion.objects.get(pk=op.pk)
+
+            # Registrar en Historial
+            HistorialEstadoOperacion.objects.create(
+                operacion=op,
+                estado_anterior=estado_previo,
+                estado_nuevo=new_state,
+                usuario=request.user if request.user.is_authenticated else None,
+                motivo='Estado forzado manualmente por Owner'
+            )
+
+            return Response({
+                'status': 'ok',
+                'new_state': new_state,
+                'operacion': OperacionSerializer(op).data
+            })
+        except Exception as e:
+            logger.exception("Error al forzar estado de operacion %s", op.pk)
+            return Response({'error': f'Error al forzar estado: {str(e)}'}, status=500)
 
 
 
@@ -356,16 +538,21 @@ class OperacionViewSet(viewsets.ModelViewSet):
             op.mark_delivered()
             op.save()
             self.notificar_senior(op, "marcado como remitada")
+            if getattr(request.user, 'role', None) == 'OPERADOR_JR':
+                self.notificar_cierre_junior(op, "emitió el remito / finalizó entrega y la operación quedó lista para cierre")
             return Response({'status': 'delivered'})
         except ValidationError as e:
             return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['post'])
     def close_operation(self, request, pk=None):
-        from apps.usuarios.models import User
-        if request.user.role != User.Role.OWNER:
-            return Response({'error': 'Solo el Owner puede cerrar operaciones.'}, status=403)
         op = self.get_object()
+        from apps.usuarios.models import User
+        if request.user.role == User.Role.OPERADOR_JR:
+            self.notificar_cierre_junior(op, "intentó cerrar la operación de productos")
+            return Response({'error': 'Los operadores junior no tienen autorización para cerrar operaciones. Se ha enviado un aviso a supervisión.'}, status=403)
+        if request.user.role not in [User.Role.OWNER, User.Role.OPERADOR]:
+            return Response({'error': 'Solo personal autorizado (Senior / Dueño) puede cerrar operaciones.'}, status=403)
         
         # Validación de Rancho antes de cerrar
         if not op.rancho_file:
@@ -1266,16 +1453,21 @@ class OperacionViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 op.finalizar_servicio_reporte()
                 op.save()
+            if getattr(request.user, 'role', None) == 'OPERADOR_JR':
+                self.notificar_cierre_junior(op, "finalizó la ejecución del servicio y la operación quedó lista para cierre")
             return Response({'status': 'reporte_firmado'})
         except ValidationError as e:
             return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['post'])
     def close_servicio(self, request, pk=None):
-        from apps.usuarios.models import User
-        if request.user.role != User.Role.OWNER:
-            return Response({'error': 'Solo el Owner puede cerrar operaciones.'}, status=403)
         op = self.get_object()
+        from apps.usuarios.models import User
+        if request.user.role == User.Role.OPERADOR_JR:
+            self.notificar_cierre_junior(op, "intentó cerrar la operación de servicios")
+            return Response({'error': 'Los operadores junior no tienen autorización para cerrar operaciones. Se ha enviado un aviso a supervisión.'}, status=403)
+        if request.user.role not in [User.Role.OWNER, User.Role.OPERADOR]:
+            return Response({'error': 'Solo personal autorizado (Senior / Dueño) puede cerrar operaciones.'}, status=403)
         
         # Validaciones para cerrar Servicios
         if not op.factura_file:

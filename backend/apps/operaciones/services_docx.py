@@ -116,9 +116,13 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 c_importe = c_price if c_forma == 'lumpsum' else (c_qty * c_price)
                 importe_total += c_importe
                 
+                if lang == 'es':
+                    desc = item.get('nombre_es') or item.get('nombre') or item.get('nombre_en', '')
+                else:
+                    desc = item.get('nombre_en') or item.get('nombre') or item.get('nombre_es', '')
                 items_context.append({
-                    'descripcion': item.get('nombre', ''),
-                    'scope_of_work': item.get('nombre', ''),
+                    'descripcion': desc,
+                    'scope_of_work': desc,
                     'categoria': 'Service' if lang == 'en' else 'Servicio',
                     'cantidad': str(int(c_qty) if c_qty.is_integer() else c_qty),
                     'unidad': c_unidad,
