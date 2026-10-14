@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -29,8 +29,17 @@ logger = logging.getLogger(__name__)
 
 
 class ClientViewSet(viewsets.ModelViewSet):
-    queryset = Client.objects.all()
+    queryset = Client.objects.all().order_by('name')
     serializer_class = ClientSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except models.ProtectedError:
+            return Response(
+                {'error': 'No se puede eliminar el cliente porque tiene operaciones asociadas en el sistema.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class ShipViewSet(viewsets.ModelViewSet):
@@ -44,8 +53,17 @@ class PortViewSet(viewsets.ModelViewSet):
 
 
 class AgencyViewSet(viewsets.ModelViewSet):
-    queryset = Agency.objects.all()
+    queryset = Agency.objects.all().order_by('name')
     serializer_class = AgencySerializer
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except models.ProtectedError:
+            return Response(
+                {'error': 'No se puede eliminar la agencia porque tiene operaciones asociadas en el sistema.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class OperacionViewSet(viewsets.ModelViewSet):
@@ -101,6 +119,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
             operation.mensaje_revision = f"Operación iniciada por {display_name} ({user.role}) el {timezone.now().strftime('%d/%m/%Y a las %H:%M')}"
             operation.save()
 
+        # Iniciar contador de control de inactividad (24h) si el creador es operador o tiene operadores asignados
+        es_operador = user.role in [User.Role.OPERADOR, getattr(User.Role, 'OPERADOR_JR', None)]
+        if (es_operador or operation.operadores_asignados.exists()) and not operation.fecha_inicio_control_operador:
+            operation.fecha_inicio_control_operador = timezone.now()
+            operation.save(update_fields=['fecha_inicio_control_operador'])
+
         # Vincular correo fuente si se provee
         source_email_id = self.request.data.get('source_email_id')
         if source_email_id:
@@ -111,6 +135,12 @@ class OperacionViewSet(viewsets.ModelViewSet):
                 email.save()
             except Exception as e:
                 logger.error(f"No se pudo vincular el correo {source_email_id} a la operacion {operation.id}: {e}")
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        if instance.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            raise ValidationError("La operación se encuentra cerrada o cancelada. No se permite modificar sus datos.")
+        serializer.save()
 
     @action(detail=False, methods=['get'])
     def dashboard_metrics(self, request):
@@ -266,6 +296,9 @@ class OperacionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Solo el Owner puede forzar estados.'}, status=403)
         
         op = self.get_object()
+        if op.estado == Operacion.ESTADO_ENTREGADA:
+            return Response({'error': 'La operación ya está cerrada por completo y no se puede modificar su estado.'}, status=400)
+        
         new_state = request.data.get('estado')
         
         if not new_state:
@@ -395,6 +428,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_packing')
     def upload_packing(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.packing_list_file = request.FILES['file']
@@ -404,6 +439,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_lista_ingredientes')
     def upload_lista_ingredientes(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.lista_ingredientes_file = request.FILES['file']
@@ -413,6 +450,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_remito')
     def upload_remito(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.remito_file = request.FILES['file']
@@ -422,6 +461,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_rancho')
     def upload_rancho(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.rancho_file = request.FILES['file']
@@ -431,6 +472,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_solicitud_particular')
     def upload_solicitud_particular(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.solicitud_particular_file = request.FILES['file']
@@ -440,6 +483,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_factura')
     def upload_factura(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.factura_file = request.FILES['file']
@@ -449,6 +494,8 @@ class OperacionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload_reporte')
     def upload_reporte(self, request, pk=None):
         op = self.get_object()
+        if op.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite modificar su documentación.'}, status=400)
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=400)
         op.reporte_file = request.FILES['file']
@@ -953,33 +1000,94 @@ class OperacionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='documentos')
     def upload_documento(self, request, pk=None):
-        """Subir un documento adicional a la operación"""
+        """Subir uno o más documentos adicionales a la operación"""
         operacion = self.get_object()
+        if operacion.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite subir documentos.'}, status=400)
         tipo = request.data.get('tipo')
-        archivo = request.FILES.get('archivo')
+        archivos = request.FILES.getlist('archivos') or request.FILES.getlist('archivo')
+        if not archivos:
+            single = request.FILES.get('archivo') or request.FILES.get('file')
+            if single:
+                archivos = [single]
         nombre_personalizado = request.data.get('nombre_personalizado', '')
         descripcion = request.data.get('descripcion', '')
 
-        if not tipo or not archivo:
+        if not tipo or not archivos:
             return Response({'error': 'Faltan campos obligatorios (tipo, archivo)'}, status=400)
 
         if tipo == 'otros' and not nombre_personalizado:
             return Response({'error': 'Para tipo "Otros" debe especificar un nombre personalizado'}, status=400)
 
-        documento = DocumentoAdjunto.objects.create(
-            operacion=operacion,
-            tipo=tipo,
-            nombre_personalizado=nombre_personalizado if tipo == 'otros' else '',
-            archivo=archivo,
-            descripcion=descripcion,
-            subido_por=request.user if request.user.is_authenticated else None
-        )
-        return Response(DocumentoAdjuntoSerializer(documento).data, status=201)
+        created_docs = []
+        for arch in archivos:
+            documento = DocumentoAdjunto.objects.create(
+                operacion=operacion,
+                tipo=tipo,
+                nombre_personalizado=nombre_personalizado if tipo == 'otros' else '',
+                archivo=arch,
+                descripcion=descripcion,
+                subido_por=request.user if request.user.is_authenticated else None
+            )
+            created_docs.append(documento)
+
+        if len(created_docs) == 1:
+            return Response(DocumentoAdjuntoSerializer(created_docs[0]).data, status=201)
+        return Response(DocumentoAdjuntoSerializer(created_docs, many=True).data, status=201)
+
+    @action(detail=True, methods=['post'], url_path='upload_ingreso_puerto')
+    def upload_ingreso_puerto(self, request, pk=None):
+        """Subir uno o múltiples archivos para Ingreso a Puerto"""
+        operacion = self.get_object()
+        if operacion.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite subir documentos.'}, status=400)
+        archivos = request.FILES.getlist('archivos') or request.FILES.getlist('archivo') or request.FILES.getlist('file')
+        if not archivos and 'file' in request.FILES:
+            archivos = [request.FILES['file']]
+        if not archivos and 'archivo' in request.FILES:
+            archivos = [request.FILES['archivo']]
+
+        if not archivos:
+            return Response({'error': 'No se proporcionaron archivos'}, status=400)
+
+        descripcion = request.data.get('descripcion', '')
+        created_docs = []
+        for f in archivos:
+            doc = DocumentoAdjunto.objects.create(
+                operacion=operacion,
+                tipo=DocumentoAdjunto.TIPO_INGRESO_PUERTO,
+                archivo=f,
+                descripcion=descripcion,
+                subido_por=request.user if request.user.is_authenticated else None
+            )
+            created_docs.append(DocumentoAdjuntoSerializer(doc).data)
+
+        return Response({
+            'status': 'ok',
+            'created_count': len(created_docs),
+            'documentos': created_docs
+        }, status=201)
+
+    @action(detail=True, methods=['post', 'patch'], url_path='toggle_ingreso_puerto')
+    def toggle_ingreso_puerto(self, request, pk=None):
+        """Marcar o desmarcar como listo el Ingreso a Puerto"""
+        operacion = self.get_object()
+        if operacion.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada.'}, status=400)
+        listo = request.data.get('listo')
+        if listo is None:
+            operacion.ingreso_puerto_listo = not operacion.ingreso_puerto_listo
+        else:
+            operacion.ingreso_puerto_listo = bool(listo)
+        operacion.save(update_fields=['ingreso_puerto_listo'])
+        return Response({'status': 'ok', 'ingreso_puerto_listo': operacion.ingreso_puerto_listo})
 
     @action(detail=True, methods=['delete'], url_path='documentos/(?P<doc_id>[^/.]+)')
     def delete_documento(self, request, pk=None, doc_id=None):
         """Eliminar un documento adicional"""
         operacion = self.get_object()
+        if operacion.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            return Response({'error': 'La operación se encuentra cerrada o cancelada. No se permite eliminar documentos.'}, status=400)
         try:
             documento = operacion.documentos_adjuntos.get(id=doc_id)
             documento.archivo.delete()

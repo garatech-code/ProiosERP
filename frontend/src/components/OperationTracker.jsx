@@ -1,7 +1,7 @@
 // src/components/OperationTracker.jsx
 import React from 'react';
 
-export default function OperationTracker({ currentState, operationType }) {
+export default function OperationTracker({ currentState, operationType, operation }) {
     const isService = operationType === 'servicios';
 
     // Mapeo robusto de estados (soporta los tuyos en español e inglés)
@@ -56,23 +56,24 @@ export default function OperationTracker({ currentState, operationType }) {
 
     const stepsProduct = [
         { num: 1, label: 'Recibida', icon: 'bi-inbox', desc: 'Solicitud ingresada' },
-        { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
+        { num: 2, label: 'Cotización enviada', icon: 'bi-send-check', desc: 'Esperando respuesta' },
         { num: 3, label: 'Preparación', icon: 'bi-file-earmark-text', desc: 'Aprobada por cliente' },
         { num: 4, label: 'Suministros', icon: 'bi-box-seam', desc: 'Armado Packing List' },
         { num: 5, label: 'Aduanas', icon: 'bi-building-check', desc: 'Esperando Rancho' },
         { num: 6, label: 'Logística', icon: 'bi-truck', desc: 'Despacho y remito' },
-        { num: 7, label: 'Finalizada', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
+        { num: 7, label: 'Cerrar Operación', icon: 'bi-check-circle-fill', desc: 'Operación cerrada' },
     ];
 
     const stepsService = [
         { num: 1, label: 'Solicitud Recibida', icon: 'bi-file-earmark-text', desc: 'Análisis de servicio' },
-        { num: 2, label: 'Cotización', icon: 'bi-currency-dollar', desc: 'Cotización enviada' },
+        { num: 2, label: 'Cotización enviada', icon: 'bi-send-check', desc: 'Esperando respuesta' },
         { num: 3, label: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA/Aduana' },
         { num: 4, label: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
-        { num: 5, label: 'Reporte Final', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
+        { num: 5, label: 'Cerrar Operación', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
     ];
 
     const steps = isService ? stepsService : stepsProduct;
+    const isClosed = currentState === 'entregada' || currentState === 'closed';
 
     if (isCancelled) {
         return (
@@ -99,39 +100,70 @@ export default function OperationTracker({ currentState, operationType }) {
 
                 {/* Línea vertical animada (progreso) */}
                 <div
-                    className="absolute left-[19px] top-6 w-0.5 bg-indigo-500 transition-all duration-1000 ease-in-out"
+                    className={`absolute left-[19px] top-6 w-0.5 transition-all duration-1000 ease-in-out ${isClosed ? 'bg-emerald-500' : 'bg-indigo-500'}`}
                     style={{ height: `${Math.max(0, ((activeStep - 1) / (steps.length - 1)) * 100)}%` }}
                 ></div>
 
                 <div className="flex flex-col justify-between h-full relative z-10">
                     {steps.map((step) => {
-                        const isCompleted = step.num < activeStep;
-                        const isCurrent = step.num === activeStep;
+                        const isCompleted = step.num < activeStep || (isClosed && step.num === steps.length);
+                        const isCurrent = step.num === activeStep && !isClosed;
                         const isPending = step.num > activeStep;
+                        const isFinalCompleted = isClosed && step.num === steps.length;
 
                         return (
                             <div key={step.num} className={`flex items-start gap-4 group transition-opacity duration-500 ${isPending ? 'opacity-40' : 'opacity-100'}`}>
                                 {/* Indicador Circular */}
                                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 transition-all duration-500 shadow-sm
-                  ${isCompleted ? 'bg-indigo-500 border-indigo-500 text-white' : ''}
+                  ${isFinalCompleted ? 'bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-50 dark:ring-emerald-900/40' : ''}
+                  ${isCompleted && !isFinalCompleted ? 'bg-indigo-500 border-indigo-500 text-white' : ''}
                   ${isCurrent ? 'bg-white dark:bg-slate-800 border-indigo-500 text-indigo-600 ring-4 ring-indigo-50 dark:ring-indigo-900/50 scale-110' : ''}
                   ${isPending ? 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500' : ''}
                 `}>
-                                    {isCompleted ? <i className="bi bi-check-lg text-lg"></i> : <i className={`bi ${step.icon} text-sm`}></i>}
+                                    {isFinalCompleted ? (
+                                        <i className="bi bi-check-circle-fill text-lg"></i>
+                                    ) : isCompleted ? (
+                                        <i className="bi bi-check-lg text-lg"></i>
+                                    ) : (
+                                        <i className={`bi ${step.icon} text-sm`}></i>
+                                    )}
                                 </div>
 
                                 {/* Textos */}
                                 <div className={`pt-1 transition-all duration-300 ${isCurrent ? 'transform translate-x-1' : ''}`}>
-                                    <h4 className={`text-sm font-bold ${isCurrent ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    <h4 className={`text-sm font-bold ${isFinalCompleted ? 'text-emerald-700 dark:text-emerald-400' : isCurrent ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                         {step.label}
                                     </h4>
                                     <p className="text-xs font-medium text-slate-500 dark:text-slate-500 mt-0.5 leading-tight">{step.desc}</p>
+
+                                    {isFinalCompleted && (
+                                        <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-[9px] font-black rounded uppercase tracking-wider">
+                                            Operación Cerrada
+                                        </span>
+                                    )}
 
                                     {isCurrent && (
                                         <span className="inline-block mt-2 px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 text-[9px] font-black rounded uppercase tracking-wider animate-pulse">
                                             Fase Actual
                                         </span>
+                                    )}
+
+                                    {/* Contador de inactividad de 24hs en Paso 1 */}
+                                    {step.num === 1 && operation && (
+                                        operation.alerta_inactividad_24h_enviada ? (
+                                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-[9px] font-bold rounded">
+                                                <i className="bi bi-exclamation-triangle-fill"></i> Alerta 24h enviada a Eva
+                                            </span>
+                                        ) : !operation.presenta_avances && operation.fecha_inicio_control_operador && operation.tiempo_restante_24h !== null && operation.tiempo_restante_24h !== undefined ? (
+                                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-[9px] font-bold rounded">
+                                                <i className="bi bi-stopwatch"></i> Plazo: {operation.tiempo_restante_24h}h restantes
+                                            </span>
+                                        ) : operation.presenta_avances ? (
+                                            <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-[9px] font-semibold rounded">
+                                                <i className="bi bi-check2"></i> Avance registrado
+                                            </span>
+                                        ) : null
                                     )}
                                 </div>
                             </div>

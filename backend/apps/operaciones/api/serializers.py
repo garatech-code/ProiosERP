@@ -9,6 +9,11 @@ class ClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = ['id', 'name', 'email', 'contact_person', 'phone']
+        extra_kwargs = {
+            'email': {'required': False, 'allow_blank': True},
+            'contact_person': {'required': False, 'allow_blank': True},
+            'phone': {'required': False, 'allow_blank': True},
+        }
 
 
 class ShipSerializer(serializers.ModelSerializer):
@@ -32,6 +37,11 @@ class AgencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Agency
         fields = ['id', 'name', 'contact_name', 'phone', 'email']
+        extra_kwargs = {
+            'contact_name': {'required': False, 'allow_blank': True},
+            'phone': {'required': False, 'allow_blank': True},
+            'email': {'required': False, 'allow_blank': True},
+        }
 
 
 class OperacionDetalleSerializer(serializers.ModelSerializer):
@@ -114,6 +124,9 @@ class OperacionSerializer(serializers.ModelSerializer):
     can_send_to_customs = serializers.SerializerMethodField()
     can_coordinate = serializers.SerializerMethodField()
     can_deliver = serializers.SerializerMethodField()
+    presenta_avances = serializers.BooleanField(read_only=True)
+    horas_sin_avances = serializers.FloatField(read_only=True)
+    tiempo_restante_24h = serializers.FloatField(read_only=True, allow_null=True)
 
     # Relaciones anidadas (solo lectura)
     detalles = OperacionDetalleSerializer(many=True, read_only=True)
@@ -150,15 +163,17 @@ class OperacionSerializer(serializers.ModelSerializer):
             'order_received_date', 'client_confirmed_date', 'quotation_sent_date', 'quoted_by', 'dificil_conseguir',
             'delivery_date', 'closed_date', 'closed_by', 'motivo_rechazo',
             'packing_list_file', 'remito_file', 'rancho_file', 'solicitud_particular_file',
-            'factura_file', 'reporte_file', 'lista_ingredientes_file',
+            'factura_file', 'reporte_file', 'lista_ingredientes_file', 'ingreso_puerto_listo',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
             'operadores_nombres', 'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
-            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio',
+            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio', 'expensas',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
             'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional', 'materiales_a_bordo',
-            'creado_por'
+            'creado_por',
+            'fecha_inicio_control_operador', 'alerta_inactividad_24h_enviada', 'fecha_alerta_inactividad_24h',
+            'presenta_avances', 'horas_sin_avances', 'tiempo_restante_24h'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -170,8 +185,14 @@ class OperacionSerializer(serializers.ModelSerializer):
             'client_confirmed_date': {'required': False, 'allow_null': True},
             'delivery_date': {'required': False, 'allow_null': True},
             'closed_date': {'required': False, 'allow_null': True},
+            'detalle_servicio': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'expensas': {'required': False},
         }
-        read_only_fields = ['estado_revision', 'mensaje_revision', 'creado_por']
+        read_only_fields = [
+            'estado_revision', 'mensaje_revision', 'creado_por',
+            'fecha_inicio_control_operador', 'alerta_inactividad_24h_enviada', 'fecha_alerta_inactividad_24h',
+            'presenta_avances', 'horas_sin_avances', 'tiempo_restante_24h'
+        ]
 
     # Métodos auxiliares
     def get_operadores_nombres(self, obj):
@@ -282,6 +303,17 @@ class OperacionSerializer(serializers.ModelSerializer):
         if 'eta' in mutable_data and not mutable_data['eta']:
             mutable_data['eta'] = None
 
+        if mutable_data.get('tipo_operacion') == 'servicios' and not mutable_data.get('detalle_servicio'):
+            mutable_data['detalle_servicio'] = mutable_data.get('nombre') or 'Servicio Técnico'
+
+        if 'expensas' in mutable_data:
+            val = mutable_data['expensas']
+            if isinstance(val, str):
+                try:
+                    mutable_data['expensas'] = json.loads(val)
+                except (ValueError, TypeError):
+                    mutable_data['expensas'] = []
+
         return super().to_internal_value(mutable_data)
 
     def create(self, validated_data):
@@ -307,6 +339,9 @@ class OperacionSerializer(serializers.ModelSerializer):
         return operation
 
     def update(self, instance, validated_data):
+        if instance.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            raise serializers.ValidationError("Esta operación se encuentra cerrada o cancelada. No se permite modificar sus datos.")
+
         products_data = validated_data.pop('products', None)
         if products_data is None:
             products_data = self.initial_data.get('products', None)

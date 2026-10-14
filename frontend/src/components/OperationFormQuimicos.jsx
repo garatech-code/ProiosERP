@@ -599,26 +599,39 @@ export default function OperationFormQuimicos({ id: propId, onClose, onSuccess, 
                       className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid ${formData.delivery_method === 'lancha' ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
                     <div>
                       <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Método de Entrega</label>
                       <select
                         name="delivery_method"
                         value={formData.delivery_method}
-                        onChange={handleChange}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            delivery_method: val,
+                            detalle_lugar_entrega: val === 'lancha' ? prev.detalle_lugar_entrega : ''
+                          }));
+                        }}
                         className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
                       >
                         <option value="muelle">Muelle</option>
                         <option value="lancha">Lancha</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Detalle (Lugar)</label>
-                      <input type="text" name="detalle_lugar_entrega" value={formData.detalle_lugar_entrega} onChange={handleChange}
-                        placeholder="Ej. Terminal 4"
-                        className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                      />
-                    </div>
+                    {formData.delivery_method === 'lancha' && (
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Lugar donde la lancha sale</label>
+                        <input
+                          type="text"
+                          name="detalle_lugar_entrega"
+                          value={formData.detalle_lugar_entrega}
+                          onChange={handleChange}
+                          placeholder="Ej. Muelle de lanchas, amarradero..."
+                          className="block w-full py-2 px-3 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Notas Internas</label>

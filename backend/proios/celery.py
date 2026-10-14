@@ -28,4 +28,8 @@ app.conf.beat_schedule = {
         'task': 'apps.correos.tasks.sync_outlook_inbox',
         'schedule': crontab(minute='*/5'),
     },
+    'verificar-inactividad-operaciones-24h': {
+        'task': 'apps.operaciones.tasks.verificar_inactividad_operaciones_24h',
+        'schedule': crontab(minute='*/15'),
+    },
 }
