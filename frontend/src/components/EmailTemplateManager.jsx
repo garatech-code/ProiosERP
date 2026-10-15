@@ -220,7 +220,7 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
 
   if (editMode) {
     return (
-      <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-4xl h-[650px] max-h-[90vh] mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
           <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
             <i className="bi bi-gear-fill text-indigo-500"></i>
@@ -231,7 +231,7 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
           </button>
         </div>
         
-        <div className="p-6 flex flex-col gap-5 overflow-y-auto flex-1">
+        <div className="p-6 flex flex-col gap-5 overflow-y-auto flex-1 min-h-0">
           {!editingTemplate ? (
             <>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -294,9 +294,9 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                 </div>
               )}
               
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="overflow-x-auto overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 flex-1 min-h-0 bg-white dark:bg-slate-800">
                 <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-                  <thead className="text-xs text-slate-700 dark:text-slate-200 uppercase bg-slate-100 dark:bg-slate-700/80">
+                  <thead className="text-xs text-slate-700 dark:text-slate-200 uppercase bg-slate-100 dark:bg-slate-700/80 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-4 py-3">Idioma</th>
                       <th className="px-4 py-3">Título</th>
@@ -307,9 +307,9 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {filteredManagementTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan="4" className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                        <td colSpan="4" className="px-4 py-16 text-center text-slate-500 dark:text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-2">
-                            <i className="bi bi-search text-2xl text-slate-400"></i>
+                            <i className="bi bi-search text-3xl text-slate-400 dark:text-slate-500"></i>
                             <p className="font-semibold text-sm">
                               {searchTerm.trim()
                                 ? `No se encontraron plantillas que coincidan con "${searchTerm}"`
@@ -369,7 +369,7 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
 
             </>
           ) : (
-            <form onSubmit={handleSaveOverwrite} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveOverwrite} className="flex flex-col gap-4 flex-1 min-h-0">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Idioma</label>
@@ -401,16 +401,16 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                   className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg" 
                 />
               </div>
-              <div>
+              <div className="flex-1 flex flex-col min-h-0">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Cuerpo</label>
                 <textarea 
-                  required rows={6}
+                  required
                   value={editingTemplate.cuerpo}
                   onChange={(e) => setEditingTemplate({...editingTemplate, cuerpo: e.target.value})}
-                  className="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg" 
+                  className="block w-full flex-1 min-h-[160px] py-2 px-3 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg resize-none" 
                 />
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-auto pt-3 border-t border-slate-200 dark:border-slate-700 shrink-0">
                 <button 
                   type="button" 
                   onClick={() => setEditingTemplate(null)} 
@@ -535,9 +535,9 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
 
   // --- Main Selector UI ---
   return (
-    <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col">
+    <div className="w-full max-w-4xl h-[650px] max-h-[90vh] mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
         <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
           <i className="bi bi-envelope-paper text-indigo-500" aria-label="Icono de plantillas de correo" title="Plantillas de Correo"></i>
           Seleccionar Plantilla
@@ -552,12 +552,12 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
         )}
       </div>
 
-      <div className="p-6 flex flex-col gap-6">
+      <div className="p-6 flex flex-col gap-6 overflow-y-auto flex-1 min-h-0">
         {loading ? (
           <div className="py-8 text-center text-slate-500"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div></div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0">
               
               {/* Language Selector */}
               <div className="flex flex-col gap-2">
@@ -614,11 +614,17 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
 
             </div>
 
-            {selectedTemplateId && (
-              <div className="border-t border-slate-200 dark:border-slate-700 pt-6 flex flex-col gap-4 animate-fadeIn">
+            {!selectedTemplateId ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-center text-slate-400 dark:text-slate-500">
+                <i className="bi bi-file-earmark-text text-4xl mb-2 text-slate-300 dark:text-slate-600"></i>
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Seleccione una plantilla de la lista</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Podrá visualizar y editar el asunto y el cuerpo antes de aplicarla.</p>
+              </div>
+            ) : (
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-6 flex flex-col gap-4 animate-fadeIn flex-1 min-h-0">
                 
                 {/* Editor - Asunto */}
-                <div>
+                <div className="shrink-0">
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Vista Previa: Asunto
                   </label>
@@ -631,7 +637,7 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                 </div>
 
                 {/* Editor - Cuerpo */}
-                <div className="flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col min-h-0">
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Vista Previa: Mensaje
                   </label>
@@ -639,7 +645,7 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     rows={8}
-                    className="block w-full py-3 px-4 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-y custom-scrollbar transition-colors leading-relaxed"
+                    className="block w-full flex-1 py-3 px-4 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none custom-scrollbar transition-colors leading-relaxed"
                   ></textarea>
                 </div>
               </div>
