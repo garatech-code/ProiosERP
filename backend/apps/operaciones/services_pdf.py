@@ -557,7 +557,8 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         else:
             custom_items_list = custom_items
             
-        print(f"DEBUG custom_items parsed: {custom_items_list}")
+        if not custom_items_list and getattr(operacion, 'items_cotizacion_servicio', None):
+            custom_items_list = operacion.items_cotizacion_servicio
             
         if isinstance(custom_items_list, list):
             if 'SERVICES' not in grupos:
@@ -587,12 +588,10 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
                     unit_label = 'hrs'
                 elif forma_c == 'dias':
                     unit_label = 'days'
-                elif forma_c == 'lumpsum':
-                    unit_label = 'Lumpsum'
                 elif forma_c == 'general':
-                    unit_label = 'UN'
+                    unit_label = 'Unit' if lang == 'en' else 'Unid.'
                 else:
-                    unit_label = 'UN'
+                    unit_label = 'Unit' if lang == 'en' else 'Unid.'
 
                 if lang == 'es':
                     desc = c_item.get('nombre_es') or c_item.get('descripcion') or c_item.get('nombre') or c_item.get('nombre_en', '')
@@ -1084,6 +1083,9 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
         else:
             custom_items_list = custom_items
             
+        if not custom_items_list and getattr(operacion, 'items_cotizacion_servicio', None):
+            custom_items_list = operacion.items_cotizacion_servicio
+            
         if isinstance(custom_items_list, list):
             if 'SERVICIOS' not in grupos:
                 grupos['SERVICIOS'] = []
@@ -1112,12 +1114,10 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
                     unit_label = 'hrs'
                 elif forma_c == 'dias':
                     unit_label = 'days'
-                elif forma_c == 'lumpsum':
-                    unit_label = 'Lumpsum'
                 elif forma_c == 'general':
-                    unit_label = 'UN'
+                    unit_label = 'Unit' if lang == 'en' else 'Unid.'
                 else:
-                    unit_label = 'UN'
+                    unit_label = 'Unit' if lang == 'en' else 'Unid.'
 
                 if lang == 'es':
                     desc = c_item.get('nombre_es') or c_item.get('descripcion') or c_item.get('nombre') or c_item.get('nombre_en', '')

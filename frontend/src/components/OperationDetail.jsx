@@ -558,10 +558,11 @@ export default function OperationDetail() {
           const p = it.precio_unitario !== undefined && it.precio_unitario !== '' ? it.precio_unitario : (it.precio || 0);
           const q = it.cantidad !== undefined && it.cantidad !== '' ? it.cantidad : 1;
           const defaultImporte = ((parseFloat(q) || 0) * (parseFloat(p) || 0)).toFixed(2);
+          const u = (it.unidad !== undefined && it.unidad !== null && String(it.unidad).trim() !== '') ? String(it.unidad).trim() : (isGeneral ? 'Unid.' : 'Hr');
           return {
             ...it,
             forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
-            unidad: it.unidad || (isGeneral ? 'Unid.' : 'Hr'),
+            unidad: u,
             cantidad: q,
             precio: p,
             precio_unitario: p,
@@ -982,6 +983,9 @@ export default function OperationDetail() {
             const qty = parseFloat(i.cantidad) || 1;
             const price = parseFloat(i.precio_unitario !== undefined && i.precio_unitario !== '' ? i.precio_unitario : (i.precio || 0)) || 0;
             const imp = i.importe !== undefined && i.importe !== '' && i.importe !== null ? parseFloat(i.importe) : (qty * price);
+            const u = (i.unidad !== undefined && i.unidad !== null && String(i.unidad).trim() !== '')
+              ? String(i.unidad).trim()
+              : (isGeneral ? (cotizacionLang === 'en' ? 'Unit' : 'Unid.') : (cotizacionLang === 'en' ? 'Hr' : 'Hs'));
             return {
               ...i,
               forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
@@ -989,7 +993,7 @@ export default function OperationDetail() {
               nombre_es: nEs || selectedName,
               nombre_en: nEn || selectedName,
               descripcion: i.descripcion || selectedName,
-              unidad: i.unidad || (isGeneral ? (cotizacionLang === 'en' ? 'Unit' : 'Unid.') : (cotizacionLang === 'en' ? 'Hr' : 'Hs')),
+              unidad: u,
               cantidad: i.cantidad !== undefined && i.cantidad !== '' ? i.cantidad : qty,
               precio_unitario: price,
               precio: price,
@@ -1055,6 +1059,9 @@ export default function OperationDetail() {
             const qty = parseFloat(i.cantidad) || 1;
             const price = parseFloat(i.precio_unitario !== undefined && i.precio_unitario !== '' ? i.precio_unitario : (i.precio || 0)) || 0;
             const imp = i.importe !== undefined && i.importe !== '' && i.importe !== null ? parseFloat(i.importe) : (qty * price);
+            const u = (i.unidad !== undefined && i.unidad !== null && String(i.unidad).trim() !== '')
+              ? String(i.unidad).trim()
+              : (isGeneral ? (cotizacionLang === 'en' ? 'Unit' : 'Unid.') : (cotizacionLang === 'en' ? 'Hr' : 'Hs'));
             return {
               ...i,
               forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
@@ -1062,7 +1069,7 @@ export default function OperationDetail() {
               nombre_es: nEs || selectedName,
               nombre_en: nEn || selectedName,
               descripcion: i.descripcion || selectedName,
-              unidad: i.unidad || (isGeneral ? (cotizacionLang === 'en' ? 'Unit' : 'Unid.') : (cotizacionLang === 'en' ? 'Hr' : 'Hs')),
+              unidad: u,
               cantidad: i.cantidad !== undefined && i.cantidad !== '' ? i.cantidad : qty,
               precio_unitario: price,
               precio: price,
@@ -1721,6 +1728,7 @@ export default function OperationDetail() {
         const qty = parseFloat(i.cantidad) || 1;
         const price = parseFloat(i.precio_unitario !== undefined && i.precio_unitario !== '' ? i.precio_unitario : (i.precio || 0)) || 0;
         const imp = i.importe !== undefined && i.importe !== '' && i.importe !== null ? parseFloat(i.importe) : (qty * price);
+        const u = (i.unidad !== undefined && i.unidad !== null && String(i.unidad).trim() !== '') ? String(i.unidad).trim() : (isGeneral ? 'Unid.' : 'Hr');
         return {
           ...i,
           forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
@@ -1728,7 +1736,7 @@ export default function OperationDetail() {
           nombre_es: nEs || selName,
           nombre_en: nEn || selName,
           descripcion: i.descripcion || (cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn)),
-          unidad: i.unidad || (isGeneral ? 'Unid.' : 'Hr'),
+          unidad: u,
           cantidad: i.cantidad !== undefined && i.cantidad !== '' ? i.cantidad : qty,
           precio_unitario: price,
           precio: price,
@@ -3336,7 +3344,7 @@ export default function OperationDetail() {
                             {/* Fila de campos según selector */}
                             {!isGeneral ? (
                               /* Horas Hombre: funcionamiento actual */
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
                                   <select
@@ -3357,6 +3365,17 @@ export default function OperationDetail() {
                                     className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
                                     value={item.cantidad}
                                     onChange={(e) => handleCustomItemChange(index, 'cantidad', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unidad</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ej: Hr, Hs..."
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.unidad !== undefined ? item.unidad : 'Hr'}
+                                    onChange={(e) => handleCustomItemChange(index, 'unidad', e.target.value)}
                                   />
                                 </div>
                                 <div>

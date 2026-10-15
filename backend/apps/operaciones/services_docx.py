@@ -62,6 +62,10 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
             items_list = custom_items
     except:
         items_list = []
+
+    # Fallback to operation's saved items if request custom_items is empty
+    if not items_list and getattr(op, 'items_cotizacion_servicio', None):
+        items_list = op.items_cotizacion_servicio
         
     # Unificamos los items para "scope_of_work" y "importe" de la primer tabla
     items_context = []
@@ -81,7 +85,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         precio_unit_str = format_num(importe_total)
         
         if forma == 'hora_hombre':
-            unidad = 'Hr'
+            unidad = 'Hr' if lang == 'en' else 'Hs'
             if service_qty_override and service_unit_price_override:
                 cantidad_str = str(service_qty_override)
                 precio_unit_str = format_num(service_unit_price_override)
@@ -90,8 +94,13 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
             if service_qty_override and service_unit_price_override:
                 cantidad_str = str(service_qty_override)
                 precio_unit_str = format_num(service_unit_price_override)
+        elif forma == 'general':
+            unidad = 'Unit' if lang == 'en' else 'Unid.'
+            if service_qty_override and service_unit_price_override:
+                cantidad_str = str(service_qty_override)
+                precio_unit_str = format_num(service_unit_price_override)
         else:
-            unidad = 'LS'
+            unidad = 'Unit' if lang == 'en' else 'Unid.'
             
         if items_list:
             importe_total = 0.0
@@ -110,7 +119,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 except:
                     c_price = 0.0
                 
-                # Unidad
+                # Unidad: Priorizar estrictamente lo cargado en el textbox
                 if item.get('unidad') and str(item.get('unidad')).strip():
                     c_unidad = str(item.get('unidad')).strip()
                 elif c_forma == 'hora_hombre':
@@ -120,7 +129,7 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
                 elif c_forma == 'general':
                     c_unidad = 'Unit' if lang == 'en' else 'Unid.'
                 else:
-                    c_unidad = 'LS'
+                    c_unidad = 'Unit' if lang == 'en' else 'Unid.'
                 
                 # Importe
                 if item.get('importe') is not None and str(item.get('importe')).strip() != '':
