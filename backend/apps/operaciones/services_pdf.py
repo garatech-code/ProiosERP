@@ -1468,17 +1468,17 @@ def generar_remito_pdf(operacion, params=None):
     FONT_SIZE = 10
     
     # FECHA (Día, Mes, Año)
-    # Suponemos que hay 3 cajitas arriba a la derecha. Ajustar Y según el talonario.
+    # Suponemos que hay 3 cajitas arriba a la derecha. Correr 1cm (+10mm) a la derecha.
     Y_FECHA = 245 * mm
-    X_DIA = 150 * mm
-    X_MES = 165 * mm
-    X_ANIO = 180 * mm
+    X_DIA = 160 * mm
+    X_MES = 175 * mm
+    X_ANIO = 190 * mm
     
-    # DATOS CLIENTE
-    Y_CLIENTE = 210 * mm
+    # DATOS CLIENTE (subir 2cm = +20mm)
+    Y_CLIENTE = 230 * mm
     X_CLIENTE = 30 * mm
     
-    Y_DOMICILIO = 200 * mm
+    Y_DOMICILIO = 220 * mm
     X_DOMICILIO = 30 * mm
     
     Y_REF = 190 * mm
@@ -1499,8 +1499,8 @@ def generar_remito_pdf(operacion, params=None):
     Y_CUIT = 140 * mm
     X_CUIT = 178 * mm
     
-    # ITEMS
-    Y_ITEMS_START = 150 * mm
+    # ITEMS (subir 2cm = +20mm)
+    Y_ITEMS_START = 170 * mm
     Y_ITEMS_STEP = 6 * mm
     X_ITEM_CANT = 15 * mm
     X_ITEM_DESC = 35 * mm
@@ -1530,31 +1530,32 @@ def generar_remito_pdf(operacion, params=None):
         pass
 
     # Cliente
-    cliente_nombre = operacion.cliente.name if operacion.cliente else ""
+    cliente_nombre = params.get('cliente', '').strip() if params.get('cliente') else ""
+    if not cliente_nombre:
+        if operacion.ship and operacion.ship.name:
+            cliente_nombre = operacion.ship.name
+        elif operacion.cliente and operacion.cliente.name:
+            cliente_nombre = operacion.cliente.name
     c.drawString(X_CLIENTE, Y_CLIENTE, cliente_nombre)
     
     # Domicilio
-    domicilio = params.get('domicilio', '')
-    if not domicilio and operacion.cliente:
-        domicilio = operacion.cliente.address or ''
+    domicilio = params.get('domicilio', '').strip() if params.get('domicilio') else ""
+    if not domicilio:
+        if operacion.port and operacion.port.name:
+            domicilio = operacion.port.name
+        elif operacion.cliente and operacion.cliente.address:
+            domicilio = operacion.cliente.address
     c.drawString(X_DOMICILIO, Y_DOMICILIO, domicilio)
     
-    # Referencia, Rancho, OC
-    c.drawString(X_REF, Y_REF, f"OP-{operacion.id:04d}")
-    if params.get('rancho'):
-        c.drawString(X_RANCHO, Y_REF, params.get('rancho'))
-    elif operacion.ship:
-        c.drawString(X_RANCHO, Y_REF, operacion.ship.name[:30])
-        
+    # Referencia, Rancho, OC (Omitidos operación y buque según pedido del usuario)
     if params.get('oc'):
         c.drawString(X_OC, Y_REF, params.get('oc'))
 
     # CUIT
-    Y_CUIT = 178 * mm  # Corregido: antes estaba en 140
     cuit = params.get('cuit', '')
-    if not cuit and operacion.cliente:
-        cuit = getattr(operacion.cliente, 'cuit', '') or getattr(operacion.cliente, 'tax_id', '') or ''
-    c.drawString(X_CUIT, Y_CUIT, cuit)
+    if cuit:
+        Y_CUIT = 178 * mm
+        c.drawString(X_CUIT, Y_CUIT, cuit)
 
     # Checkboxes IVA
     iva = params.get('iva', '').lower()
@@ -1638,9 +1639,8 @@ def generar_remito_pdf(operacion, params=None):
         ]))
 
     w, h = t.wrap(letter[0], letter[1])
-    # Dibujar la tabla de items anclada en (X=15mm, Y=150mm - altura)
-    # Se recomienda revisar la posición de inicio (Y=150mm) en el talonario
-    t.drawOn(c, 15 * mm, 155 * mm - h)
+    # Dibujar la tabla de items anclada en Y=175mm - altura (subida 2cm = +20mm)
+    t.drawOn(c, 15 * mm, 175 * mm - h)
 
     # Transportó
     transporto = params.get('transporto', '')

@@ -25,11 +25,6 @@ export default function UserManagement() {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
-    // Notification email state
-    const [notificationEmail, setNotificationEmail] = useState('');
-    const [savingEmail, setSavingEmail] = useState(false);
-    const [savedEmailSuccess, setSavedEmailSuccess] = useState(false);
-
     // Create modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
@@ -56,7 +51,6 @@ export default function UserManagement() {
 
     useEffect(() => {
         fetchUsers();
-        fetchNotificationEmail();
     }, []);
 
     const fetchUsers = async () => {
@@ -73,35 +67,6 @@ export default function UserManagement() {
         }
     };
 
-    const fetchNotificationEmail = async () => {
-        try {
-            const res = await axios.get('/usuarios/users/config_notificaciones/');
-            if (res.data?.email) {
-                setNotificationEmail(res.data.email);
-            }
-        } catch (err) {
-            console.error('Error al cargar email de notificaciones:', err);
-        }
-    };
-
-    const handleSaveNotificationEmail = async () => {
-        setSavingEmail(true);
-        try {
-            await axios.post('/usuarios/users/config_notificaciones/', { email: notificationEmail });
-            setSavedEmailSuccess(true);
-            setSuccessMessage('Correo de avisos de supervisión guardado exitosamente.');
-            setTimeout(() => {
-                setSavedEmailSuccess(false);
-                setSuccessMessage('');
-            }, 4000);
-        } catch (err) {
-            console.error('Error al guardar email de notificaciones:', err);
-            setError(err.response?.data?.detail || 'Error al guardar el correo de avisos.');
-            setTimeout(() => setError(''), 4000);
-        } finally {
-            setSavingEmail(false);
-        }
-    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -233,52 +198,6 @@ export default function UserManagement() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full xl:w-auto">
-                    {/* Casilla de configuración de correo de avisos para Juniors al lado de Crear Usuario */}
-                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-proios-accent/50 focus-within:border-proios-accent transition-all">
-                        <div className="p-1.5 bg-sky-50 dark:bg-sky-950/40 text-proios-accent rounded-lg shrink-0">
-                            <i className="bi bi-envelope-at-fill text-base"></i>
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500 leading-tight">
-                                Mail de Avisos Junior
-                            </span>
-                            <input
-                                type="email"
-                                placeholder="supervisor@ejemplo.com"
-                                value={notificationEmail}
-                                onChange={(e) => setNotificationEmail(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNotificationEmail(); }}
-                                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none w-48 sm:w-60"
-                                title="Dirección de correo a la que se enviarán las alertas cuando usuarios juniors requieran supervisión o intenten cerrar operaciones"
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleSaveNotificationEmail}
-                            disabled={savingEmail}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm shrink-0 ${
-                                savedEmailSuccess
-                                    ? 'bg-emerald-500 text-white'
-                                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
-                            }`}
-                            title="Guardar correo de notificación"
-                        >
-                            {savingEmail ? (
-                                <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-proios-accent"></span>
-                            ) : savedEmailSuccess ? (
-                                <>
-                                    <i className="bi bi-check-lg text-sm"></i>
-                                    <span className="hidden sm:inline">Guardado</span>
-                                </>
-                            ) : (
-                                <>
-                                    <i className="bi bi-floppy"></i>
-                                    <span className="hidden sm:inline">Guardar</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
-
                     {/* Botón Crear Usuario */}
                     <button
                         onClick={handleOpenModal}

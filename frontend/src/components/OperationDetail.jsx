@@ -2835,11 +2835,10 @@ export default function OperationDetail() {
                         setMainViewTab(prev => prev === 'correos' ? 'detalles' : 'correos');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className={`ml-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all shadow-sm border ${
-                        mainViewTab === 'correos'
+                      className={`ml-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all shadow-sm border ${mainViewTab === 'correos'
                           ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-indigo-600/30'
                           : 'bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-                      }`}
+                        }`}
                       title={mainViewTab === 'correos' ? 'Volver a los detalles de la operación' : 'Ver cadena de correos vinculados'}
                     >
                       <i className={`bi ${mainViewTab === 'correos' ? 'bi-arrow-left-circle-fill' : 'bi-envelope-paper-fill'}`}></i>
@@ -3054,11 +3053,10 @@ export default function OperationDetail() {
               <button
                 type="button"
                 onClick={() => setMainViewTab('detalles')}
-                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
-                  mainViewTab === 'detalles'
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${mainViewTab === 'detalles'
                     ? 'bg-slate-900 text-white dark:bg-indigo-600 shadow-sm'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
-                }`}
+                  }`}
               >
                 <i className="bi bi-card-checklist text-base"></i>
                 <span>Detalles de Operación</span>
@@ -3067,19 +3065,17 @@ export default function OperationDetail() {
               <button
                 type="button"
                 onClick={() => setMainViewTab('correos')}
-                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
-                  mainViewTab === 'correos'
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${mainViewTab === 'correos'
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
-                }`}
+                  }`}
               >
                 <i className="bi bi-envelope-paper-fill text-base"></i>
                 <span>Cadena de Correos</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                  mainViewTab === 'correos'
+                <span className={`px-2 py-0.5 rounded-full text-xs font-black ${mainViewTab === 'correos'
                     ? 'bg-white/20 text-white'
                     : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
-                }`}>
+                  }`}>
                   {emails.length}
                 </span>
               </button>
@@ -3087,11 +3083,10 @@ export default function OperationDetail() {
               <button
                 type="button"
                 onClick={() => setMainViewTab('split')}
-                className={`hidden lg:flex px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold items-center gap-2 transition-all ${
-                  mainViewTab === 'split'
+                className={`hidden lg:flex px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold items-center gap-2 transition-all ${mainViewTab === 'split'
                     ? 'bg-slate-900 text-white dark:bg-indigo-600 shadow-sm'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
-                }`}
+                  }`}
                 title="Ver Detalles y Cadena de Correos en paralelo en pantallas grandes"
               >
                 <i className="bi bi-layout-split text-base"></i>
@@ -3153,462 +3148,462 @@ export default function OperationDetail() {
 
 
 
-              <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
-                <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
-                  <div>
-                    <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white">Resumen Operativo</h3>
-                    <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">Información logística y de tiempos</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {checkingStock && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
-                    {statusBadge(operation.status || operation.estado)}
-                  </div>
-                </div>
-
-                <div>
-                  <dl className="grid grid-cols-1 sm:grid-cols-2">
-                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Cliente</dt>
-                      <dd className="text-sm font-semibold text-slate-900 dark:text-white">{operation.client_name}</dd>
-                    </div>
-                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
-                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Buque</dt>
-                      <dd className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                        <i className="bi bi-geo-alt-fill text-indigo-400"></i> {operation.ship_name}
-                      </dd>
-                    </div>
-                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700">
-                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Puerto</dt>
-                      <dd className="text-sm font-semibold text-slate-900 dark:text-white">{operation.port_name}</dd>
-                    </div>
-                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/20">
-                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">ETA (Arribo)</dt>
-                      <dd className="text-sm font-black text-indigo-700 dark:text-indigo-400">{formatDate(operation.eta)}</dd>
-                    </div>
-                    <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Agencia / Entrega</dt>
-                      <dd className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
-                        {operation.delivery_method === 'lancha' && operation.detalle_lugar_entrega && (
-                          <span className="block sm:inline sm:ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
-                            (Salida: {operation.detalle_lugar_entrega})
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                    <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
-                      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Notas</dt>
-                      <dd className="text-sm font-medium text-slate-600 dark:text-slate-300 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
-                    </div>
-                  </dl>
-
-                  {(isOwner || isOperador) && (
-                    <>
-                      <div className="bg-slate-800 px-4 py-4 sm:px-6 text-white">
-                        <div className="flex justify-between items-center mb-3">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 m-0">
-                            <i className="bi bi-people-fill"></i> Personal de Misión Asignado
-                          </p>
-                          <button
-                            onClick={handleOpenStaffModal}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1"
-                          >
-                            <i className="bi bi-pencil-fill"></i> Editar Personal
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-xs">
-                          <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                            Operadores (Oficina): {operation.operadores_id?.length || 0}
-                          </span>
-                          <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                            Operarios (Planta - PersonalPlantel): {operation.operarios_id?.length || 0}
-                          </span>
-                          <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
-                            Operarios Usuarios App: {operation.operarios_usuarios_id?.length || 0}
-                          </span>
-                        </div>
-                        {operation.operarios_usuarios_nombres?.length > 0 && (
-                          <div className="mt-2 text-xs text-slate-300">
-                            <span className="font-bold">Nombres:</span> {operation.operarios_usuarios_nombres.join(', ')}
-                          </div>
-                        )}
+                  <div className="bg-white dark:bg-slate-800 shadow-sm overflow-hidden sm:rounded-2xl border border-slate-200 dark:border-slate-700">
+                    <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
+                      <div>
+                        <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white">Resumen Operativo</h3>
+                        <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">Información logística y de tiempos</p>
                       </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {operation?.tipo_operacion === 'servicios' && (
-                <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
-                  <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
-                    <div className="flex items-center gap-3">
-                      <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                        <i className="bi bi-tools text-indigo-500"></i> Detalles del Servicio Técnico
-                      </h4>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
-                        Total Items: ${customItems.reduce((acc, it) => {
-                          const imp = parseFloat(it.importe);
-                          if (!isNaN(imp) && it.importe !== '' && it.importe !== null) return acc + imp;
-                          const q = parseFloat(it.cantidad) || 0;
-                          const p = parseFloat(it.precio_unitario || it.precio) || 0;
-                          return acc + (q * p);
-                        }, 0).toFixed(2)}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        {checkingStock && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
+                        {statusBadge(operation.status || operation.estado)}
+                      </div>
                     </div>
-                    {canEdit && (
-                      <button
-                        onClick={handleSaveServiceDetails}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2"
-                      >
-                        <i className="bi bi-save"></i> Guardar Detalles
-                      </button>
-                    )}
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo (aparecerá en la cotización)</label>
-                    {customItems.length === 0 ? (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">No hay ítems cargados en el detalle del servicio.</p>
-                    ) : (
-                      customItems.map((item, index) => {
-                        const isGeneral = (item.forma_cotizacion === 'general' || item.forma_cotizacion === 'lumpsum');
-                        const valEs = item.nombre_es !== undefined ? item.nombre_es : (item.descripcion !== undefined ? item.descripcion : (item.nombre || ''));
-                        const valEn = item.nombre_en !== undefined ? item.nombre_en : (item.nombre || '');
-                        return (
-                          <div key={index} className="flex flex-col gap-2 mb-4 p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                            <div className="flex gap-2 items-center">
-                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">ES</span>
-                                      {isGeneral ? 'Descripción en Español (Cotizaciones en Español)' : 'Nombre en Español (Cotizaciones en Español)'}
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="text"
-                                    disabled={!canEdit}
-                                    placeholder={isGeneral ? 'Ej: REPARACIÓN GENERAL DE VÁLVULAS' : 'Ej: SUPERVISOR DE ING. MECÁNICA'}
-                                    className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                                    value={valEs}
-                                    onChange={(e) => handleCustomItemChange(index, 'nombre_es', e.target.value)}
-                                  />
-                                </div>
+                    <div>
+                      <dl className="grid grid-cols-1 sm:grid-cols-2">
+                        <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                          <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Cliente</dt>
+                          <dd className="text-sm font-semibold text-slate-900 dark:text-white">{operation.client_name}</dd>
+                        </div>
+                        <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
+                          <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Buque</dt>
+                          <dd className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <i className="bi bi-geo-alt-fill text-indigo-400"></i> {operation.ship_name}
+                          </dd>
+                        </div>
+                        <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700">
+                          <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Puerto</dt>
+                          <dd className="text-sm font-semibold text-slate-900 dark:text-white">{operation.port_name}</dd>
+                        </div>
+                        <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/20">
+                          <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">ETA (Arribo)</dt>
+                          <dd className="text-sm font-black text-indigo-700 dark:text-indigo-400">{formatDate(operation.eta)}</dd>
+                        </div>
+                        <div className="px-4 py-4 sm:px-6 border-b sm:border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                          <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Agencia / Entrega</dt>
+                          <dd className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
+                            {operation.delivery_method === 'lancha' && operation.detalle_lugar_entrega && (
+                              <span className="block sm:inline sm:ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+                                (Salida: {operation.detalle_lugar_entrega})
+                              </span>
+                            )}
+                          </dd>
+                        </div>
+                        <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
+                          <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Notas</dt>
+                          <dd className="text-sm font-medium text-slate-600 dark:text-slate-300 line-clamp-2">{operation.notes || 'Sin anotaciones'}</dd>
+                        </div>
+                      </dl>
 
-                                <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">EN</span>
-                                      {isGeneral ? 'Descripción en Inglés (Cotizaciones en Inglés)' : 'Nombre en Inglés (Cotizaciones en Inglés)'}
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="text"
-                                    disabled={!canEdit}
-                                    placeholder={isGeneral ? 'Ej: GENERAL VALVE REPAIR' : 'Ej: MECHANICAL ENG. SUPERVISOR'}
-                                    className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                                    value={valEn}
-                                    onChange={(e) => handleCustomItemChange(index, 'nombre_en', e.target.value)}
-                                  />
-                                </div>
-                              </div>
-
-                              {canEdit && (
-                                <div className="flex flex-col gap-1 shrink-0 pt-4">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newItems = [...customItems];
-                                      const curEs = newItems[index].nombre_es !== undefined ? newItems[index].nombre_es : (newItems[index].descripcion || newItems[index].nombre || '');
-                                      const curEn = newItems[index].nombre_en !== undefined ? newItems[index].nombre_en : (newItems[index].nombre || '');
-                                      newItems[index].nombre_es = curEn;
-                                      newItems[index].descripcion = curEn;
-                                      newItems[index].nombre_en = curEs;
-                                      newItems[index].nombre = cotizacionLang === 'en' ? curEs : curEn;
-                                      setCustomItems(newItems);
-                                    }}
-                                    className="p-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg transition"
-                                    title="Intercambiar textos Español ⇄ Inglés"
-                                  >
-                                    <i className="bi bi-arrow-left-right text-xs"></i>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newItems = customItems.filter((_, i) => i !== index);
-                                      setCustomItems(newItems);
-                                    }}
-                                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition"
-                                    title="Eliminar ítem"
-                                  >
-                                    <i className="bi bi-trash-fill text-xs"></i>
-                                  </button>
-                                </div>
-                              )}
+                      {(isOwner || isOperador) && (
+                        <>
+                          <div className="bg-slate-800 px-4 py-4 sm:px-6 text-white">
+                            <div className="flex justify-between items-center mb-3">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 m-0">
+                                <i className="bi bi-people-fill"></i> Personal de Misión Asignado
+                              </p>
+                              <button
+                                onClick={handleOpenStaffModal}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1"
+                              >
+                                <i className="bi bi-pencil-fill"></i> Editar Personal
+                              </button>
                             </div>
-
-                            {/* Fila de campos según selector */}
-                            {!isGeneral ? (
-                              /* Horas Hombre: funcionamiento actual */
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
-                                  <select
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.forma_cotizacion}
-                                    onChange={(e) => handleCustomItemChange(index, 'forma_cotizacion', e.target.value)}
-                                  >
-                                    <option value="hora_hombre">Por horas hombre</option>
-                                    <option value="general">General</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad (Horas)</label>
-                                  <input
-                                    type="number"
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.cantidad}
-                                    onChange={(e) => handleCustomItemChange(index, 'cantidad', e.target.value)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unidad</label>
-                                  <input
-                                    type="text"
-                                    placeholder="Ej: Hr, Hs..."
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.unidad !== undefined ? item.unidad : 'Hr'}
-                                    onChange={(e) => handleCustomItemChange(index, 'unidad', e.target.value)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.precio_unitario}
-                                    onChange={(e) => handleCustomItemChange(index, 'precio_unitario', e.target.value)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Valor Total ($)</label>
-                                  <div className="w-full text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-600 dark:text-slate-400 font-semibold">
-                                    {((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)).toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              /* General: con el mismo funcionamiento que tiene expensas (cantidad, unidad, precio, importe) */
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
-                                  <select
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value="general"
-                                    onChange={(e) => handleCustomItemChange(index, 'forma_cotizacion', e.target.value)}
-                                  >
-                                    <option value="hora_hombre">Por horas hombre</option>
-                                    <option value="general">General</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad</label>
-                                  <FormattedNumberInput
-                                    placeholder="Cant."
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.cantidad}
-                                    onChange={(val) => handleCustomItemChange(index, 'cantidad', val)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unidad</label>
-                                  <input
-                                    type="text"
-                                    placeholder="Ej: Unid., GL, Día..."
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.unidad || ''}
-                                    onChange={(e) => handleCustomItemChange(index, 'unidad', e.target.value)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
-                                  <FormattedNumberInput
-                                    placeholder="Precio"
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                                    value={item.precio_unitario !== undefined ? item.precio_unitario : item.precio}
-                                    onChange={(val) => handleCustomItemChange(index, 'precio_unitario', val)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Importe ($)</label>
-                                  <FormattedNumberInput
-                                    placeholder="Importe"
-                                    disabled={!canEdit}
-                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 font-semibold text-slate-800 dark:text-slate-100"
-                                    value={item.importe}
-                                    onChange={(val) => handleCustomItemChange(index, 'importe', val)}
-                                  />
-                                </div>
+                            <div className="flex flex-wrap gap-4 text-xs">
+                              <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                                Operadores (Oficina): {operation.operadores_id?.length || 0}
+                              </span>
+                              <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                                Operarios (Planta - PersonalPlantel): {operation.operarios_id?.length || 0}
+                              </span>
+                              <span className="bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 font-bold">
+                                Operarios Usuarios App: {operation.operarios_usuarios_id?.length || 0}
+                              </span>
+                            </div>
+                            {operation.operarios_usuarios_nombres?.length > 0 && (
+                              <div className="mt-2 text-xs text-slate-300">
+                                <span className="font-bold">Nombres:</span> {operation.operarios_usuarios_nombres.join(', ')}
                               </div>
                             )}
                           </div>
-                        );
-                      })
-                    )}
-                    {canEdit && (
-                      <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setCustomItems([...customItems, { nombre: '', nombre_es: '', nombre_en: '', descripcion: '', forma_cotizacion: 'hora_hombre', cantidad: 1, unidad: 'Hr', precio_unitario: 0, precio: 0, importe: '0.00' }])}
-                          className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 transition"
-                        >
-                          <i className="bi bi-plus-circle-fill"></i> Agregar ítem Horas Hombre
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCustomItems([...customItems, { nombre: '', nombre_es: '', nombre_en: '', descripcion: '', forma_cotizacion: 'general', cantidad: 1, unidad: 'Unid.', precio_unitario: 0, precio: 0, importe: '0.00' }])}
-                          className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 transition"
-                        >
-                          <i className="bi bi-plus-circle-fill"></i> Agregar ítem General
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowTarifarioModal(true)}
-                          className="text-xs text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition shadow-sm"
-                        >
-                          <i className="bi bi-clock-history"></i> Cargar desde Tarifario Horas Hombre
-                        </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {operation?.tipo_operacion === 'servicios' && (
+                    <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
+                      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
+                        <div className="flex items-center gap-3">
+                          <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <i className="bi bi-tools text-indigo-500"></i> Detalles del Servicio Técnico
+                          </h4>
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                            Total Items: ${customItems.reduce((acc, it) => {
+                              const imp = parseFloat(it.importe);
+                              if (!isNaN(imp) && it.importe !== '' && it.importe !== null) return acc + imp;
+                              const q = parseFloat(it.cantidad) || 0;
+                              const p = parseFloat(it.precio_unitario || it.precio) || 0;
+                              return acc + (q * p);
+                            }, 0).toFixed(2)}
+                          </span>
+                        </div>
+                        {canEdit && (
+                          <button
+                            onClick={handleSaveServiceDetails}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow transition-colors flex items-center gap-2"
+                          >
+                            <i className="bi bi-save"></i> Guardar Detalles
+                          </button>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo (aparecerá en la cotización)</label>
+                        {customItems.length === 0 ? (
+                          <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">No hay ítems cargados en el detalle del servicio.</p>
+                        ) : (
+                          customItems.map((item, index) => {
+                            const isGeneral = (item.forma_cotizacion === 'general' || item.forma_cotizacion === 'lumpsum');
+                            const valEs = item.nombre_es !== undefined ? item.nombre_es : (item.descripcion !== undefined ? item.descripcion : (item.nombre || ''));
+                            const valEn = item.nombre_en !== undefined ? item.nombre_en : (item.nombre || '');
+                            return (
+                              <div key={index} className="flex flex-col gap-2 mb-4 p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div className="flex gap-2 items-center">
+                                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">ES</span>
+                                          {isGeneral ? 'Descripción en Español (Cotizaciones en Español)' : 'Nombre en Español (Cotizaciones en Español)'}
+                                        </span>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        disabled={!canEdit}
+                                        placeholder={isGeneral ? 'Ej: REPARACIÓN GENERAL DE VÁLVULAS' : 'Ej: SUPERVISOR DE ING. MECÁNICA'}
+                                        className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                        value={valEs}
+                                        onChange={(e) => handleCustomItemChange(index, 'nombre_es', e.target.value)}
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">EN</span>
+                                          {isGeneral ? 'Descripción en Inglés (Cotizaciones en Inglés)' : 'Nombre en Inglés (Cotizaciones en Inglés)'}
+                                        </span>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        disabled={!canEdit}
+                                        placeholder={isGeneral ? 'Ej: GENERAL VALVE REPAIR' : 'Ej: MECHANICAL ENG. SUPERVISOR'}
+                                        className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                        value={valEn}
+                                        onChange={(e) => handleCustomItemChange(index, 'nombre_en', e.target.value)}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {canEdit && (
+                                    <div className="flex flex-col gap-1 shrink-0 pt-4">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newItems = [...customItems];
+                                          const curEs = newItems[index].nombre_es !== undefined ? newItems[index].nombre_es : (newItems[index].descripcion || newItems[index].nombre || '');
+                                          const curEn = newItems[index].nombre_en !== undefined ? newItems[index].nombre_en : (newItems[index].nombre || '');
+                                          newItems[index].nombre_es = curEn;
+                                          newItems[index].descripcion = curEn;
+                                          newItems[index].nombre_en = curEs;
+                                          newItems[index].nombre = cotizacionLang === 'en' ? curEs : curEn;
+                                          setCustomItems(newItems);
+                                        }}
+                                        className="p-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg transition"
+                                        title="Intercambiar textos Español ⇄ Inglés"
+                                      >
+                                        <i className="bi bi-arrow-left-right text-xs"></i>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newItems = customItems.filter((_, i) => i !== index);
+                                          setCustomItems(newItems);
+                                        }}
+                                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition"
+                                        title="Eliminar ítem"
+                                      >
+                                        <i className="bi bi-trash-fill text-xs"></i>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Fila de campos según selector */}
+                                {!isGeneral ? (
+                                  /* Horas Hombre: funcionamiento actual */
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
+                                      <select
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.forma_cotizacion}
+                                        onChange={(e) => handleCustomItemChange(index, 'forma_cotizacion', e.target.value)}
+                                      >
+                                        <option value="hora_hombre">Por hs hombre</option>
+                                        <option value="general">General</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad (Horas)</label>
+                                      <input
+                                        type="number"
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.cantidad}
+                                        onChange={(e) => handleCustomItemChange(index, 'cantidad', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Unidad</label>
+                                      <input
+                                        type="text"
+                                        placeholder="Ej: Hr, Hs..."
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.unidad !== undefined ? item.unidad : 'Hr'}
+                                        onChange={(e) => handleCustomItemChange(index, 'unidad', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.precio_unitario}
+                                        onChange={(e) => handleCustomItemChange(index, 'precio_unitario', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Valor Total ($)</label>
+                                      <div className="w-full text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-600 dark:text-slate-400 font-semibold">
+                                        {((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)).toFixed(2)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* General: con el mismo funcionamiento que tiene expensas (cantidad, unidad, precio, importe) */
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
+                                      <select
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value="general"
+                                        onChange={(e) => handleCustomItemChange(index, 'forma_cotizacion', e.target.value)}
+                                      >
+                                        <option value="hora_hombre">Por hs hombre</option>
+                                        <option value="general">General</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad</label>
+                                      <FormattedNumberInput
+                                        placeholder="Cant."
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.cantidad}
+                                        onChange={(val) => handleCustomItemChange(index, 'cantidad', val)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Unidad</label>
+                                      <input
+                                        type="text"
+                                        placeholder="Ej: Unid., GL, Día..."
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.unidad || ''}
+                                        onChange={(e) => handleCustomItemChange(index, 'unidad', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
+                                      <FormattedNumberInput
+                                        placeholder="Precio"
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                        value={item.precio_unitario !== undefined ? item.precio_unitario : item.precio}
+                                        onChange={(val) => handleCustomItemChange(index, 'precio_unitario', val)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Importe ($)</label>
+                                      <FormattedNumberInput
+                                        placeholder="Importe"
+                                        disabled={!canEdit}
+                                        className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 font-semibold text-slate-800 dark:text-slate-100"
+                                        value={item.importe}
+                                        onChange={(val) => handleCustomItemChange(index, 'importe', val)}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                        {canEdit && (
+                          <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setCustomItems([...customItems, { nombre: '', nombre_es: '', nombre_en: '', descripcion: '', forma_cotizacion: 'hora_hombre', cantidad: 1, unidad: 'Hr', precio_unitario: 0, precio: 0, importe: '0.00' }])}
+                              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 transition"
+                            >
+                              <i className="bi bi-plus-circle-fill"></i> Agregar ítem Horas Hombre
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCustomItems([...customItems, { nombre: '', nombre_es: '', nombre_en: '', descripcion: '', forma_cotizacion: 'general', cantidad: 1, unidad: 'Unid.', precio_unitario: 0, precio: 0, importe: '0.00' }])}
+                              className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 transition"
+                            >
+                              <i className="bi bi-plus-circle-fill"></i> Agregar ítem General
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowTarifarioModal(true)}
+                              className="text-xs text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition shadow-sm"
+                            >
+                              <i className="bi bi-clock-history"></i> Cargar desde Tarifario Horas Hombre
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+
+
+                  {/* === LAYOUT DINAMICO === */}
+                  {operation.tipo_operacion === 'servicios' ? (
+                    <>
+                      {nodeExpensasYBotones}
+                      {nodeMaterialesABordo}
+                      {leaveMaterials && nodeDetalleCarga}
+                      {nodePackingYDoc}
+                      {nodeSolicitudParticular}
+                    </>
+                  ) : (
+                    <>
+                      {nodeDetalleCarga}
+                      {nodeOrdersAndPedido}
+                      {nodeExpensasYBotones}
+                      {nodePackingYDoc}
+                    </>
+                  )}
+
+                  {/* DOCUMENTOS ADICIONALES (NUEVO) */}
+                  <OperationDocuments
+                    operacionId={operation.id}
+                    documentos={(documentos || []).filter(d => d.tipo !== 'ingreso_puerto')}
+                    onDocumentChange={refreshDocuments}
+                    openPreview={openPreview}
+                    selectedDocs={selectedDocs}
+                    toggleSelectDoc={toggleSelectDoc}
+                    canEdit={canEdit}
+                  />
+
+                  {/* ADJUNTOS DE LA CADENA DE CORREOS */}
+                  <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
+                    <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
+                      <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <i className="bi bi-paperclip text-indigo-500"></i> Adjuntos de la Cadena de Correos
+                      </h3>
+                      <span className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-1 rounded-full font-bold">
+                        {emailAttachments.length} {emailAttachments.length === 1 ? 'archivo' : 'archivos'}
+                      </span>
+                    </div>
+                    {emailAttachments.length === 0 ? (
+                      <p className="text-gray-500 dark:text-slate-400 text-sm">No hay archivos adjuntos en la cadena de correos de esta operación.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {emailAttachments.map((adj) => {
+                          const isImage = adj.content_type?.startsWith('image/') || adj.filename?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
+                          const isPdf = adj.content_type === 'application/pdf' || adj.filename?.match(/\.pdf$/i);
+                          const isExcel = adj.content_type?.includes('spreadsheet') || adj.content_type?.includes('excel') || adj.filename?.match(/\.xlsx?$/i);
+                          const isWord = adj.content_type?.includes('wordprocessingml') || adj.content_type?.includes('msword') || adj.filename?.match(/\.docx?$/i);
+
+                          let iconClass = "bi-file-earmark-fill text-slate-400";
+                          if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
+                          else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
+                          else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
+                          else if (isWord) iconClass = "bi-file-earmark-word text-blue-500";
+
+                          return (
+                            <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedEmailAtts.includes(adj.id)}
+                                  onChange={() => toggleSelectEmailAtt(adj.id)}
+                                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0 mt-2.5"
+                                />
+                                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
+                                  <i className={`bi ${iconClass} text-xl`}></i>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate animate-pulse" title={adj.filename}>
+                                    {adj.filename}
+                                  </h4>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                                    <span className="font-bold text-slate-600 dark:text-slate-300">De:</span> {adj.emailSender} <br />
+                                    <span className="font-bold text-slate-600 dark:text-slate-300">Asunto:</span> "{adj.emailSubject}"
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 mt-1">
+                                    {new Date(adj.emailDate).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
+                                <button
+                                  onClick={() => openPreview(getMediaUrl(adj.file), adj.filename)}
+                                  className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
+                                >
+                                  <i className="bi bi-eye-fill"></i> Ver
+                                </button>
+                                <a
+                                  href={getMediaUrl(adj.file)}
+                                  download
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
+                                >
+                                  <i className="bi bi-download"></i> Descargar
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                </div>
-              )}
 
-
-
-              {/* === LAYOUT DINAMICO === */}
-              {operation.tipo_operacion === 'servicios' ? (
-                <>
-                  {nodeExpensasYBotones}
-                  {nodeMaterialesABordo}
-                  {leaveMaterials && nodeDetalleCarga}
-                  {nodePackingYDoc}
-                  {nodeSolicitudParticular}
-                </>
-              ) : (
-                <>
-                  {nodeDetalleCarga}
-                  {nodeOrdersAndPedido}
-                  {nodeExpensasYBotones}
-                  {nodePackingYDoc}
+                  {mainViewTab !== 'split' && (
+                    <div className="mt-8 mb-8">
+                      <OperationEmails operacionId={id} openPreview={openPreview} />
+                    </div>
+                  )}
                 </>
               )}
 
-              {/* DOCUMENTOS ADICIONALES (NUEVO) */}
-              <OperationDocuments
-                operacionId={operation.id}
-                documentos={(documentos || []).filter(d => d.tipo !== 'ingreso_puerto')}
-                onDocumentChange={refreshDocuments}
-                openPreview={openPreview}
-                selectedDocs={selectedDocs}
-                toggleSelectDoc={toggleSelectDoc}
-                canEdit={canEdit}
-              />
-
-              {/* ADJUNTOS DE LA CADENA DE CORREOS */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 mt-6">
-                <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-700 pb-3">
-                  <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <i className="bi bi-paperclip text-indigo-500"></i> Adjuntos de la Cadena de Correos
-                  </h3>
-                  <span className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-1 rounded-full font-bold">
-                    {emailAttachments.length} {emailAttachments.length === 1 ? 'archivo' : 'archivos'}
-                  </span>
-                </div>
-                {emailAttachments.length === 0 ? (
-                  <p className="text-gray-500 dark:text-slate-400 text-sm">No hay archivos adjuntos en la cadena de correos de esta operación.</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {emailAttachments.map((adj) => {
-                      const isImage = adj.content_type?.startsWith('image/') || adj.filename?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
-                      const isPdf = adj.content_type === 'application/pdf' || adj.filename?.match(/\.pdf$/i);
-                      const isExcel = adj.content_type?.includes('spreadsheet') || adj.content_type?.includes('excel') || adj.filename?.match(/\.xlsx?$/i);
-                      const isWord = adj.content_type?.includes('wordprocessingml') || adj.content_type?.includes('msword') || adj.filename?.match(/\.docx?$/i);
-
-                      let iconClass = "bi-file-earmark-fill text-slate-400";
-                      if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
-                      else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
-                      else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
-                      else if (isWord) iconClass = "bi-file-earmark-word text-blue-500";
-
-                      return (
-                        <div key={adj.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700 transition-colors shadow-sm gap-3">
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedEmailAtts.includes(adj.id)}
-                              onChange={() => toggleSelectEmailAtt(adj.id)}
-                              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0 mt-2.5"
-                            />
-                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
-                              <i className={`bi ${iconClass} text-xl`}></i>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate animate-pulse" title={adj.filename}>
-                                {adj.filename}
-                              </h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                                <span className="font-bold text-slate-600 dark:text-slate-300">De:</span> {adj.emailSender} <br />
-                                <span className="font-bold text-slate-600 dark:text-slate-300">Asunto:</span> "{adj.emailSubject}"
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-1">
-                                {new Date(adj.emailDate).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700/50 pt-2 mt-auto">
-                            <button
-                              onClick={() => openPreview(getMediaUrl(adj.file), adj.filename)}
-                              className="flex-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-indigo-100 dark:border-indigo-800 transition-colors"
-                            >
-                              <i className="bi bi-eye-fill"></i> Ver
-                            </button>
-                            <a
-                              href={getMediaUrl(adj.file)}
-                              download
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-600 transition-colors"
-                            >
-                              <i className="bi bi-download"></i> Descargar
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {mainViewTab !== 'split' && (
-                <div className="mt-8 mb-8">
-                  <OperationEmails operacionId={id} openPreview={openPreview} />
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col gap-6">
+              <div className="bg-slate-800 shadow-lg sm:rounded-2xl overflow-hidden p-4 sm:p-6 flex flex-col gap-6">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
                   <div className="text-white w-full sm:w-auto text-center sm:text-left">
                     <h4 className="font-black text-lg">Controles Operativos</h4>
@@ -3957,7 +3952,7 @@ export default function OperationDetail() {
                       </h4>
                       {isEditingNotas ? (
                         <button onClick={handleSaveNotas} disabled={actionLoading} className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition-colors">
-                           {actionLoading ? 'Guardando...' : 'Guardar'}
+                          {actionLoading ? 'Guardando...' : 'Guardar'}
                         </button>
                       ) : (
                         <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
@@ -4013,7 +4008,7 @@ export default function OperationDetail() {
                       </h4>
                       {isEditingNotas ? (
                         <button onClick={handleSaveNotas} disabled={actionLoading} className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg font-bold shadow-sm transition-colors">
-                           {actionLoading ? 'Guardando...' : 'Guardar'}
+                          {actionLoading ? 'Guardando...' : 'Guardar'}
                         </button>
                       ) : (
                         canEdit && (
@@ -5117,6 +5112,7 @@ Saludos cordiales.`
         isOpen={isRemitoModalOpen}
         onClose={() => setIsRemitoModalOpen(false)}
         operationId={id}
+        operation={operation}
         showToast={showToast}
       />
 
