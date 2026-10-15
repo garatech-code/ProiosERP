@@ -433,11 +433,17 @@ export default function OperationDetail() {
 
       if (offerValidity === '15 days' || offerValidity === '15 días') {
         setOfferValidity(isEs ? '15 días' : '15 days');
+      } else if (offerValidity === '30 days' || offerValidity === '30 días') {
+        setOfferValidity(isEs ? '30 días' : '30 days');
       }
 
       if (!paymentTermsIsManual) {
         if (paymentTerms === '30 days from invoice date' || paymentTerms === '30 días fecha de factura') {
           setPaymentTerms(isEs ? '30 días fecha de factura' : '30 days from invoice date');
+        } else if (paymentTerms === 'In advance' || paymentTerms === 'Por adelantado') {
+          setPaymentTerms(isEs ? 'Por adelantado' : 'In advance');
+        } else if (paymentTerms === 'On delivery' || paymentTerms === 'Contra entrega') {
+          setPaymentTerms(isEs ? 'Contra entrega' : 'On delivery');
         }
       }
       setDamageFramesTitle(isEs ? 'Cuaderna(s)' : 'Frame(s)');
@@ -4561,7 +4567,7 @@ Saludos cordiales.`
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[95vh] overflow-hidden border border-slate-200 dark:border-slate-700 transform transition-all">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800">
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> Generar Cotización (PDF)
+                <i className="bi bi-file-earmark-pdf-fill text-red-500"></i> {cotizacionLang === 'es' ? 'Generar Cotización (PDF)' : 'Generate Quotation (PDF)'}
               </h3>
               <button onClick={() => setShowCotizacionWordModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors bg-white dark:bg-slate-700 shadow-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:bg-slate-900/20">
                 <i className="bi bi-x-lg"></i>
@@ -4570,12 +4576,12 @@ Saludos cordiales.`
 
             <div className="p-6 bg-slate-50 dark:bg-slate-900/40 space-y-6 overflow-y-auto flex-1">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Personaliza las condiciones comerciales que se incluirán en el documento.
+                {cotizacionLang === 'es' ? 'Personaliza las condiciones comerciales que se incluirán en el documento.' : 'Customize the commercial terms to be included in the document.'}
               </p>
 
               {/* Language Selector */}
               <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
-                <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Idioma del Documento / Document Language</label>
+                <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">{cotizacionLang === 'es' ? 'Idioma del Documento' : 'Document Language'}</label>
                 <div className="flex gap-4">
                   <label className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all flex-1 ${cotizacionLang === 'en' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/50'}`}>
                     <input type="radio" name="cotizacionLang" value="en" checked={cotizacionLang === 'en'} onChange={(e) => setCotizacionLang(e.target.value)} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 mr-3" />
@@ -4605,13 +4611,13 @@ Saludos cordiales.`
                     <div className="space-y-5 flex-1">
                       {/* Attn */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Attn</label>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Atención (Attn)' : 'Attn'}</label>
                         <input
                           type="text"
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors"
                           value={cotizacionAttn}
                           onChange={(e) => setCotizacionAttn(e.target.value)}
-                          placeholder="Completa Attn"
+                          placeholder={cotizacionLang === 'es' ? 'Contacto o departamento...' : 'Contact person or department...'}
                         />
                       </div>
 
@@ -4642,13 +4648,13 @@ Saludos cordiales.`
                               className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors ${offerValidity.length > 35 ? 'border-orange-500' : ''}`}
                               value={offerValidity}
                               onChange={(e) => setOfferValidity(e.target.value)}
-                              placeholder="Escriba..."
+                              placeholder={cotizacionLang === 'es' ? 'Escriba validez...' : 'Enter validity...'}
                               autoFocus
                             />
-                            <button onClick={() => { setOfferValidityIsManual(false); setOfferValidity('15 days'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                            <button onClick={() => { setOfferValidityIsManual(false); setOfferValidity(cotizacionLang === 'es' ? '15 días' : '15 days'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" title={cotizacionLang === 'es' ? 'Volver a seleccionar' : 'Back to select'}><i className="bi bi-x-circle-fill"></i></button>
                           </div>
                         )}
-                        {offerValidityIsManual && offerValidity.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> Texto largo.</p>}
+                        {offerValidityIsManual && offerValidity.length > 35 && <p className="text-xs text-orange-500 mt-1 font-semibold"><i className="bi bi-exclamation-triangle-fill"></i> {cotizacionLang === 'es' ? 'Texto largo.' : 'Text is long.'}</p>}
                       </div>
 
                       {/* Payment Terms */}
@@ -4679,10 +4685,10 @@ Saludos cordiales.`
                               className={`w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2.5 border transition-colors ${paymentTerms.length > 35 ? 'border-orange-500' : ''}`}
                               value={paymentTerms}
                               onChange={(e) => setPaymentTerms(e.target.value)}
-                              placeholder="Escriba..."
+                              placeholder={cotizacionLang === 'es' ? 'Escriba forma de pago...' : 'Enter payment terms...'}
                               autoFocus
                             />
-                            <button onClick={() => { setPaymentTermsIsManual(false); setPaymentTerms('30 days from invoice date'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" title="Volver a seleccionar"><i className="bi bi-x-circle-fill"></i></button>
+                            <button onClick={() => { setPaymentTermsIsManual(false); setPaymentTerms(cotizacionLang === 'es' ? '30 días fecha de factura' : '30 days from invoice date'); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors p-2" title={cotizacionLang === 'es' ? 'Volver a seleccionar' : 'Back to select'}><i className="bi bi-x-circle-fill"></i></button>
                           </div>
                         )}
                       </div>
@@ -4699,7 +4705,7 @@ Saludos cordiales.`
                             onChange={(e) => setDeliveryTime(e.target.value)}
                             placeholder="5"
                           />
-                          <span className="text-sm font-semibold text-slate-400 dark:text-slate-500 pr-3">business days</span>
+                          <span className="text-sm font-semibold text-slate-400 dark:text-slate-500 pr-3">{cotizacionLang === 'es' ? 'días hábiles' : 'business days'}</span>
                         </div>
                       </div>
 
@@ -4710,8 +4716,8 @@ Saludos cordiales.`
                         <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Impuestos (IVA)</p>
-                              <p className="text-xs text-slate-500">Aplicar impuestos</p>
+                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{cotizacionLang === 'es' ? 'Impuestos (IVA)' : 'Taxes (VAT)'}</p>
+                              <p className="text-xs text-slate-500">{cotizacionLang === 'es' ? 'Aplicar impuestos' : 'Apply taxes'}</p>
                             </div>
                             <button
                               type="button"
@@ -4723,7 +4729,7 @@ Saludos cordiales.`
                           </div>
                           {includeVat && (
                             <div className="flex items-center justify-between mt-1 pt-2 border-t border-slate-200 dark:border-slate-700">
-                              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Porcentaje VAT:</span>
+                              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{cotizacionLang === 'es' ? 'Porcentaje IVA:' : 'VAT Percentage:'}</span>
                               <div className="flex items-center relative w-24">
                                 <input
                                   type="number"
@@ -4742,8 +4748,8 @@ Saludos cordiales.`
                         <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{cotizacionLang === 'en' ? 'Discount' : 'Descuento'}</p>
-                              <p className="text-xs text-slate-500">Aplicar descuento al total</p>
+                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{cotizacionLang === 'es' ? 'Descuento' : 'Discount'}</p>
+                              <p className="text-xs text-slate-500">{cotizacionLang === 'es' ? 'Aplicar descuento al total' : 'Apply discount to total'}</p>
                             </div>
                             <button
                               type="button"
@@ -4756,18 +4762,18 @@ Saludos cordiales.`
                           {includeDiscount && (
                             <div className="flex flex-col gap-2 mt-1 pt-2 border-t border-slate-200 dark:border-slate-700">
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Tipo de descuento:</span>
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{cotizacionLang === 'es' ? 'Tipo de descuento:' : 'Discount type:'}</span>
                                 <select
                                   className="w-24 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md py-1 px-2 focus:ring-blue-500 focus:border-blue-500"
                                   value={discountType}
                                   onChange={(e) => setDiscountType(e.target.value)}
                                 >
-                                  <option value="percentage">%</option>
-                                  <option value="fixed">Fijo</option>
+                                  <option value="percentage">{cotizacionLang === 'es' ? 'Porcentaje (%)' : 'Percentage (%)'}</option>
+                                  <option value="fixed">{cotizacionLang === 'es' ? 'Fijo ($)' : 'Fixed ($)'}</option>
                                 </select>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Valor a descontar:</span>
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{cotizacionLang === 'es' ? 'Valor a descontar:' : 'Discount value:'}</span>
                                 <div className="flex items-center relative w-24">
                                   <input
                                     type="number"
@@ -4791,14 +4797,14 @@ Saludos cordiales.`
                 <div className="lg:col-span-8">
                   <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm h-full flex flex-col">
                     <h4 className="text-xs font-black text-slate-900 dark:text-white mb-5 uppercase tracking-wider flex items-center gap-2">
-                      <i className="bi bi-text-paragraph text-purple-500 text-base"></i> Contenido del Documento
+                      <i className="bi bi-text-paragraph text-purple-500 text-base"></i> {cotizacionLang === 'es' ? 'Contenido del Documento' : 'Document Content'}
                     </h4>
 
                     <div className="space-y-5 flex-1">
 
                       {/* Notes */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Notes <span className="normal-case font-normal">(Optional)</span></label>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{cotizacionLang === 'es' ? 'Notas' : 'Notes'} <span className="normal-case font-normal">({cotizacionLang === 'es' ? 'Opcional' : 'Optional'})</span></label>
                         <textarea
                           rows={4}
                           className="w-full rounded-lg border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm p-2.5 border transition-colors resize-none"
@@ -4822,7 +4828,7 @@ Saludos cordiales.`
                 onClick={() => setShowCotizacionWordModal(false)}
                 className="px-5 py-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-600 transition-colors shadow-sm"
               >
-                Cancelar
+                {cotizacionLang === 'es' ? 'Cancelar' : 'Cancel'}
               </button>
               <button
                 onClick={() => {
@@ -4833,9 +4839,9 @@ Saludos cordiales.`
                 className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 transform active:scale-95"
               >
                 {actionLoading ? (
-                  <><i className="bi bi-arrow-repeat animate-spin"></i> Generando...</>
+                  <><i className="bi bi-arrow-repeat animate-spin"></i> {cotizacionLang === 'es' ? 'Generando...' : 'Generating...'}</>
                 ) : (
-                  <><i className="bi bi-file-earmark-pdf-fill"></i> Descargar PDF</>
+                  <><i className="bi bi-file-earmark-pdf-fill"></i> {cotizacionLang === 'es' ? 'Descargar PDF' : 'Download PDF'}</>
                 )}
               </button>
               <button
@@ -4847,9 +4853,9 @@ Saludos cordiales.`
                 className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 transform active:scale-95"
               >
                 {actionLoading ? (
-                  <><i className="bi bi-arrow-repeat animate-spin"></i> Enviando...</>
+                  <><i className="bi bi-arrow-repeat animate-spin"></i> {cotizacionLang === 'es' ? 'Enviando...' : 'Sending...'}</>
                 ) : (
-                  <><i className="bi bi-envelope-check-fill"></i> Enviar por Correo</>
+                  <><i className="bi bi-envelope-check-fill"></i> {cotizacionLang === 'es' ? 'Enviar por Correo' : 'Send by Email'}</>
                 )}
               </button>
             </div>
