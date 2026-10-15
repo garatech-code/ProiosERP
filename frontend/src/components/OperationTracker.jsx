@@ -14,9 +14,8 @@ export const STEPS_PRODUCT = [
 export const STEPS_SERVICE = [
     { num: 1, label: 'Solicitud Recibida', shortLabel: 'Recibida', icon: 'bi-file-earmark-text', desc: 'Análisis de servicio' },
     { num: 2, label: 'Cotización enviada', shortLabel: 'Cotización', icon: 'bi-send-check', desc: 'Esperando respuesta' },
-    { num: 3, label: 'Permisos', shortLabel: 'Permisos', icon: 'bi-shield-check', desc: 'Gestión PNA/Aduana' },
-    { num: 4, label: 'Ejecución', shortLabel: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
-    { num: 5, label: 'Cerrar Operación', shortLabel: 'Reporte', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
+    { num: 3, label: 'Ejecución', shortLabel: 'Ejecución', icon: 'bi-tools', desc: 'Trabajo a bordo' },
+    { num: 4, label: 'Cerrar Operación', shortLabel: 'Reporte', icon: 'bi-check-circle-fill', desc: 'Servicio finalizado' },
 ];
 
 export const getActiveTrackerStep = (state, isService) => {
@@ -31,13 +30,12 @@ export const getActiveTrackerStep = (state, isService) => {
             case 'cotizado':
                 return 2;
             case 'permisos_pna':
-                return 3;
             case 'en_ejecucion':
-                return 4;
+                return 3;
             case 'reporte_firmado':
             case 'entregada':
             case 'closed':
-                return 5;
+                return 4;
             default:
                 return 1;
         }
