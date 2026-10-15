@@ -1961,36 +1961,22 @@ export default function OperationDetail() {
 
   const statusBadge = (status) => {
     const colors = {
-      solicitada: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
-      solicitud_servicio: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
-      cotizacion_enviada: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
-      cotizado: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
-      armado_packing: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
-      en_aduana: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
-      permisos_pna: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300',
-      en_ejecucion: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
-      reporte_firmado: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300',
-      lista_para_envio: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
-      remitada: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
-      entregada: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
-      cancelada: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
-      pausada: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+      solicitada: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800',
+      armado_packing: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800',
+      en_aduana: 'bg-orange-100 text-orange-800',
+      lista_para_envio: 'bg-green-100 dark:bg-green-900/30 text-green-800',
+      remitada: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800',
+      entregada: 'bg-gray-100 text-gray-800',
+      cancelada: 'bg-red-100 dark:bg-red-900/30 text-red-800',
     };
     const labels = {
       solicitada: 'Preparación',
-      solicitud_servicio: 'Solicitud Servicio',
-      cotizacion_enviada: 'Cotización Enviada',
-      cotizado: 'Cotizado',
       armado_packing: 'Suministros',
       en_aduana: 'Aduanas',
-      permisos_pna: 'Permisos PNA',
-      en_ejecucion: 'En Ejecución',
-      reporte_firmado: 'Reporte Firmado',
       lista_para_envio: 'Logística',
       remitada: 'Remito Enviado',
       entregada: 'Entregada',
       cancelada: 'Cancelada',
-      pausada: 'Pausada',
     };
     return (
       <span className={`px-3 py-1.5 inline-flex text-xs leading-5 font-black uppercase tracking-wider rounded-lg ${colors[status] || 'bg-gray-100 dark:bg-slate-800/50 text-gray-800 dark:text-slate-200'}`}>
@@ -3712,7 +3698,7 @@ export default function OperationDetail() {
                         <button
                           onClick={() => {
                             if (operation.tipo_operacion === 'servicios') {
-                              handleAction('iniciar_ejecucion_servicio', '¿El cliente ha confirmado la cotización? La operación pasará directamente a Ejecución.');
+                              handleAction('tramitar_permisos_pna', '¿El cliente ha confirmado la cotización? La operación pasará a gestión de PNA.');
                             } else {
                               handleAction('cliente_confirma_producto', '¿El cliente ha confirmado la cotización? La operación pasará a preparación.');
                             }
@@ -3852,12 +3838,13 @@ export default function OperationDetail() {
                         )}
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'cotizado' && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            {/* Removed PNA buttons from here based on user request */}
                             <button
-                              onClick={() => handleAction('iniciar_ejecucion_servicio', '¿Iniciar la ejecución del servicio? La operación pasará directamente a Ejecución.')}
+                              onClick={() => handleAction('tramitar_permisos_pna')}
                               disabled={actionLoading}
-                              className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 text-white hover:bg-indigo-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-400 font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                             >
-                              {actionLoading ? 'Procesando...' : <><i className="bi bi-tools"></i> Iniciar Ejecución</>}
+                              {actionLoading ? 'Procesando...' : <><i className="bi bi-shield-check"></i> Proceder a Permisos</>}
                             </button>
                           </div>
                         )}
@@ -3881,13 +3868,6 @@ export default function OperationDetail() {
                         )}
                         {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && operation.estado === 'en_ejecucion' && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <button
-                              onClick={openPnaModal}
-                              disabled={actionLoading}
-                              className="w-full sm:w-auto px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                            >
-                              <i className="bi bi-file-earmark-pdf"></i> Generar Permiso PNA
-                            </button>
                             <button
                               onClick={() => handleGeneratePdf('generate_reporte_servicio')}
                               disabled={actionLoading}
