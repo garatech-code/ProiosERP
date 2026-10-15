@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -107,11 +107,11 @@ export default function OperationDetail() {
       const scrollPosition = window.scrollY || document.documentElement.scrollTop;
       const windowSize = window.innerHeight;
       const bodyHeight = document.documentElement.scrollHeight;
-      
+
       setShowScrollTop(scrollPosition > 300);
       setShowScrollBottom(scrollPosition + windowSize < bodyHeight - 100);
     };
-    
+
     window.addEventListener('scroll', handleScroll);
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
@@ -170,7 +170,7 @@ export default function OperationDetail() {
   const handleForceState = async () => {
     if (!forceStateSelection) return;
     if (!window.confirm(`¿Estás seguro de forzar el estado de la operación? Esta acción ignorará las validaciones regulares y puede causar inconsistencias.`)) return;
-    
+
     setActionLoading(true);
     try {
       const res = await axios.post(`/operaciones/operations/${id}/force_state/`, { estado: forceStateSelection });
@@ -251,80 +251,90 @@ export default function OperationDetail() {
   const handleSaveNotas = async () => {
     setActionLoading(true);
     try {
-        await axios.patch(`/operaciones/operations/${id}/`, { notes: tempNotas });
-        showToast('Notas internas actualizadas', 'success');
-        setIsEditingNotas(false);
-        fetchOperation();
+      await axios.patch(`/operaciones/operations/${id}/`, { notes: tempNotas });
+      showToast('Notas internas actualizadas', 'success');
+      setIsEditingNotas(false);
+      fetchOperation();
     } catch (error) {
-        console.error("Error al guardar notas:", error);
-        showToast('Error al guardar notas internas', 'error');
+      console.error("Error al guardar notas:", error);
+      showToast('Error al guardar notas internas', 'error');
     } finally {
-        setActionLoading(false);
+      setActionLoading(false);
     }
   };
 
   // -------------------------------------------------------------
-  // Lógica de Expensas: Persistencia (localStorage/DB) y cálculo
+  // Lógica de Expensas: Persistencia (DB/localStorage) y cálculo
   // -------------------------------------------------------------
+  const expensasSaveTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (operation && id) {
-      const isEs = cotizacionLang === 'es';
-      const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
-      const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
-      const defaultHsEn = 'Customs Overtime';
-      const defaultHsEs = 'Hs extra de Aduana';
+      // 1. Cargar desde la base de datos si existen expensas guardadas
+      if (operation.expensas !== undefined && operation.expensas !== null) {
+        let loaded = [];
+        if (Array.isArray(operation.expensas)) {
+          loaded = operation.expensas;
+        } else if (typeof operation.expensas === 'string' && operation.expensas.trim()) {
+          try { loaded = JSON.parse(operation.expensas); } catch (e) { }
+        }
+        if (Array.isArray(loaded)) {
+          // Descartar viejos defaults que nunca fueron modificados
+          const isOldDefault = loaded.length === 2 &&
+            loaded.every(p => (p.descripcion?.includes('Customs') || p.descripcion?.includes('Aduana')) && !p.cantidad && !p.precio);
+          const finalLoaded = isOldDefault ? [] : loaded;
+          setExpensas(finalLoaded);
+          localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(finalLoaded));
+          return;
+        }
+      }
 
-      // 1. Intentar cargar desde localStorage (borrador local sin guardar)
+      // 2. Intentar cargar desde localStorage si hay algo guardado por el usuario
       const draft = localStorage.getItem(`expensas_draft_${id}`);
       if (draft !== null) {
         try {
           const parsed = JSON.parse(draft);
-          setExpensas(parsed);
-          return; // Cargado desde localStorage
+          if (Array.isArray(parsed)) {
+            const isOldDefault = parsed.length === 2 &&
+              parsed.every(p => (p.descripcion?.includes('Customs') || p.descripcion?.includes('Aduana')) && !p.cantidad && !p.precio);
+            if (!isOldDefault) {
+              setExpensas(parsed);
+              return;
+            } else {
+              localStorage.removeItem(`expensas_draft_${id}`);
+            }
+          }
         } catch (e) { }
       }
 
-      // 2. Intentar cargar desde el backend (operation.expensas)
-      if (operation.expensas) {
-        try {
-          const parsed = JSON.parse(operation.expensas);
-          setExpensas(parsed);
-          return; // Cargado exitosamente desde DB
-        } catch (e) { }
-      }
-
-      // 3. Fallback: cargar los defaults vacíos si no hay nada
-      setExpensas([
-        { descripcion: isEs ? defaultAduanaEs : defaultAduanaEn, cantidad: '', unidad: '', precio: '', importe: '' },
-        { descripcion: isEs ? defaultHsEs : defaultHsEn, cantidad: '', unidad: '', precio: '', importe: '' }
-      ]);
+      // 3. Sin opciones precargadas: comenzar con lista vacía
+      setExpensas([]);
+      localStorage.setItem(`expensas_draft_${id}`, JSON.stringify([]));
     }
-  }, [operation, id]);
+  }, [operation?.id, id]);
 
-  // Manejar el cambio de idioma para traducir los campos por defecto (si no fueron modificados)
-  useEffect(() => {
-    const isEs = cotizacionLang === 'es';
-    const defaultAduanaEn = 'Customs and transport to: {{ubicacion}}';
-    const defaultAduanaEs = 'Aduana y transporte hasta: {{ubicacion}}';
-    const defaultHsEn = 'Customs Overtime';
-    const defaultHsEs = 'Hs extra de Aduana';
-
-    if (expensas.length > 0) {
-      setExpensas(prev => prev.map(exp => {
-        let newDesc = exp.descripcion;
-        if (newDesc === defaultAduanaEn || newDesc === defaultAduanaEs) newDesc = isEs ? defaultAduanaEs : defaultAduanaEn;
-        if (newDesc === defaultHsEn || newDesc === defaultHsEs) newDesc = isEs ? defaultHsEs : defaultHsEn;
-        return { ...exp, descripcion: newDesc };
-      }));
+  const handleAddExpensa = async () => {
+    const newExp = [...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }];
+    setExpensas(newExp);
+    localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(newExp));
+    try {
+      await axios.patch(`/operaciones/operations/${id}/`, { expensas: newExp });
+    } catch (err) {
+      console.error('Error al guardar nueva expensa:', err);
     }
-  }, [cotizacionLang]);
+  };
 
-  // Auto-guardar en localStorage ante cada cambio
-  useEffect(() => {
-    if (id) {
-      localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(expensas));
+  const handleDeleteExpensa = async (index) => {
+    const newExp = [...expensas];
+    newExp.splice(index, 1);
+    setExpensas(newExp);
+    localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(newExp));
+    try {
+      await axios.patch(`/operaciones/operations/${id}/`, { expensas: newExp });
+    } catch (err) {
+      console.error('Error al eliminar expensa:', err);
     }
-  }, [expensas, id]);
+  };
 
   // Persistir ajustes comerciales de cotizacion
   useEffect(() => {
@@ -351,11 +361,11 @@ export default function OperationDetail() {
           if (parsed.otrosGastos !== undefined) setOtrosGastos(parsed.otrosGastos);
         } catch (e) { }
       } else {
-         if (operation?.cliente?.contact_person) {
-             setCotizacionAttn(operation.cliente.contact_person);
-         } else if (operation?.cliente?.name) {
-             setCotizacionAttn(operation.cliente.name);
-         }
+        if (operation?.cliente?.contact_person) {
+          setCotizacionAttn(operation.cliente.contact_person);
+        } else if (operation?.cliente?.name) {
+          setCotizacionAttn(operation.cliente.name);
+        }
       }
     }
   }, [id, operation]);
@@ -369,10 +379,10 @@ export default function OperationDetail() {
     }
   }, [id, offerValidity, paymentTerms, includeVat, vatPercentage, includeDiscount, discountType, discountValue, deliveryTime, lugarEntrega, cotizacionAttn, scopeIncludes, scopeExcludes, cotizacionNotes, cotizacionTemplate, cotizacionLang, otrosGastos]);
 
-  // Handler centralizado para cambios en expensas (con auto-cálculo)
+  // Handler centralizado para cambios en expensas (con auto-cálculo y persistencia)
   const handleExpensaChange = (index, field, value) => {
     const newExp = [...expensas];
-    newExp[index][field] = value;
+    newExp[index] = { ...newExp[index], [field]: value };
 
     if (field === 'cantidad' || field === 'precio') {
       const parseVal = (v) => parseFloat(String(v).replace(',', '.'));
@@ -385,6 +395,16 @@ export default function OperationDetail() {
       }
     }
     setExpensas(newExp);
+    localStorage.setItem(`expensas_draft_${id}`, JSON.stringify(newExp));
+
+    if (expensasSaveTimeoutRef.current) clearTimeout(expensasSaveTimeoutRef.current);
+    expensasSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await axios.patch(`/operaciones/operations/${id}/`, { expensas: newExp });
+      } catch (err) {
+        console.error('Error auto-guardando expensas:', err);
+      }
+    }, 600);
   };
 
   useEffect(() => {
@@ -1212,6 +1232,57 @@ export default function OperationDetail() {
     }
   };
 
+  const handleToggleIngresoPuerto = async () => {
+    const newValue = !operation.ingreso_puerto_listo;
+    setOperation(prev => ({ ...prev, ingreso_puerto_listo: newValue }));
+    try {
+      await axios.patch(`/operaciones/operations/${id}/`, {
+        ingreso_puerto_listo: newValue
+      });
+      showToast(newValue ? 'Ingreso a Puerto marcado como listo' : 'Ingreso a Puerto marcado como pendiente', 'success');
+    } catch (err) {
+      console.error(err);
+      setOperation(prev => ({ ...prev, ingreso_puerto_listo: !newValue }));
+      showToast('Error al actualizar el estado de Ingreso a Puerto', 'error');
+    }
+  };
+
+  const handleUploadIngresoPuerto = async (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('archivos', files[i]);
+    }
+    formData.append('tipo', 'ingreso_puerto');
+    try {
+      await axios.post(`/operaciones/operations/${id}/upload_ingreso_puerto/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      showToast(files.length > 1 ? `${files.length} archivos subidos correctamente` : 'Archivo subido correctamente', 'success');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al subir archivos de Ingreso a Puerto', 'error');
+    } finally {
+      setUploading(false);
+      event.target.value = null;
+    }
+  };
+
+  const handleDeleteIngresoPuertoDoc = async (docId) => {
+    if (!window.confirm('¿Eliminar este archivo de Ingreso a Puerto?')) return;
+    try {
+      await axios.delete(`/operaciones/operations/${id}/documentos/${docId}/`);
+      showToast('Archivo eliminado', 'success');
+      fetchOperation();
+    } catch (err) {
+      console.error(err);
+      showToast('Error al eliminar el archivo', 'error');
+    }
+  };
+
   const previewExcelFile = async (url) => {
     try {
       const response = await axios.get(url, {
@@ -1783,15 +1854,17 @@ export default function OperationDetail() {
     return operation.products.reduce((sum, p) => sum + (p.quantity * p.unit_price), 0);
   };
 
-  const isOperario = user?.role === 'OPERARIO';
-  const isOwner = user?.role === 'OWNER';
+  const isClosed = operation?.estado === 'entregada' || operation?.status === 'closed';
+  const isCancelled = operation?.estado === 'cancelada' || operation?.status === 'cancelled';
+  const isFinished = isClosed || isCancelled;
+
   const isSenior = user?.role === 'OPERADOR';
   const isJunior = user?.role === 'OPERADOR_JR';
   const canClose = isOwner || isSenior;
-  const canEdit = isOwner || (isOperador && (
+  const canEdit = !isFinished && (isOwner || (isOperador && (
     operation?.creado_por === user?.id ||
     (operation?.operadores_id && operation.operadores_id.includes(user?.id))
-  ));
+  )));
 
   if (loading) return <div className="flex justify-center mt-20"><LogoSpinner size="w-16 h-16" /></div>;
   if (error) return <div className="text-center text-red-600 mt-10 font-bold bg-red-50 dark:bg-red-900/20 p-4 rounded-xl max-w-lg mx-auto">{error}</div>;
@@ -2088,10 +2161,12 @@ export default function OperationDetail() {
                   <i className="bi bi-card-list"></i> Gestionar Herramientas
                 </button>
               )}
-              <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
-                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-              </label>
+              {canEdit && (
+                <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir PDF Externo
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_solicitud_particular', '¿Subir documento externo para Solicitud Particular?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              )}
             </div>
           </div>
         </div>
@@ -2107,79 +2182,74 @@ export default function OperationDetail() {
           <h3 className="text-lg leading-6 font-black text-slate-900 dark:text-white flex items-center gap-2">
             <i className="bi bi-cash-stack text-emerald-500"></i> Expensas (Gastos Detallados)
           </h3>
-          <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
-            <button
-              onClick={() => setCotizacionLang('es')}
-              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'es' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-            >
-              ES
-            </button>
-            <button
-              onClick={() => setCotizacionLang('en')}
-              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${cotizacionLang === 'en' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-            >
-              EN
-            </button>
-          </div>
         </div>
 
         <div className="space-y-2">
-          {expensas.map((exp, index) => (
-            <div key={index} className="flex gap-2 items-start">
-              <input
-                type="text"
-                placeholder="Descripción"
-                className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                value={exp.descripcion}
-                onChange={(e) => handleExpensaChange(index, 'descripcion', e.target.value)}
-              />
-              <FormattedNumberInput
-                placeholder="Cant."
-                className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                value={exp.cantidad}
-                onChange={(val) => handleExpensaChange(index, 'cantidad', val)}
-              />
-              <input
-                type="text"
-                placeholder="Unid."
-                className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                value={exp.unidad}
-                onChange={(e) => handleExpensaChange(index, 'unidad', e.target.value)}
-              />
-              <FormattedNumberInput
-                placeholder="Precio"
-                className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                value={exp.precio}
-                onChange={(val) => handleExpensaChange(index, 'precio', val)}
-              />
-              <FormattedNumberInput
-                placeholder="Importe"
-                className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2"
-                value={exp.importe}
-                onChange={(val) => handleExpensaChange(index, 'importe', val)}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const newExp = [...expensas];
-                  newExp.splice(index, 1);
-                  setExpensas(newExp);
-                }}
-                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
-                title="Eliminar fila"
-              >
-                <i className="bi bi-trash-fill"></i>
-              </button>
-            </div>
-          ))}
+          {expensas.length === 0 ? (
+            <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1">No hay expensas cargadas.</p>
+          ) : (
+            expensas.map((exp, index) => (
+              <div key={index} className="flex gap-2 items-start">
+                <input
+                  type="text"
+                  placeholder="Descripción"
+                  disabled={!canEdit}
+                  className="flex-1 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2 disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  value={exp.descripcion}
+                  onChange={(e) => handleExpensaChange(index, 'descripcion', e.target.value)}
+                />
+                <FormattedNumberInput
+                  placeholder="Cant."
+                  disabled={!canEdit}
+                  className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2 disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  value={exp.cantidad}
+                  onChange={(val) => handleExpensaChange(index, 'cantidad', val)}
+                />
+                <input
+                  type="text"
+                  placeholder="Unid."
+                  disabled={!canEdit}
+                  className="w-16 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2 disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  value={exp.unidad}
+                  onChange={(e) => handleExpensaChange(index, 'unidad', e.target.value)}
+                />
+                <FormattedNumberInput
+                  placeholder="Precio"
+                  disabled={!canEdit}
+                  className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2 disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  value={exp.precio}
+                  onChange={(val) => handleExpensaChange(index, 'precio', val)}
+                />
+                <FormattedNumberInput
+                  placeholder="Importe"
+                  disabled={!canEdit}
+                  className="w-20 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs p-2 disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                  value={exp.importe}
+                  onChange={(val) => handleExpensaChange(index, 'importe', val)}
+                />
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteExpensa(index)}
+                    className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors mt-0.5"
+                    title="Eliminar fila"
+                  >
+                    <i className="bi bi-trash-fill"></i>
+                  </button>
+                )}
+              </div>
+            ))
+          )}
         </div>
-        <button
-          type="button"
-          onClick={() => setExpensas([...expensas, { descripcion: '', cantidad: '', unidad: '', precio: '', importe: '' }])}
-          className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-        >
-          <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={handleAddExpensa}
+            className="mt-4 text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          >
+            <i className="bi bi-plus-circle-fill"></i> Añadir fila de expensa
+          </button>
+        )}
       </div>
 
       {/* Generate Cotizacion (PDF) Box - Unified for Products and Services */}
@@ -2328,6 +2398,127 @@ export default function OperationDetail() {
             </div>
           )}
 
+          {/* Ingreso a Puerto (Exclusivo si delivery_method === 'muelle') */}
+          {operation.delivery_method === 'muelle' && (() => {
+            const ingresoDocs = (documentos || []).filter(d => d.tipo === 'ingreso_puerto');
+            return (
+              <div className="flex flex-col p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Ingreso a Puerto</h4>
+                      {operation.ingreso_puerto_listo ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                          <i className="bi bi-check-circle-fill"></i> Listo
+                        </span>
+                      ) : ingresoDocs.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                          <i className="bi bi-file-earmark-check-fill"></i> {ingresoDocs.length} {ingresoDocs.length === 1 ? 'adjunto' : 'adjuntos'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                          Pendiente
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Permiso o documentación de ingreso a muelle/puerto. Puedes subir múltiples archivos o marcarlo como listo.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+                    <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-bold px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!operation.ingreso_puerto_listo}
+                        onChange={handleToggleIngresoPuerto}
+                        disabled={!canEdit || (isOperador && operation.estado_revision === 'rejected')}
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+                      />
+                      <span>Listo</span>
+                    </label>
+
+                    {canEdit && (
+                      <label className={`cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <i className="bi bi-cloud-arrow-up-fill"></i> Subir Archivos
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={handleUploadIngresoPuerto}
+                          disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista de archivos subidos para Ingreso a Puerto */}
+                {ingresoDocs.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {ingresoDocs.map((doc) => {
+                      const isImage = doc.archivo?.match(/\.(jpe?g|png|gif|bmp|webp)$/i);
+                      const isPdf = doc.archivo?.match(/\.pdf$/i);
+                      const isExcel = doc.archivo?.match(/\.xlsx?$/i);
+                      let iconClass = "bi-file-earmark-fill text-slate-400";
+                      if (isImage) iconClass = "bi-file-earmark-image text-indigo-500";
+                      else if (isPdf) iconClass = "bi-file-earmark-pdf text-red-500";
+                      else if (isExcel) iconClass = "bi-file-earmark-excel text-emerald-500";
+
+                      const fileName = doc.archivo ? doc.archivo.split('/').pop() : 'Documento';
+
+                      return (
+                        <div key={doc.id} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 text-xs">
+                          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                            <i className={`bi ${iconClass} text-lg shrink-0`}></i>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={fileName}>
+                                {fileName}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {doc.fecha_subida ? new Date(doc.fecha_subida).toLocaleDateString() : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => openPreview(getMediaUrl(doc.archivo), 'Ingreso a Puerto')}
+                              className="px-2 py-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded font-bold transition-colors"
+                              title="Ver documento"
+                            >
+                              <i className="bi bi-eye-fill"></i>
+                            </button>
+                            <a
+                              href={getMediaUrl(doc.archivo)}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded font-bold transition-colors"
+                              title="Descargar"
+                            >
+                              <i className="bi bi-download"></i>
+                            </a>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteIngresoPuertoDoc(doc.id)}
+                                className="px-2 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded font-bold transition-colors"
+                                title="Eliminar archivo"
+                              >
+                                <i className="bi bi-trash-fill"></i>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {(operation.tipo_operacion !== 'servicios' || leaveMaterials) && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-700/50 shadow-sm hover:shadow-md transition-shadow gap-4">
               <div>
@@ -2342,10 +2533,12 @@ export default function OperationDetail() {
                   </button>
                 )}
               </div>
-              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
-                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-              </label>
+              {canEdit && (
+                <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir Remito
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_remito', '¿Subir remito firmado?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              )}
             </div>
           )}
 
@@ -2363,10 +2556,12 @@ export default function OperationDetail() {
                   </button>
                 )}
               </div>
-              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
-                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-              </label>
+              {canEdit && (
+                <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir Rancho
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_rancho', '¿Subir documentación aduanera (rancho)?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              )}
             </div>
           )}
 
@@ -2398,10 +2593,12 @@ export default function OperationDetail() {
                 >
                   <i className="bi bi-file-earmark-spreadsheet"></i> Exportar
                 </button>
-                <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir
-                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-                </label>
+                {canEdit && (
+                  <label className={`flex-1 sm:flex-none justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <i className="bi bi-cloud-arrow-up-fill"></i> Subir
+                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_lista_ingredientes', '¿Subir lista de ingredientes externa?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                  </label>
+                )}
               </div>
             </div>
           )}
@@ -2421,10 +2618,12 @@ export default function OperationDetail() {
                   </button>
                 )}
               </div>
-              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Reporte
-                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_reporte', '¿Subir reporte?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-              </label>
+              {canEdit && (
+                <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <i className="bi bi-cloud-arrow-up-fill"></i> Subir Reporte
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_reporte', '¿Subir reporte?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+                </label>
+              )}
             </div>
           )}
 
@@ -2442,10 +2641,12 @@ export default function OperationDetail() {
                 </button>
               )}
             </div>
-            <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
-              <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
-              <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
-            </label>
+            {canEdit && (
+              <label className={`w-full sm:w-auto justify-center cursor-pointer px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900/20 hover:text-indigo-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shrink-0 ${uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected') ? 'opacity-50 pointer-events-none' : ''}`}>
+                <i className="bi bi-cloud-arrow-up-fill"></i> Subir Factura
+                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'upload_factura', '¿Subir factura de la operación?')} disabled={uploading || !canEdit || (isOperador && operation.estado_revision === 'rejected')} />
+              </label>
+            )}
           </div>
         </div>
       </div>
@@ -2527,6 +2728,24 @@ export default function OperationDetail() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {isClosed && (
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-emerald-500 p-4 rounded-r-xl mb-6 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-800/50 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                <i className="bi bi-shield-lock-fill text-xl"></i>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wider">
+                  Operación Cerrada y Bloqueada
+                </h3>
+                <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">
+                  Esta operación ha concluido su ciclo operativo. Toda la información, el detalle de carga y la documentación se encuentran protegidos de forma permanente.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {operation.estado === 'pausada' && (
           <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded-r-xl mb-6 shadow-sm">
             <div className="flex">
@@ -2577,6 +2796,68 @@ export default function OperationDetail() {
         )}
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* BANNER DE ALERTA DE INACTIVIDAD (24H ENVIADA A EVA PROIOS) */}
+          {operation.alerta_inactividad_24h_enviada && !isClosed && !isCancelled && (
+            <div className="mb-6 bg-red-50 dark:bg-red-950/40 border-l-4 border-red-500 p-4 sm:p-5 rounded-r-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 flex items-center justify-center shrink-0 mt-0.5">
+                  <i className="bi bi-clock-history text-xl"></i>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-red-900 dark:text-red-200 font-extrabold text-sm uppercase tracking-wide">
+                      Alerta de Inactividad (+24hs sin avances)
+                    </h4>
+                    <span className="px-2.5 py-0.5 bg-red-600 text-white text-[10px] font-black rounded-full uppercase tracking-wider">
+                      Notificado a eva@proios.com
+                    </span>
+                  </div>
+                  <p className="text-red-700 dark:text-red-300 text-xs mt-1 leading-relaxed">
+                    Esta operación ha superado el plazo de 24 horas ({operation.horas_sin_avances || 24} hs) sin avances en la cotización o fase inicial. Se ha notificado automáticamente a Gerencia desde <strong>operations@proios.com</strong>.
+                  </p>
+                  {operation.fecha_alerta_inactividad_24h && (
+                    <p className="text-red-500 dark:text-red-400 text-[11px] mt-1 font-medium">
+                      <i className="bi bi-envelope-check mr-1"></i> Correo enviado el {new Date(operation.fecha_alerta_inactividad_24h).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BANNER DE CONTADOR 24H ACTIVO */}
+          {operation.fecha_inicio_control_operador && !operation.presenta_avances && !isClosed && !isCancelled && !operation.alerta_inactividad_24h_enviada && operation.estado !== 'pausada' && (
+            <div className="mb-6 bg-amber-50 dark:bg-amber-950/30 border-l-4 border-amber-500 p-4 sm:p-5 rounded-r-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 animate-pulse mt-0.5">
+                  <i className="bi bi-stopwatch-fill text-xl"></i>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-amber-900 dark:text-amber-200 font-bold text-sm">
+                      Plazo de Primer Avance (Control 24hs)
+                    </h4>
+                    <span className="px-2 py-0.5 bg-amber-500 text-slate-900 text-[10px] font-black rounded-full uppercase">
+                      En Curso
+                    </span>
+                  </div>
+                  <p className="text-amber-700 dark:text-amber-300 text-xs mt-1 leading-relaxed">
+                    Iniciado el {new Date(operation.fecha_inicio_control_operador).toLocaleString()}. Si transcurren 24 horas sin enviar la cotización ni registrar avances, se emitirá una alerta automática a <strong>eva@proios.com</strong>.
+                  </p>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-slate-800 px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60 shadow-sm flex items-center gap-3 shrink-0 self-start sm:self-auto">
+                <i className="bi bi-hourglass-split text-amber-600 dark:text-amber-400 text-lg"></i>
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">Tiempo Restante</div>
+                  <div className="text-sm font-black text-amber-700 dark:text-amber-300">
+                    {operation.tiempo_restante_24h !== null && operation.tiempo_restante_24h !== undefined ? `${operation.tiempo_restante_24h} hs` : 'Calculando...'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* BANNER DE REVISIÓN */}
           {operation.estado_revision === 'pending' && (
@@ -2765,6 +3046,11 @@ export default function OperationDetail() {
                       <dt className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Agencia / Entrega</dt>
                       <dd className="text-sm font-semibold text-slate-900 dark:text-white">
                         {operation.agency_name || 'Sin agencia'} • <span className="capitalize">{operation.delivery_method}</span>
+                        {operation.delivery_method === 'lancha' && operation.detalle_lugar_entrega && (
+                          <span className="block sm:inline sm:ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+                            (Salida: {operation.detalle_lugar_entrega})
+                          </span>
+                        )}
                       </dd>
                     </div>
                     <div className="px-4 py-4 sm:px-6 border-b border-slate-100 dark:border-slate-700">
@@ -3026,7 +3312,7 @@ export default function OperationDetail() {
               {/* DOCUMENTOS ADICIONALES (NUEVO) */}
               <OperationDocuments
                 operacionId={operation.id}
-                documentos={documentos}
+                documentos={(documentos || []).filter(d => d.tipo !== 'ingreso_puerto')}
                 onDocumentChange={refreshDocuments}
                 openPreview={openPreview}
                 selectedDocs={selectedDocs}
@@ -3122,10 +3408,17 @@ export default function OperationDetail() {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
                   <div className="text-white w-full sm:w-auto text-center sm:text-left">
                     <h4 className="font-black text-lg">Controles Operativos</h4>
-                    <p className="text-xs text-slate-400 font-medium">Avanza la operación a la siguiente fase.</p>
+                    <p className="text-xs text-slate-400 font-medium">
+                      {isClosed ? 'Operación cerrada y finalizada con éxito.' : 'Avanza la operación a la siguiente fase.'}
+                    </p>
                   </div>
 
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto sm:justify-end">
+                    {isClosed && (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-sm font-bold shadow-sm">
+                        <i className="bi bi-check-circle-fill text-emerald-400"></i> Operación Finalizada
+                      </div>
+                    )}
                     {isOwner && operation.status !== 'closed' && operation.estado !== 'entregada' && operation.status !== 'cancelled' && operation.estado !== 'cancelada' && (
                       <button
                         onClick={() => handleAction('cancel_operation', '¿Cancelar esta operación? Se marcará como cancelada y el stock consumido se devolverá automáticamente al inventario.')}
@@ -3153,7 +3446,7 @@ export default function OperationDetail() {
                         </button>
                       </div>
                     )}
-                    
+
                     {isOwner && (operation.estado === 'cancelada' || operation.status === 'cancelled') && (
                       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <button
@@ -3483,7 +3776,6 @@ export default function OperationDetail() {
                   </div>
                 </div>
               )}
-
             </div>
 
             <div className="lg:col-span-1 sticky top-20 self-start space-y-6">
@@ -3507,7 +3799,7 @@ export default function OperationDetail() {
                 </div>
               ) : (
                 <>
-                  <OperationTracker currentState={operation.status || operation.estado} operationType={operation.tipo_operacion} />
+                  <OperationTracker currentState={operation.status || operation.estado} operationType={operation.tipo_operacion} operation={operation} />
 
                   {/* Notas Internas */}
                   <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-2xl shadow-sm p-4 sm:p-5">
@@ -3520,9 +3812,11 @@ export default function OperationDetail() {
                            {actionLoading ? 'Guardando...' : 'Guardar'}
                         </button>
                       ) : (
-                        <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
-                          Editar
-                        </button>
+                        canEdit && (
+                          <button onClick={() => setIsEditingNotas(true)} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 px-3 py-1 rounded-lg font-bold transition-colors">
+                            Editar
+                          </button>
+                        )
                       )}
                     </div>
                     {isEditingNotas ? (
@@ -4218,7 +4512,7 @@ Saludos cordiales.`
                         <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Taxes (VAT)</p>
+                              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Impuestos (IVA)</p>
                               <p className="text-xs text-slate-500">Aplicar impuestos</p>
                             </div>
                             <button
@@ -4553,39 +4847,39 @@ Saludos cordiales.`
           <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100 dark:border-slate-700 animate-fadeIn">
             <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Forzar Estado Manualmente</h3>
             <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-3 mb-6 rounded-r">
-                <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
-                    <i className="bi bi-exclamation-triangle-fill mr-1"></i>
-                    Atención: Mover la operación manualmente ignorará validaciones como cargar documentos. Si cierras la operación esto no aplicará.
-                </p>
+              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                <i className="bi bi-exclamation-triangle-fill mr-1"></i>
+                Atención: Mover la operación manualmente ignorará validaciones como cargar documentos. Si cierras la operación esto no aplicará.
+              </p>
             </div>
-            
+
             <div className="mb-6">
-                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Seleccione el estado destino</label>
-                <select
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                    value={forceStateSelection}
-                    onChange={(e) => setForceStateSelection(e.target.value)}
-                >
-                    <option value="">Seleccione un estado...</option>
-                    <option value="recibida">Recibida</option>
-                    <option value="cotizacion_enviada">Cotización Enviada</option>
-                    <option value="solicitada">Solicitada (Preparación)</option>
-                    <option value="armado_packing">En Gestión (Packing List)</option>
-                    <option value="en_aduana">En Aduana</option>
-                    <option value="lista_para_envio">Logística / Lista para envío</option>
-                    <option value="remitada">Remitada / Entregada en Sitio</option>
-                    
-                    <option disabled>──────────</option>
-                    
-                    <option value="solicitud_servicio">Solicitud de Servicio</option>
-                    <option value="cotizado">Servicio Cotizado</option>
-                    <option value="permisos_pna">Permisos PNA</option>
-                    <option value="en_ejecucion">En Ejecución</option>
-                    <option value="reporte_firmado">Reporte Firmado</option>
-                    
-                    <option disabled>──────────</option>
-                    <option value="pausada">Pausada</option>
-                </select>
+              <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Seleccione el estado destino</label>
+              <select
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                value={forceStateSelection}
+                onChange={(e) => setForceStateSelection(e.target.value)}
+              >
+                <option value="">Seleccione un estado...</option>
+                <option value="recibida">Recibida</option>
+                <option value="cotizacion_enviada">Cotización Enviada</option>
+                <option value="solicitada">Solicitada (Preparación)</option>
+                <option value="armado_packing">En Gestión (Packing List)</option>
+                <option value="en_aduana">En Aduana</option>
+                <option value="lista_para_envio">Logística / Lista para envío</option>
+                <option value="remitada">Remitada / Entregada en Sitio</option>
+
+                <option disabled>──────────</option>
+
+                <option value="solicitud_servicio">Solicitud de Servicio</option>
+                <option value="cotizado">Servicio Cotizado</option>
+                <option value="permisos_pna">Permisos PNA</option>
+                <option value="en_ejecucion">En Ejecución</option>
+                <option value="reporte_firmado">Reporte Firmado</option>
+
+                <option disabled>──────────</option>
+                <option value="pausada">Pausada</option>
+              </select>
             </div>
 
             <div className="flex gap-3">
@@ -4615,10 +4909,10 @@ Saludos cordiales.`
         />
       )}
 
-      <GenerateRemitoModal 
-        isOpen={isRemitoModalOpen} 
-        onClose={() => setIsRemitoModalOpen(false)} 
-        operationId={id} 
+      <GenerateRemitoModal
+        isOpen={isRemitoModalOpen}
+        onClose={() => setIsRemitoModalOpen(false)}
+        operationId={id}
         showToast={showToast}
       />
 

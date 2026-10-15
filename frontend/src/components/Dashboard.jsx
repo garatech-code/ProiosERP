@@ -143,7 +143,9 @@ export default function Dashboard() {
 
   const handleSuccess = (id) => {
     closeForms();
-    navigate(`/operations/${id}`);
+    if (id) {
+      window.open(`/operations/${id}`, '_blank');
+    }
   };
 
   return (

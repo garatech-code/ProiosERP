@@ -17,6 +17,7 @@ import NotificationMenu from '../components/NotificationMenu';
 import { useTheme } from '../context/ThemeContext';
 import { useTourStore } from '../stores/tourStore';
 import LogoSpinner from '../components/LogoSpinner';
+import RegistrosManagement from '../components/RegistrosManagement';
 import AppVersionInfo from '../components/AppVersionInfo';
 import OperationHistoryModal from '../components/OperationHistoryModal';
 
@@ -311,9 +312,19 @@ export default function OperadorDashboard() {
         return [...evts, ...holEvts, ...agendaEvts];
     }, [operations, holidays, agendaEvents]);
 
-    const handleFormSuccess = () => {
+    const handleFormSuccess = (createdOrUpdatedId) => {
+        const isCreation = !operationModalState.id;
+        const targetId = typeof createdOrUpdatedId === 'object' && createdOrUpdatedId !== null
+            ? createdOrUpdatedId.id
+            : createdOrUpdatedId;
+
         setOperationModalState({ isOpen: false, type: null, id: null });
+        setEmailSource(null);
         fetchData();
+
+        if (isCreation && targetId) {
+            window.open(`/operations/${targetId}`, '_blank');
+        }
     };
 
     const eventStyleGetter = (event) => {
@@ -543,6 +554,10 @@ export default function OperadorDashboard() {
                         <i className="bi bi-box-seam text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Inventario & Fórmulas</span>}
                     </button>
+                    <button title={!isSidebarOpen ? "Registros" : ""} onClick={() => setActiveTab('registros')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'registros' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-journal-bookmark text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Registros</span>}
+                    </button>
                 </div>
 
                 <div className={`border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
@@ -621,6 +636,10 @@ export default function OperadorDashboard() {
                     <i className="bi relative bi-envelope-open text-xl"></i>
                     <span className="text-[10px] mt-1 font-semibold">Correo</span>
                 </button>
+                <button onClick={() => setActiveTab('registros')} className={`flex flex-col items-center p-2 ${activeTab === 'registros' ? 'text-indigo-600' : 'text-gray-400'}`}>
+                    <i className="bi bi-journal-bookmark text-xl"></i>
+                    <span className="text-[10px] mt-1 font-semibold">Registros</span>
+                </button>
             </div>
 
             {/* Main Content Area */}
@@ -633,14 +652,15 @@ export default function OperadorDashboard() {
                             {activeTab === 'operations' && 'Gestión Operativa'}
                             {activeTab === 'inbox' && 'Tráfico Marítimo'}
                             {activeTab === 'inventory' && 'Inventario y Fórmulas'}
+                            {activeTab === 'registros' && 'Directorio de Registros'}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
-                            {activeTab === 'operations' ? 'Gestiona la logística y cumplimiento de las operaciones.' : 'Bandeja de gestión de oficina.'}
+                            {activeTab === 'operations' ? 'Gestiona la logística y cumplimiento de las operaciones.' : activeTab === 'registros' ? 'Directorio central de clientes y agencias marítimas de la empresa.' : 'Bandeja de gestión de oficina.'}
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
                         <NotificationMenu />
-                        {activeTab !== 'inventory' && (
+                        {activeTab !== 'inventory' && activeTab !== 'registros' && (
                             <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="tour-new-op-btn bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                                 <i className="bi bi-plus-lg text-lg"></i>
                                 Nueva Operación
@@ -668,6 +688,7 @@ export default function OperadorDashboard() {
                             {activeTab === 'calendar' && renderCalendar()}
                             {activeTab === 'inbox' && <InboxView onCreateFromEmail={handleCreateFromEmail} />}
                             {activeTab === 'inventory' && <InventoryManagement />}
+                            {activeTab === 'registros' && <RegistrosManagement />}
                         </>
                     )}
                 </div>

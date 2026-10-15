@@ -3,6 +3,8 @@ from django.conf import settings
 from django_fsm import FSMField, transition, RETURN_VALUE
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
 
 
 class Client(models.Model):
@@ -134,6 +136,7 @@ class Operacion(models.Model):
     )
     detalle_servicio = models.TextField(blank=True, null=True, help_text="Descripción detallada para operaciones de tipo Servicio.")
     items_cotizacion_servicio = models.JSONField(blank=True, null=True, default=list, help_text="Items estructurados de servicio para cotizacion")
+    expensas = models.JSONField(blank=True, null=True, default=list, help_text="Listado estructurado de expensas (gastos detallados)")
     valor_servicio = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Valor monetario del trabajo a realizar")
     subtipo_servicio = models.CharField(max_length=100, blank=True, null=True, help_text="Categoría específica del servicio (Mecanica, Electricidad, etc.)")
     forma_cotizacion_servicio = models.CharField(max_length=20, choices=COTIZACION_CHOICES, blank=True, null=True)
@@ -149,9 +152,15 @@ class Operacion(models.Model):
     factura_file = models.FileField(upload_to='facturas/', null=True, blank=True)
     reporte_file = models.FileField(upload_to='reportes/', null=True, blank=True)
     lista_ingredientes_file = models.FileField(upload_to='lista_ingredientes/', null=True, blank=True)
+    ingreso_puerto_listo = models.BooleanField(default=False, help_text="Indica si el Ingreso a Puerto está listo cuando el método de entrega es muelle")
     stock_consumido = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    # Control de inactividad de operador (alerta de 24 horas)
+    fecha_inicio_control_operador = models.DateTimeField(null=True, blank=True, help_text="Fecha y hora de inicio del control de inactividad (creación por operador o asignación)")
+    alerta_inactividad_24h_enviada = models.BooleanField(default=False, help_text="Indica si se envió la alerta de inactividad de 24hs a Eva Proios")
+    fecha_alerta_inactividad_24h = models.DateTimeField(null=True, blank=True, help_text="Fecha y hora de envío de la alerta de 24hs a Eva Proios")
 
     ESTADO_REVISION_NONE = 'none'
     ESTADO_REVISION_PENDING = 'pending'
@@ -186,6 +195,36 @@ class Operacion(models.Model):
 
     def __str__(self):
         return f"OP-{self.pk:05d} : {self.cliente} ({self.get_estado_display()})"
+
+    @property
+    def presenta_avances(self):
+        """
+        Determina si la operación ya presenta avances operativos posteriores a la creación/asignación:
+        - Cotización enviada / fecha de cotización registrada
+        - Estado posterior a la fase inicial (no es 'recibida', 'solicitud_servicio' ni 'solicitada' sin cotizar)
+        - Documentos de despacho, packing list o reporte cargados
+        """
+        if self.quotation_sent_date is not None:
+            return True
+        if self.estado not in [self.ESTADO_RECIBIDA, self.ESTADO_SOLICITUD_SERVICIO, self.ESTADO_SOLICITADA]:
+            return True
+        if self.packing_list_file or self.reporte_file or self.factura_file or self.remito_file:
+            return True
+        return False
+
+    @property
+    def horas_sin_avances(self):
+        if not self.fecha_inicio_control_operador or self.presenta_avances:
+            return 0.0
+        delta = timezone.now() - self.fecha_inicio_control_operador
+        return max(0.0, round(delta.total_seconds() / 3600, 1))
+
+    @property
+    def tiempo_restante_24h(self):
+        if not self.fecha_inicio_control_operador or self.presenta_avances:
+            return None
+        horas = self.horas_sin_avances
+        return max(0.0, round(24.0 - horas, 1))
 
     @transition(field=estado, source=[ESTADO_RECIBIDA, ESTADO_COTIZACION_ENVIADA, ESTADO_PAUSADA], target=ESTADO_COTIZACION_ENVIADA)
     def cotizar_producto(self):
@@ -400,6 +439,7 @@ class DocumentoAdjunto(models.Model):
     TIPO_SOLICITUD_PARTICULAR = 'solicitud_particular'
     TIPO_REPORTE_SERVICIO = 'reporte_servicio'
     
+    TIPO_INGRESO_PUERTO = 'ingreso_puerto'
     TIPO_OTROS = 'otros'
 
     TIPO_CHOICES = (
@@ -412,6 +452,7 @@ class DocumentoAdjunto(models.Model):
         (TIPO_SOLICITUD_PARTICULAR, 'Solicitud Particular'),
         (TIPO_REPORTE_SERVICIO, 'Reporte de Servicio'),
         
+        (TIPO_INGRESO_PUERTO, 'Ingreso a Puerto'),
         (TIPO_OTROS, 'Otros'),
     )
 
@@ -488,4 +529,15 @@ class HistorialEstadoOperacion(models.Model):
     def __str__(self):
         return f"OP-{self.operacion_id}: {self.estado_anterior} -> {self.estado_nuevo} ({self.fecha})"
 
-
+
+@receiver(m2m_changed, sender=Operacion.operadores_asignados.through)
+def on_operadores_asignados_changed(sender, instance, action, **kwargs):
+    """
+    Inicia el contador de control cuando se asigna al menos un operador a la operación
+    y aún no tiene fecha de inicio de control.
+    """
+    if action in ['post_add', 'post_set'] and instance.operadores_asignados.exists():
+        if not instance.fecha_inicio_control_operador:
+            instance.fecha_inicio_control_operador = timezone.now()
+            instance.save(update_fields=['fecha_inicio_control_operador'])
+

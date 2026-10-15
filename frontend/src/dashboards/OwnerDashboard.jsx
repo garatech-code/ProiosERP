@@ -20,6 +20,7 @@ import LogoSpinner from '../components/LogoSpinner';
 import StockMovements from '../components/StockMovements'; // NUEVO
 import UserManagement from '../components/UserManagement';
 import SeguimientoOperadores from '../components/SeguimientoOperadores';
+import RegistrosManagement from '../components/RegistrosManagement';
 import AppVersionInfo from '../components/AppVersionInfo';
 import TarifarioModal from '../components/TarifarioModal';
 import OperationHistoryModal from '../components/OperationHistoryModal';
@@ -362,9 +363,19 @@ export default function OwnerDashboard() {
         );
     };
 
-    const handleFormSuccess = () => {
+    const handleFormSuccess = (createdOrUpdatedId) => {
+        const isCreation = !operationModalState.id;
+        const targetId = typeof createdOrUpdatedId === 'object' && createdOrUpdatedId !== null
+            ? createdOrUpdatedId.id
+            : createdOrUpdatedId;
+
         setOperationModalState({ isOpen: false, type: null, id: null });
+        setEmailSource(null);
         fetchData();
+
+        if (isCreation && targetId) {
+            window.open(`/operations/${targetId}`, '_blank');
+        }
     };
 
     const calendarEvents = useMemo(() => {
@@ -1219,6 +1230,10 @@ export default function OwnerDashboard() {
                         <i className="bi bi-activity text-lg shrink-0"></i>
                         {isSidebarOpen && <span>Seguimiento Ops</span>}
                     </button>
+                    <button title={!isSidebarOpen ? "Registros" : ""} onClick={() => setActiveTab('registros')} className={`flex items-center rounded-xl font-medium text-sm transition-all ${isSidebarOpen ? 'w-full gap-3 px-3 py-2.5' : 'w-12 h-12 justify-center'} ${activeTab === 'registros' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                        <i className="bi bi-journal-bookmark text-lg shrink-0"></i>
+                        {isSidebarOpen && <span>Registros</span>}
+                    </button>
                 </div>
 
                 <div className={`tour-system-menu border-t border-slate-800 bg-slate-900 flex ${isSidebarOpen ? 'p-4 flex-col' : 'p-2 py-4 flex-col items-center gap-4'}`}>
@@ -1355,6 +1370,12 @@ export default function OwnerDashboard() {
                                 </div>
                                 <span className="text-[10px] font-semibold text-center leading-tight">KPIs</span>
                             </button>
+                            <button onClick={() => { setActiveTab('registros'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-2 ${activeTab === 'registros' ? 'text-indigo-600' : 'text-gray-600 dark:text-slate-300'}`}>
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${activeTab === 'registros' ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'}`}>
+                                    <i className="bi bi-journal-bookmark text-xl"></i>
+                                </div>
+                                <span className="text-[10px] font-semibold text-center leading-tight">Registros</span>
+                            </button>
                         </div>
                         
                         <h3 className="text-xs font-black text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-4">Ajustes</h3>
@@ -1392,6 +1413,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'stockMovements' && 'Movimientos de Stock'}
                             {activeTab === 'users' && 'Gestión de Usuarios'}
                             {activeTab === 'seguimiento_operadores' && 'Rendimiento y Seguimiento'}
+                            {activeTab === 'registros' && 'Directorio de Registros'}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-slate-400">
                             {activeTab === 'inventory' ? 'Administra las existencias de productos y recetas químicas de la compañía.' :
@@ -1400,12 +1422,13 @@ export default function OwnerDashboard() {
                                         activeTab === 'stockMovements' ? 'Historial detallado de entradas, salidas y ajustes de inventario.' :
                                             activeTab === 'users' ? 'Crea y administra las cuentas de acceso web para tus empleados.' :
                                                 activeTab === 'seguimiento_operadores' ? 'Métricas de rendimiento de operadores y tiempos de cierre.' :
-                                                    'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
+                                                    activeTab === 'registros' ? 'Directorio central de clientes y agencias marítimas de la empresa.' :
+                                                        'Bienvenido de vuelta, mira lo que pasa en la compañía.'}
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
                         <NotificationMenu />
-                        {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && activeTab !== 'seguimiento_operadores' && (
+                        {activeTab !== 'inventory' && activeTab !== 'staff' && activeTab !== 'stockMovements' && activeTab !== 'users' && activeTab !== 'seguimiento_operadores' && activeTab !== 'registros' && (
                             <button onClick={() => setOperationModalState({ isOpen: true, type: 'selector', id: null })} className="tour-new-op-btn bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-white shadow-sm shadow-indigo-200 font-bold text-sm transition-all flex items-center gap-2">
                                 <i className="bi bi-plus-lg text-lg"></i>
                                 Nueva Operación
@@ -1437,6 +1460,7 @@ export default function OwnerDashboard() {
                             {activeTab === 'stockMovements' && <StockMovements />} {/* NUEVO */}
                             {activeTab === 'users' && <UserManagement />}
                             {activeTab === 'seguimiento_operadores' && <SeguimientoOperadores />}
+                            {activeTab === 'registros' && <RegistrosManagement />}
                         </>
                     )}
                 </div>

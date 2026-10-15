@@ -12,6 +12,11 @@ class ClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = ['id', 'name', 'email', 'contact_person', 'phone']
+        extra_kwargs = {
+            'email': {'required': False, 'allow_blank': True},
+            'contact_person': {'required': False, 'allow_blank': True},
+            'phone': {'required': False, 'allow_blank': True},
+        }
 
 
 class ShipSerializer(serializers.ModelSerializer):
@@ -35,6 +40,11 @@ class AgencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Agency
         fields = ['id', 'name', 'contact_name', 'phone', 'email']
+        extra_kwargs = {
+            'contact_name': {'required': False, 'allow_blank': True},
+            'email': {'required': False, 'allow_blank': True},
+            'phone': {'required': False, 'allow_blank': True},
+        }
 
 
 class OperacionDetalleSerializer(serializers.ModelSerializer):
@@ -106,6 +116,12 @@ class HistorialEstadoOperacionSerializer(serializers.ModelSerializer):
         return f"{obj.usuario.first_name} {obj.usuario.last_name}".strip() or obj.usuario.username
 
 
+class TarifaHoraHombreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TarifaHoraHombre
+        fields = ['id', 'categoria', 'categoria_es', 'categoria_en', 'rol', 'rol_es', 'rol_en', 'precio_usd', 'activo', 'orden']
+
+
 class OperacionSerializer(serializers.ModelSerializer):
     # Campos de solo lectura (relaciones)
     client_name = serializers.CharField(source='cliente.name', read_only=True)
@@ -130,13 +146,14 @@ class OperacionSerializer(serializers.ModelSerializer):
     can_send_to_customs = serializers.SerializerMethodField()
     can_coordinate = serializers.SerializerMethodField()
     can_deliver = serializers.SerializerMethodField()
+    presenta_avances = serializers.BooleanField(read_only=True)
+    horas_sin_avances = serializers.FloatField(read_only=True)
+    tiempo_restante_24h = serializers.FloatField(read_only=True, allow_null=True)
 
     # Relaciones anidadas (solo lectura)
     detalles = OperacionDetalleSerializer(many=True, read_only=True)
     documentos_adjuntos = DocumentoAdjuntoSerializer(many=True, read_only=True)
     historial_estados = HistorialEstadoOperacionSerializer(many=True, read_only=True)
-    creado_por_nombre = serializers.SerializerMethodField()
-
 
     # Relaciones ManyToMany (escritura)
     operadores_id = serializers.PrimaryKeyRelatedField(
@@ -160,6 +177,10 @@ class OperacionSerializer(serializers.ModelSerializer):
     # Snapshot de operarios (solo lectura, para compatibilidad con versiones anteriores)
     plantel_asignado = serializers.JSONField(read_only=True)
 
+    creado_por_nombre = serializers.SerializerMethodField()
+    fecha_creacion = serializers.DateTimeField(read_only=True)
+    fecha_actualizacion = serializers.DateTimeField(read_only=True)
+
     class Meta:
         model = Operacion
         fields = [
@@ -169,15 +190,17 @@ class OperacionSerializer(serializers.ModelSerializer):
             'order_received_date', 'client_confirmed_date', 'quotation_sent_date', 'quoted_by', 'dificil_conseguir',
             'delivery_date', 'closed_date', 'closed_by', 'motivo_rechazo',
             'packing_list_file', 'remito_file', 'rancho_file', 'solicitud_particular_file',
-            'factura_file', 'reporte_file', 'lista_ingredientes_file',
+            'factura_file', 'reporte_file', 'lista_ingredientes_file', 'ingreso_puerto_listo',
             'operadores_id', 'operarios_id', 'contables_id', 'operarios_usuarios_id',
             'operadores_nombres', 'operarios_nombres', 'operarios_usuarios_nombres', 'plantel_asignado',
             'can_confirm', 'can_send_to_customs', 'can_coordinate', 'can_deliver',
             'stock_consumido', 'tipo_operacion', 'aprobacion_requerida_owner',
-            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio',
+            'detalle_servicio', 'subtipo_servicio', 'forma_cotizacion_servicio', 'valor_servicio', 'items_cotizacion_servicio', 'expensas',
             'estado_revision', 'mensaje_revision', 'texto_pedido', 'nombre',
             'herramientas_solicitud_particular', 'texto_permiso_pna', 'texto_cotizacion_adicional', 'materiales_a_bordo',
-            'creado_por', 'creado_por_nombre', 'fecha_creacion', 'fecha_actualizacion'
+            'creado_por', 'creado_por_nombre', 'fecha_creacion', 'fecha_actualizacion',
+            'fecha_inicio_control_operador', 'alerta_inactividad_24h_enviada', 'fecha_alerta_inactividad_24h',
+            'presenta_avances', 'horas_sin_avances', 'tiempo_restante_24h'
         ]
         extra_kwargs = {
             'cliente': {'required': False},
@@ -189,15 +212,21 @@ class OperacionSerializer(serializers.ModelSerializer):
             'client_confirmed_date': {'required': False, 'allow_null': True},
             'delivery_date': {'required': False, 'allow_null': True},
             'closed_date': {'required': False, 'allow_null': True},
+            'detalle_servicio': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'expensas': {'required': False},
         }
-        read_only_fields = ['estado_revision', 'mensaje_revision', 'creado_por', 'creado_por_nombre', 'fecha_creacion', 'fecha_actualizacion']
+        read_only_fields = [
+            'estado_revision', 'mensaje_revision', 'creado_por', 'creado_por_nombre', 'fecha_creacion', 'fecha_actualizacion',
+            'fecha_inicio_control_operador', 'alerta_inactividad_24h_enviada', 'fecha_alerta_inactividad_24h',
+            'presenta_avances', 'horas_sin_avances', 'tiempo_restante_24h'
+        ]
 
     # Métodos auxiliares
     def get_creado_por_nombre(self, obj):
         if not obj.creado_por:
             return None
         u = obj.creado_por
-        return f"{u.first_name} {u.last_name}".strip() if (u.first_name or u.last_name) else u.username
+        return f"{u.first_name} {u.last_name}".strip() or u.username
 
     def get_operadores_nombres(self, obj):
         return [
@@ -214,12 +243,8 @@ class OperacionSerializer(serializers.ModelSerializer):
             for u in obj.operarios_usuarios_asignados.all()
         ]
 
-    def get_status(self, obj):
-        return obj.estado
-
     def get_can_confirm(self, obj):
         return obj.estado == Operacion.ESTADO_SOLICITADA
-
 
     def get_can_send_to_customs(self, obj):
         return obj.estado == Operacion.ESTADO_ARMADO_PACKING
@@ -311,6 +336,17 @@ class OperacionSerializer(serializers.ModelSerializer):
         if 'eta' in mutable_data and not mutable_data['eta']:
             mutable_data['eta'] = None
 
+        if mutable_data.get('tipo_operacion') == 'servicios' and not mutable_data.get('detalle_servicio'):
+            mutable_data['detalle_servicio'] = mutable_data.get('nombre') or 'Servicio Técnico'
+
+        if 'expensas' in mutable_data:
+            val = mutable_data['expensas']
+            if isinstance(val, str):
+                try:
+                    mutable_data['expensas'] = json.loads(val)
+                except (ValueError, TypeError):
+                    mutable_data['expensas'] = []
+
         return super().to_internal_value(mutable_data)
 
     def create(self, validated_data):
@@ -336,6 +372,9 @@ class OperacionSerializer(serializers.ModelSerializer):
         return operation
 
     def update(self, instance, validated_data):
+        if instance.estado in [Operacion.ESTADO_ENTREGADA, Operacion.ESTADO_CANCELADA]:
+            raise serializers.ValidationError("Esta operación se encuentra cerrada o cancelada. No se permite modificar sus datos.")
+
         products_data = validated_data.pop('products', None)
         if products_data is None:
             products_data = self.initial_data.get('products', None)
@@ -429,9 +468,3 @@ class AgendaEventSerializer(serializers.ModelSerializer):
         if not obj.assigned_to:
             return ""
         return f"{obj.assigned_to.first_name} {obj.assigned_to.last_name}".strip() or obj.assigned_to.username
-
-
-class TarifaHoraHombreSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TarifaHoraHombre
-        fields = ['id', 'categoria', 'categoria_es', 'categoria_en', 'rol', 'rol_es', 'rol_en', 'precio_usd', 'activo', 'orden']
