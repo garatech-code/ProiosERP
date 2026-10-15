@@ -26,6 +26,38 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
   const [showSaveAsNewModal, setShowSaveAsNewModal] = useState(false);
   const [newTemplateTitle, setNewTemplateTitle] = useState('');
   const [savingNew, setSavingNew] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const normalizeText = (text) =>
+    (text || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const getMatchSnippet = (content, term) => {
+    if (!content || !term) return null;
+    const cleanContent = content.replace(/[\r\n]+/g, ' ');
+    const normContent = normalizeText(cleanContent);
+    const normTerm = normalizeText(term);
+    const idx = normContent.indexOf(normTerm);
+    if (idx === -1) return null;
+    const start = Math.max(0, idx - 30);
+    const end = Math.min(cleanContent.length, idx + term.length + 40);
+    let snippet = cleanContent.substring(start, end);
+    if (start > 0) snippet = '...' + snippet;
+    if (end < cleanContent.length) snippet = snippet + '...';
+    return snippet;
+  };
+
+  const filteredManagementTemplates = templates.filter((t) => {
+    if (!searchTerm.trim()) return true;
+    const term = normalizeText(searchTerm.trim());
+    const matchTitle = normalizeText(t.titulo).includes(term);
+    const matchCuerpo = normalizeText(t.cuerpo).includes(term);
+    const matchAsunto = normalizeText(t.asunto).includes(term);
+    return matchTitle || matchCuerpo || matchAsunto;
+  });
 
   useEffect(() => {
     fetchTemplates();
@@ -188,47 +220,79 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
 
   if (editMode) {
     return (
-      <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col">
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+      <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
           <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
             <i className="bi bi-gear-fill text-indigo-500"></i>
             Gestión de Plantillas (Owner)
           </h2>
-          <button onClick={() => { if (defaultEditMode && onCancel) onCancel(); else setEditMode(false); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <button onClick={() => { if (defaultEditMode && onCancel) onCancel(); else setEditMode(false); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
             <i className="bi bi-x-lg"></i>
           </button>
         </div>
         
-        <div className="p-6 flex flex-col gap-6">
+        <div className="p-6 flex flex-col gap-5 overflow-y-auto flex-1">
           {!editingTemplate ? (
             <>
-              <div className="flex items-center justify-between gap-3">
-                <button 
-                  onClick={() => setEditingTemplate({ titulo: '', asunto: '', cuerpo: '', idioma: 'ES' })}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-1.5"
-                >
-                  <i className="bi bi-plus-lg"></i> Nueva Plantilla
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      await axios.post('/correos/templates/seed-defaults/');
-                      await fetchTemplates();
-                    } catch (err) {
-                      console.error(err);
-                      alert('Error al cargar las plantillas estándar.');
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600"
-                  title="Carga las plantillas estándar de Techship si falta alguna"
-                >
-                  <i className="bi bi-arrow-clockwise"></i> Cargar Plantillas Estándar
-                </button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                {/* Buscador de plantillas por nombre o contenido */}
+                <div className="relative flex-1 max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <i className="bi bi-search text-xs"></i>
+                  </div>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar plantilla por nombre o contenido..."
+                    className="block w-full pl-9 pr-8 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700/60 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors shadow-sm"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                      title="Limpiar búsqueda"
+                    >
+                      <i className="bi bi-x-circle-fill text-xs"></i>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 justify-end">
+                  <button 
+                    onClick={() => setEditingTemplate({ titulo: '', asunto: '', cuerpo: '', idioma: 'ES' })}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-1.5 transition"
+                  >
+                    <i className="bi bi-plus-lg"></i> Nueva Plantilla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        await axios.post('/correos/templates/seed-defaults/');
+                        await fetchTemplates();
+                      } catch (err) {
+                        console.error(err);
+                        alert('Error al cargar las plantillas estándar.');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600 shadow-sm"
+                    title="Carga las plantillas estándar de Techship si falta alguna"
+                  >
+                    <i className="bi bi-arrow-clockwise"></i> Cargar Plantillas Estándar
+                  </button>
+                </div>
               </div>
+
+              {searchTerm.trim() && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Mostrando <span className="font-bold text-indigo-600 dark:text-indigo-400">{filteredManagementTemplates.length}</span> de {templates.length} plantillas encontradas
+                </div>
+              )}
               
               <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                 <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
@@ -241,21 +305,64 @@ export default function EmailTemplateManager({ onSelect, onCancel, defaultEditMo
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {templates.map(t => (
-                      <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-750 transition">
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-[11px] font-black ${t.idioma === 'ES' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'}`}>
-                            {t.idioma}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white font-semibold">{t.titulo}</td>
-                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs truncate max-w-xs">{t.asunto}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button onClick={() => setEditingTemplate(t)} className="text-blue-600 dark:text-blue-400 hover:underline mr-3" title="Editar"><i className="bi bi-pencil"></i></button>
-                          <button onClick={() => deleteTemplate(t.id)} className="text-red-600 dark:text-red-400 hover:underline" title="Eliminar"><i className="bi bi-trash"></i></button>
+                    {filteredManagementTemplates.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <i className="bi bi-search text-2xl text-slate-400"></i>
+                            <p className="font-semibold text-sm">
+                              {searchTerm.trim()
+                                ? `No se encontraron plantillas que coincidan con "${searchTerm}"`
+                                : 'No hay plantillas registradas.'}
+                            </p>
+                            {searchTerm.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => setSearchTerm('')}
+                                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold mt-1"
+                              >
+                                Limpiar búsqueda
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredManagementTemplates.map(t => {
+                        const term = searchTerm.trim();
+                        const hasContentMatch = term && normalizeText(t.cuerpo).includes(normalizeText(term));
+                        const hasTitleMatch = term && normalizeText(t.titulo).includes(normalizeText(term));
+                        const snippet = hasContentMatch ? getMatchSnippet(t.cuerpo, term) : null;
+
+                        return (
+                          <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-750 transition">
+                            <td className="px-4 py-3 align-top">
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-black ${t.idioma === 'ES' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'}`}>
+                                {t.idioma}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="text-slate-900 dark:text-white font-semibold">{t.titulo}</div>
+                              {snippet && !hasTitleMatch && (
+                                <div className="mt-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-0.5">
+                                    <i className="bi bi-file-text mr-1"></i>Coincidencia en contenido:
+                                  </span>
+                                  <span className="font-mono text-[11px] leading-relaxed break-words">{snippet}</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 align-top text-slate-500 dark:text-slate-400 text-xs">
+                              <div className="truncate max-w-xs">{t.asunto}</div>
+                            </td>
+                            <td className="px-4 py-3 align-top text-right whitespace-nowrap">
+                              <button onClick={() => setEditingTemplate(t)} className="text-blue-600 dark:text-blue-400 hover:underline mr-3" title="Editar"><i className="bi bi-pencil"></i></button>
+                              <button onClick={() => deleteTemplate(t.id)} className="text-red-600 dark:text-red-400 hover:underline" title="Eliminar"><i className="bi bi-trash"></i></button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
