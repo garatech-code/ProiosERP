@@ -3735,7 +3735,7 @@ export default function OperationDetail() {
 
                     {operation.tipo_operacion !== 'servicios' ? (
                       <>
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'recibida' || operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'recibida') && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
                               <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
@@ -3821,7 +3821,7 @@ export default function OperationDetail() {
                       </>
                     ) : (
                       <>
-                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'recibida' || operation.estado === 'solicitada' || operation.estado === 'solicitud_servicio') && (
+                        {canEdit && (!isOperador || operation.estado_revision !== 'rejected') && !isOperario && (operation.estado === 'recibida' || operation.estado === 'solicitud_servicio') && (
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <label className={`w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
                               <i className="bi bi-cloud-arrow-up-fill"></i> Subir Custom
