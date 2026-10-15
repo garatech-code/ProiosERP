@@ -1858,6 +1858,8 @@ export default function OperationDetail() {
   const isCancelled = operation?.estado === 'cancelada' || operation?.status === 'cancelled';
   const isFinished = isClosed || isCancelled;
 
+  const isOperario = user?.role === 'OPERARIO';
+  const isOwner = user?.role === 'OWNER';
   const isSenior = user?.role === 'OPERADOR';
   const isJunior = user?.role === 'OPERADOR_JR';
   const canClose = isOwner || isSenior;
