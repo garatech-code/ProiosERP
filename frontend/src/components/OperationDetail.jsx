@@ -461,36 +461,128 @@ export default function OperationDetail() {
     const catEn = tarifa.categoria_en || tarifa.categoria;
     const descEs = `${rolEs} (${catEs})`;
     const descEn = `${rolEn} (${catEn})`;
+    const prec = parseFloat(tarifa.precio_usd) || 0;
     setCustomItems(prev => [
       ...prev,
       {
         nombre: cotizacionLang === 'en' ? descEn : descEs,
         nombre_es: descEs,
         nombre_en: descEn,
+        descripcion: descEs,
         categoria: catEn,
         categoria_es: catEs,
         categoria_en: catEn,
         forma_cotizacion: 'hora_hombre',
         cantidad: 1,
-        precio_unitario: parseFloat(tarifa.precio_usd) || 0
+        unidad: 'Hr',
+        precio_unitario: prec,
+        precio: prec,
+        importe: prec.toFixed(2)
       }
     ]);
     setShowTarifarioModal(false);
     showToast(`Tarifa "${rolEs}" agregada al servicio`, 'success');
   };
 
+  const handleCustomItemChange = (index, field, value) => {
+    const newItems = [...customItems];
+    const item = { ...newItems[index] };
+
+    if (field === 'nombre_es') {
+      item.nombre_es = value;
+      item.descripcion = value;
+      if (cotizacionLang === 'es' || !item.nombre) {
+        item.nombre = value;
+      }
+    } else if (field === 'nombre_en') {
+      item.nombre_en = value;
+      if (cotizacionLang === 'en') {
+        item.nombre = value;
+      }
+    } else if (field === 'descripcion') {
+      item.descripcion = value;
+      item.nombre_es = value;
+      if (cotizacionLang === 'es' || !item.nombre) {
+        item.nombre = value;
+      }
+    } else if (field === 'cantidad' || field === 'precio_unitario' || field === 'precio') {
+      if (field === 'precio') {
+        item.precio = value;
+        item.precio_unitario = value;
+      } else if (field === 'precio_unitario') {
+        item.precio_unitario = value;
+        item.precio = value;
+      } else {
+        item.cantidad = value;
+      }
+
+      // Auto-cálculo de importe como en expensas
+      const parseVal = (v) => parseFloat(String(v).replace(',', '.'));
+      const cant = parseVal(item.cantidad);
+      const prec = parseVal(item.precio_unitario);
+      if (!isNaN(cant) && !isNaN(prec)) {
+        item.importe = (cant * prec).toFixed(2).toString();
+      } else {
+        item.importe = '';
+      }
+    } else if (field === 'importe') {
+      item.importe = value;
+    } else if (field === 'unidad') {
+      item.unidad = value;
+    } else if (field === 'forma_cotizacion') {
+      item.forma_cotizacion = value;
+      if (value === 'general') {
+        if (!item.unidad || item.unidad === 'Hr') item.unidad = 'Unid.';
+      } else if (value === 'hora_hombre') {
+        if (!item.unidad || item.unidad === 'Unid.') item.unidad = 'Hr';
+      }
+      const parseVal = (v) => parseFloat(String(v).replace(',', '.'));
+      const cant = parseVal(item.cantidad);
+      const prec = parseVal(item.precio_unitario || item.precio);
+      if (!isNaN(cant) && !isNaN(prec)) {
+        item.importe = (cant * prec).toFixed(2).toString();
+      }
+    } else {
+      item[field] = value;
+    }
+
+    newItems[index] = item;
+    setCustomItems(newItems);
+  };
+
   useEffect(() => {
     if (operation?.tipo_operacion === 'servicios') {
       if (operation.items_cotizacion_servicio && operation.items_cotizacion_servicio.length > 0) {
-        setCustomItems(operation.items_cotizacion_servicio);
+        setCustomItems(operation.items_cotizacion_servicio.map(it => {
+          const isGeneral = (it.forma_cotizacion === 'lumpsum' || it.forma_cotizacion === 'general');
+          const p = it.precio_unitario !== undefined && it.precio_unitario !== '' ? it.precio_unitario : (it.precio || 0);
+          const q = it.cantidad !== undefined && it.cantidad !== '' ? it.cantidad : 1;
+          const defaultImporte = ((parseFloat(q) || 0) * (parseFloat(p) || 0)).toFixed(2);
+          return {
+            ...it,
+            forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
+            unidad: it.unidad || (isGeneral ? 'Unid.' : 'Hr'),
+            cantidad: q,
+            precio: p,
+            precio_unitario: p,
+            importe: it.importe !== undefined && it.importe !== '' && it.importe !== null ? it.importe : defaultImporte
+          };
+        }));
       } else if (operation.detalle_servicio) {
         const lines = operation.detalle_servicio.split('\n').filter(l => l.trim());
         if (lines.length > 0) {
+          const isGeneral = (operation.forma_cotizacion_servicio === 'lumpsum' || operation.forma_cotizacion_servicio === 'general');
           setCustomItems(lines.map(l => ({
             nombre: l,
-            forma_cotizacion: operation.forma_cotizacion_servicio || 'lumpsum',
+            nombre_es: l,
+            nombre_en: l,
+            descripcion: l,
+            forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
+            unidad: isGeneral ? 'Unid.' : 'Hr',
             cantidad: 1,
-            precio_unitario: operation.forma_cotizacion_servicio === 'lumpsum' ? operation.valor_servicio : 0
+            precio: isGeneral ? (operation.valor_servicio || 0) : 0,
+            precio_unitario: isGeneral ? (operation.valor_servicio || 0) : 0,
+            importe: String(isGeneral ? (operation.valor_servicio || 0) : 0)
           })));
         } else {
           setCustomItems([]);
@@ -881,16 +973,27 @@ export default function OperationDetail() {
 
       if (operation?.tipo_operacion === 'servicios') {
         const processed = customItems
-          .filter(i => (i.nombre || i.nombre_es || i.nombre_en || '').trim() !== '')
+          .filter(i => (i.nombre || i.nombre_es || i.nombre_en || i.descripcion || '').trim() !== '')
           .map(i => {
-            const nEs = (i.nombre_es || i.nombre || '').trim();
-            const nEn = (i.nombre_en || i.nombre || '').trim();
+            const nEs = (i.nombre_es || i.descripcion || i.nombre || '').trim();
+            const nEn = (i.nombre_en || i.descripcion || i.nombre || '').trim();
             const selectedName = cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn);
+            const isGeneral = (i.forma_cotizacion === 'lumpsum' || i.forma_cotizacion === 'general');
+            const qty = parseFloat(i.cantidad) || 1;
+            const price = parseFloat(i.precio_unitario !== undefined && i.precio_unitario !== '' ? i.precio_unitario : (i.precio || 0)) || 0;
+            const imp = i.importe !== undefined && i.importe !== '' && i.importe !== null ? parseFloat(i.importe) : (qty * price);
             return {
               ...i,
+              forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
               nombre: selectedName,
               nombre_es: nEs || selectedName,
-              nombre_en: nEn || selectedName
+              nombre_en: nEn || selectedName,
+              descripcion: i.descripcion || selectedName,
+              unidad: i.unidad || (isGeneral ? (cotizacionLang === 'en' ? 'Unit' : 'Unid.') : (cotizacionLang === 'en' ? 'Hr' : 'Hs')),
+              cantidad: i.cantidad !== undefined && i.cantidad !== '' ? i.cantidad : qty,
+              precio_unitario: price,
+              precio: price,
+              importe: isNaN(imp) ? (qty * price).toFixed(2) : imp.toFixed(2)
             };
           });
         payload.custom_items = JSON.stringify(processed);
@@ -943,16 +1046,27 @@ export default function OperationDetail() {
 
       if (operation?.tipo_operacion === 'servicios') {
         const processed = customItems
-          .filter(i => (i.nombre || i.nombre_es || i.nombre_en || '').trim() !== '')
+          .filter(i => (i.nombre || i.nombre_es || i.nombre_en || i.descripcion || '').trim() !== '')
           .map(i => {
-            const nEs = (i.nombre_es || i.nombre || '').trim();
-            const nEn = (i.nombre_en || i.nombre || '').trim();
+            const nEs = (i.nombre_es || i.descripcion || i.nombre || '').trim();
+            const nEn = (i.nombre_en || i.descripcion || i.nombre || '').trim();
             const selectedName = cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn);
+            const isGeneral = (i.forma_cotizacion === 'lumpsum' || i.forma_cotizacion === 'general');
+            const qty = parseFloat(i.cantidad) || 1;
+            const price = parseFloat(i.precio_unitario !== undefined && i.precio_unitario !== '' ? i.precio_unitario : (i.precio || 0)) || 0;
+            const imp = i.importe !== undefined && i.importe !== '' && i.importe !== null ? parseFloat(i.importe) : (qty * price);
             return {
               ...i,
+              forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
               nombre: selectedName,
               nombre_es: nEs || selectedName,
-              nombre_en: nEn || selectedName
+              nombre_en: nEn || selectedName,
+              descripcion: i.descripcion || selectedName,
+              unidad: i.unidad || (isGeneral ? (cotizacionLang === 'en' ? 'Unit' : 'Unid.') : (cotizacionLang === 'en' ? 'Hr' : 'Hs')),
+              cantidad: i.cantidad !== undefined && i.cantidad !== '' ? i.cantidad : qty,
+              precio_unitario: price,
+              precio: price,
+              importe: isNaN(imp) ? (qty * price).toFixed(2) : imp.toFixed(2)
             };
           });
         payload.custom_items = JSON.stringify(processed);
@@ -1600,19 +1714,32 @@ export default function OperationDetail() {
   const handleSaveServiceDetails = async () => {
     try {
       const processedItems = customItems.map(i => {
-        const nEs = (i.nombre_es || i.nombre || '').trim();
-        const nEn = (i.nombre_en || i.nombre || '').trim();
+        const nEs = (i.nombre_es || i.descripcion || i.nombre || '').trim();
+        const nEn = (i.nombre_en || i.descripcion || i.nombre || '').trim();
         const selName = cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn);
+        const isGeneral = (i.forma_cotizacion === 'lumpsum' || i.forma_cotizacion === 'general');
+        const qty = parseFloat(i.cantidad) || 1;
+        const price = parseFloat(i.precio_unitario !== undefined && i.precio_unitario !== '' ? i.precio_unitario : (i.precio || 0)) || 0;
+        const imp = i.importe !== undefined && i.importe !== '' && i.importe !== null ? parseFloat(i.importe) : (qty * price);
         return {
           ...i,
+          forma_cotizacion: isGeneral ? 'general' : 'hora_hombre',
           nombre: selName,
           nombre_es: nEs || selName,
-          nombre_en: nEn || selName
+          nombre_en: nEn || selName,
+          descripcion: i.descripcion || (cotizacionLang === 'en' ? (nEn || nEs) : (nEs || nEn)),
+          unidad: i.unidad || (isGeneral ? 'Unid.' : 'Hr'),
+          cantidad: i.cantidad !== undefined && i.cantidad !== '' ? i.cantidad : qty,
+          precio_unitario: price,
+          precio: price,
+          importe: isNaN(imp) ? (qty * price).toFixed(2) : imp.toFixed(2)
         };
       });
+      const totalServicio = processedItems.reduce((acc, curr) => acc + (parseFloat(curr.importe) || 0), 0);
       const payload = {
         detalle_servicio: processedItems.map(i => i.nombre).join('\n'),
-        items_cotizacion_servicio: processedItems
+        items_cotizacion_servicio: processedItems,
+        valor_servicio: totalServicio
       };
       await axios.patch(`/operaciones/operations/${id}/`, payload);
       showToast('Detalles del servicio guardados con éxito', 'success');
@@ -3099,10 +3226,21 @@ export default function OperationDetail() {
 
               {operation?.tipo_operacion === 'servicios' && (
                 <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 space-y-4">
-                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-3">
-                    <h4 className="text-lg font-black text-slate-800 dark:text-slate-200">
-                      <i className="bi bi-tools text-indigo-500 mr-2"></i> Detalles del Servicio Técnico
-                    </h4>
+                  <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
+                    <div className="flex items-center gap-3">
+                      <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <i className="bi bi-tools text-indigo-500"></i> Detalles del Servicio Técnico
+                      </h4>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                        Total Items: ${customItems.reduce((acc, it) => {
+                          const imp = parseFloat(it.importe);
+                          if (!isNaN(imp) && it.importe !== '' && it.importe !== null) return acc + imp;
+                          const q = parseFloat(it.cantidad) || 0;
+                          const p = parseFloat(it.precio_unitario || it.precio) || 0;
+                          return acc + (q * p);
+                        }, 0).toFixed(2)}
+                      </span>
+                    </div>
                     {canEdit && (
                       <button
                         onClick={handleSaveServiceDetails}
@@ -3115,178 +3253,217 @@ export default function OperationDetail() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Detalle del trabajo (aparecerá en la cotización)</label>
-                    {customItems.map((item, index) => {
-                      const valEs = item.nombre_es !== undefined ? item.nombre_es : (item.nombre || '');
-                      const valEn = item.nombre_en !== undefined ? item.nombre_en : (item.nombre || '');
-                      return (
-                      <div key={index} className="flex flex-col gap-2 mb-4 p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <div className="flex gap-2 items-center">
-                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">ES</span>
-                                  Nombre en Español (Cotizaciones en Español)
-                                </span>
+                    {customItems.length === 0 ? (
+                      <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">No hay ítems cargados en el detalle del servicio.</p>
+                    ) : (
+                      customItems.map((item, index) => {
+                        const isGeneral = (item.forma_cotizacion === 'general' || item.forma_cotizacion === 'lumpsum');
+                        const valEs = item.nombre_es !== undefined ? item.nombre_es : (item.descripcion !== undefined ? item.descripcion : (item.nombre || ''));
+                        const valEn = item.nombre_en !== undefined ? item.nombre_en : (item.nombre || '');
+                        return (
+                          <div key={index} className="flex flex-col gap-2 mb-4 p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="flex gap-2 items-center">
+                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">ES</span>
+                                      {isGeneral ? 'Descripción en Español (Cotizaciones en Español)' : 'Nombre en Español (Cotizaciones en Español)'}
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    disabled={!canEdit}
+                                    placeholder={isGeneral ? 'Ej: REPARACIÓN GENERAL DE VÁLVULAS' : 'Ej: SUPERVISOR DE ING. MECÁNICA'}
+                                    className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                    value={valEs}
+                                    onChange={(e) => handleCustomItemChange(index, 'nombre_es', e.target.value)}
+                                  />
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">EN</span>
+                                      {isGeneral ? 'Descripción en Inglés (Cotizaciones en Inglés)' : 'Nombre en Inglés (Cotizaciones en Inglés)'}
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    disabled={!canEdit}
+                                    placeholder={isGeneral ? 'Ej: GENERAL VALVE REPAIR' : 'Ej: MECHANICAL ENG. SUPERVISOR'}
+                                    className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                    value={valEn}
+                                    onChange={(e) => handleCustomItemChange(index, 'nombre_en', e.target.value)}
+                                  />
+                                </div>
                               </div>
-                              <input
-                                type="text"
-                                placeholder="Ej: SUPERVISOR DE ING. MECÁNICA"
-                                className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                value={valEs}
-                                onChange={(e) => {
-                                  const newItems = [...customItems];
-                                  newItems[index].nombre_es = e.target.value;
-                                  if (cotizacionLang === 'es' || !newItems[index].nombre) {
-                                    newItems[index].nombre = e.target.value;
-                                  }
-                                  setCustomItems(newItems);
-                                }}
-                              />
+
+                              {canEdit && (
+                                <div className="flex flex-col gap-1 shrink-0 pt-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newItems = [...customItems];
+                                      const curEs = newItems[index].nombre_es !== undefined ? newItems[index].nombre_es : (newItems[index].descripcion || newItems[index].nombre || '');
+                                      const curEn = newItems[index].nombre_en !== undefined ? newItems[index].nombre_en : (newItems[index].nombre || '');
+                                      newItems[index].nombre_es = curEn;
+                                      newItems[index].descripcion = curEn;
+                                      newItems[index].nombre_en = curEs;
+                                      newItems[index].nombre = cotizacionLang === 'en' ? curEs : curEn;
+                                      setCustomItems(newItems);
+                                    }}
+                                    className="p-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg transition"
+                                    title="Intercambiar textos Español ⇄ Inglés"
+                                  >
+                                    <i className="bi bi-arrow-left-right text-xs"></i>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newItems = customItems.filter((_, i) => i !== index);
+                                      setCustomItems(newItems);
+                                    }}
+                                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition"
+                                    title="Eliminar ítem"
+                                  >
+                                    <i className="bi bi-trash-fill text-xs"></i>
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">EN</span>
-                                  Nombre en Inglés (Cotizaciones en Inglés)
-                                </span>
+                            {/* Fila de campos según selector */}
+                            {!isGeneral ? (
+                              /* Horas Hombre: funcionamiento actual */
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
+                                  <select
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.forma_cotizacion}
+                                    onChange={(e) => handleCustomItemChange(index, 'forma_cotizacion', e.target.value)}
+                                  >
+                                    <option value="hora_hombre">Por horas hombre</option>
+                                    <option value="general">General</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad (Horas)</label>
+                                  <input
+                                    type="number"
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.cantidad}
+                                    onChange={(e) => handleCustomItemChange(index, 'cantidad', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.precio_unitario}
+                                    onChange={(e) => handleCustomItemChange(index, 'precio_unitario', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Valor Total ($)</label>
+                                  <div className="w-full text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-600 dark:text-slate-400 font-semibold">
+                                    {((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)).toFixed(2)}
+                                  </div>
+                                </div>
                               </div>
-                              <input
-                                type="text"
-                                placeholder="Ej: MECHANICAL ENG. SUPERVISOR"
-                                className="w-full text-xs font-semibold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                value={valEn}
-                                onChange={(e) => {
-                                  const newItems = [...customItems];
-                                  newItems[index].nombre_en = e.target.value;
-                                  if (cotizacionLang === 'en') {
-                                    newItems[index].nombre = e.target.value;
-                                  }
-                                  setCustomItems(newItems);
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-1 shrink-0 pt-4">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newItems = [...customItems];
-                                const curEs = newItems[index].nombre_es !== undefined ? newItems[index].nombre_es : (newItems[index].nombre || '');
-                                const curEn = newItems[index].nombre_en !== undefined ? newItems[index].nombre_en : (newItems[index].nombre || '');
-                                newItems[index].nombre_es = curEn;
-                                newItems[index].nombre_en = curEs;
-                                newItems[index].nombre = cotizacionLang === 'en' ? curEs : curEn;
-                                setCustomItems(newItems);
-                              }}
-                              className="p-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg transition"
-                              title="Intercambiar textos Español ⇄ Inglés"
-                            >
-                              <i className="bi bi-arrow-left-right text-xs"></i>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newItems = customItems.filter((_, i) => i !== index);
-                                setCustomItems(newItems);
-                              }}
-                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition"
-                              title="Eliminar ítem"
-                            >
-                              <i className="bi bi-trash-fill text-xs"></i>
-                            </button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
-                            <select
-                              className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                              value={item.forma_cotizacion}
-                              onChange={(e) => {
-                                const newItems = [...customItems];
-                                newItems[index].forma_cotizacion = e.target.value;
-                                setCustomItems(newItems);
-                              }}
-                            >
-                              <option value="hora_hombre">Por Horas Trabajadas</option>
-                              <option value="lumpsum">Lumpsum (Suma Global)</option>
-                            </select>
-                          </div>
-                          {item.forma_cotizacion !== 'lumpsum' && (
-                            <>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad (Horas)</label>
-
-                                <input
-                                  type="number"
-                                  className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                                  value={item.cantidad}
-                                  onChange={(e) => {
-                                    const newItems = [...customItems];
-                                    newItems[index].cantidad = e.target.value;
-                                    setCustomItems(newItems);
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                                  value={item.precio_unitario}
-                                  onChange={(e) => {
-                                    const newItems = [...customItems];
-                                    newItems[index].precio_unitario = e.target.value;
-                                    setCustomItems(newItems);
-                                  }}
-                                />
-                              </div>
-                            </>
-                          )}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Valor Total ($)</label>
-                            {item.forma_cotizacion === 'lumpsum' ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
-                                value={item.precio_unitario}
-                                onChange={(e) => {
-                                  const newItems = [...customItems];
-                                  newItems[index].precio_unitario = e.target.value;
-                                  setCustomItems(newItems);
-                                }}
-                              />
                             ) : (
-                              <div className="w-full text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-600 dark:text-slate-400">
-                                {((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)).toFixed(2)}
+                              /* General: con el mismo funcionamiento que tiene expensas (cantidad, unidad, precio, importe) */
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Forma Cotización</label>
+                                  <select
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value="general"
+                                    onChange={(e) => handleCustomItemChange(index, 'forma_cotizacion', e.target.value)}
+                                  >
+                                    <option value="hora_hombre">Por horas hombre</option>
+                                    <option value="general">General</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Cantidad</label>
+                                  <FormattedNumberInput
+                                    placeholder="Cant."
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.cantidad}
+                                    onChange={(val) => handleCustomItemChange(index, 'cantidad', val)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unidad</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ej: Unid., GL, Día..."
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.unidad || ''}
+                                    onChange={(e) => handleCustomItemChange(index, 'unidad', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Precio Unitario ($)</label>
+                                  <FormattedNumberInput
+                                    placeholder="Precio"
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                    value={item.precio_unitario !== undefined ? item.precio_unitario : item.precio}
+                                    onChange={(val) => handleCustomItemChange(index, 'precio_unitario', val)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Importe ($)</label>
+                                  <FormattedNumberInput
+                                    placeholder="Importe"
+                                    disabled={!canEdit}
+                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 font-semibold text-slate-800 dark:text-slate-100"
+                                    value={item.importe}
+                                    onChange={(val) => handleCustomItemChange(index, 'importe', val)}
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>
-                        </div>
+                        );
+                      })
+                    )}
+                    {canEdit && (
+                      <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setCustomItems([...customItems, { nombre: '', nombre_es: '', nombre_en: '', descripcion: '', forma_cotizacion: 'hora_hombre', cantidad: 1, unidad: 'Hr', precio_unitario: 0, precio: 0, importe: '0.00' }])}
+                          className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 transition"
+                        >
+                          <i className="bi bi-plus-circle-fill"></i> Agregar ítem Horas Hombre
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCustomItems([...customItems, { nombre: '', nombre_es: '', nombre_en: '', descripcion: '', forma_cotizacion: 'general', cantidad: 1, unidad: 'Unid.', precio_unitario: 0, precio: 0, importe: '0.00' }])}
+                          className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 transition"
+                        >
+                          <i className="bi bi-plus-circle-fill"></i> Agregar ítem General
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowTarifarioModal(true)}
+                          className="text-xs text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition shadow-sm"
+                        >
+                          <i className="bi bi-clock-history"></i> Cargar desde Tarifario Horas Hombre
+                        </button>
                       </div>
-                    );
-                    })}
-                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => setCustomItems([...customItems, { nombre: '', forma_cotizacion: 'hora_hombre', cantidad: 1, precio_unitario: 0 }])}
-                        className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 transition"
-                      >
-                        <i className="bi bi-plus-circle-fill"></i> Agregar ítem vacío
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowTarifarioModal(true)}
-                        className="text-xs text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition shadow-sm"
-                      >
-                        <i className="bi bi-clock-history"></i> Cargar desde Tarifario Horas Hombre
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}

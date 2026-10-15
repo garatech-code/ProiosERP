@@ -214,7 +214,11 @@ export default function OperadorDashboard() {
         }
         if (op.tipo_operacion === 'servicios') {
             if (op.items_cotizacion_servicio && op.items_cotizacion_servicio.length > 0) {
-                total += op.items_cotizacion_servicio.reduce((sum, item) => sum + ((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0)), 0);
+                total += op.items_cotizacion_servicio.reduce((sum, item) => {
+                    const imp = parseFloat(item.importe);
+                    if (!isNaN(imp) && item.importe !== '' && item.importe !== null) return sum + imp;
+                    return sum + ((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario || item.precio) || 0));
+                }, 0);
             } else {
                 total += (parseFloat(op.valor_servicio) || 0);
             }

@@ -565,31 +565,54 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
             for c_item in custom_items_list:
                 qty = c_item.get('cantidad', 1)
                 if not qty or str(qty).strip() == '': qty = 1
-                price = c_item.get('precio_unitario', 0)
-                if not price or str(price).strip() == '': price = 0
+                raw_price = c_item.get('precio_unitario')
+                if raw_price is None or str(raw_price).strip() == '':
+                    raw_price = c_item.get('precio', 0)
+                if not raw_price or str(raw_price).strip() == '': raw_price = 0
                 
-                qty = float(qty)
-                price = float(price)
+                try:
+                    qty = float(qty)
+                except:
+                    qty = 1.0
+                try:
+                    price = float(raw_price)
+                except:
+                    price = 0.0
                 
                 forma_c = c_item.get('forma_cotizacion', None)
-                unit_label = 'UN'
-                if forma_c == 'hora_hombre':
+                
+                if c_item.get('unidad') and str(c_item.get('unidad')).strip():
+                    unit_label = str(c_item.get('unidad')).strip()
+                elif forma_c == 'hora_hombre':
                     unit_label = 'hrs'
                 elif forma_c == 'dias':
                     unit_label = 'days'
                 elif forma_c == 'lumpsum':
                     unit_label = 'Lumpsum'
+                elif forma_c == 'general':
+                    unit_label = 'UN'
+                else:
+                    unit_label = 'UN'
 
                 if lang == 'es':
-                    desc = c_item.get('nombre_es') or c_item.get('nombre') or c_item.get('nombre_en', '')
+                    desc = c_item.get('nombre_es') or c_item.get('descripcion') or c_item.get('nombre') or c_item.get('nombre_en', '')
                 else:
-                    desc = c_item.get('nombre_en') or c_item.get('nombre') or c_item.get('nombre_es', '')
+                    desc = c_item.get('nombre_en') or c_item.get('descripcion') or c_item.get('nombre') or c_item.get('nombre_es', '')
+
+                if c_item.get('importe') is not None and str(c_item.get('importe')).strip() != '':
+                    try:
+                        amount = float(c_item.get('importe'))
+                    except:
+                        amount = price if forma_c == 'lumpsum' else (qty * price)
+                else:
+                    amount = price if forma_c == 'lumpsum' else (qty * price)
+
                 grupos['SERVICES'].append({
                     'desc': desc,
                     'qty': qty,
                     'unit': unit_label,
                     'price': price,
-                    'amount': price if forma_c == 'lumpsum' else (qty * price)
+                    'amount': amount
                 })
         print(f"DEBUG grupos after custom items: {grupos}")
     except Exception as e:
@@ -625,38 +648,6 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         Paragraph("Amount (USD)", th_right)
     ])
     
-    from apps.inventario.models import Articulo
-    grupos = {}
-    detalles = list(operacion.detalles.all())
-    for det in detalles:
-        try:
-            articulo = Articulo.objects.get(id=det.articulo_id)
-            cat = str(articulo.categoria).strip() if articulo.categoria and str(articulo.categoria).strip() else "GENERAL"
-            desc = articulo.nombre
-            unit = format_unit(articulo.unidad, lang)
-        except Articulo.DoesNotExist:
-            cat = "GENERAL"
-            desc = f"Item #{det.articulo_id}"
-            unit = format_unit("u", lang)
-            
-        forma_c = getattr(det, 'forma_cotizacion', None)
-        if forma_c == 'hora_hombre':
-            unit = 'hrs'
-        elif forma_c == 'dias':
-            unit = 'days'
-        elif forma_c == 'lumpsum':
-            unit = 'Lumpsum'
-            
-        cat = cat.upper()
-        if cat not in grupos:
-            grupos[cat] = []
-        grupos[cat].append({
-            'desc': desc,
-            'qty': float(det.cantidad),
-            'unit': unit,
-            'price': float(det.precio_unitario) if det.precio_unitario else 0.0
-        })
-        
     total_general = 0
     idx = 1
     
@@ -670,7 +661,7 @@ def generar_cotizacion_pdf_nativa(operacion, offer_validity="15 days", payment_t
         for item in items:
             qty = item['qty']
             price = item['price']
-            sub = qty * price
+            sub = item.get('amount') if item.get('amount') is not None else (qty * price)
             subtotal_cat += sub
             total_general += sub
             
@@ -967,7 +958,8 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             'scope': 'SCOPE OF SUPPLY', 'includes': 'Includes:', 'excludes': 'Excludes:', 'notes': 'TECHNICAL NOTES',
             'faithfully': 'Yours faithfully,', 'attn': 'Attn:', 'days': 'days', 'not_included': 'Not included',
             'vat_word': 'VAT', 'page': 'Page', 'operations': 'Operations', 'on_board': 'on board',
-            'details': 'DETAILS', 'terms_title': 'TERMS &amp; CONDITIONS', 'discount': 'Discount'
+            'details': 'DETAILS', 'terms_title': 'TERMS &amp; CONDITIONS', 'discount': 'Discount',
+            'email': 'Email:'
         },
         'es': {
             'cat_quimicos': 'Químicos', 'cat_productos': 'Productos', 'cat_servicios': 'Servicios', 'cat_general': 'General',
@@ -983,7 +975,8 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             'scope': 'ALCANCE DEL SUMINISTRO', 'includes': 'Incluye:', 'excludes': 'Excluye:', 'notes': 'NOTAS TÉCNICAS',
             'faithfully': 'Atentamente,', 'attn': 'Atención:', 'days': 'días', 'not_included': 'No incluidos',
             'vat_word': 'IVA', 'page': 'Página', 'operations': 'Operaciones', 'on_board': 'a bordo del',
-            'details': 'DETALLES', 'terms_title': 'TÉRMINOS Y CONDICIONES', 'discount': 'Descuento'
+            'details': 'DETALLES', 'terms_title': 'TÉRMINOS Y CONDICIONES', 'discount': 'Descuento',
+            'email': 'Email:'
         }
     }
     
@@ -1097,31 +1090,54 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             for c_item in custom_items_list:
                 qty = c_item.get('cantidad', 1)
                 if not qty or str(qty).strip() == '': qty = 1
-                price = c_item.get('precio_unitario', 0)
-                if not price or str(price).strip() == '': price = 0
+                raw_price = c_item.get('precio_unitario')
+                if raw_price is None or str(raw_price).strip() == '':
+                    raw_price = c_item.get('precio', 0)
+                if not raw_price or str(raw_price).strip() == '': raw_price = 0
                 
-                qty = float(qty)
-                price = float(price)
+                try:
+                    qty = float(qty)
+                except:
+                    qty = 1.0
+                try:
+                    price = float(raw_price)
+                except:
+                    price = 0.0
 
                 forma_c = c_item.get('forma_cotizacion', None)
-                unit_label = 'UN'
-                if forma_c == 'hora_hombre':
+                
+                if c_item.get('unidad') and str(c_item.get('unidad')).strip():
+                    unit_label = str(c_item.get('unidad')).strip()
+                elif forma_c == 'hora_hombre':
                     unit_label = 'hrs'
                 elif forma_c == 'dias':
                     unit_label = 'days'
                 elif forma_c == 'lumpsum':
                     unit_label = 'Lumpsum'
+                elif forma_c == 'general':
+                    unit_label = 'UN'
+                else:
+                    unit_label = 'UN'
 
                 if lang == 'es':
-                    desc = c_item.get('nombre_es') or c_item.get('nombre') or c_item.get('nombre_en', '')
+                    desc = c_item.get('nombre_es') or c_item.get('descripcion') or c_item.get('nombre') or c_item.get('nombre_en', '')
                 else:
-                    desc = c_item.get('nombre_en') or c_item.get('nombre') or c_item.get('nombre_es', '')
+                    desc = c_item.get('nombre_en') or c_item.get('descripcion') or c_item.get('nombre') or c_item.get('nombre_es', '')
+
+                if c_item.get('importe') is not None and str(c_item.get('importe')).strip() != '':
+                    try:
+                        amount = float(c_item.get('importe'))
+                    except:
+                        amount = price if forma_c == 'lumpsum' else (qty * price)
+                else:
+                    amount = price if forma_c == 'lumpsum' else (qty * price)
+
                 grupos['SERVICIOS'].append({
                     'desc': desc,
                     'qty': qty,
                     'unit': unit_label,
                     'price': price,
-                    'amount': price if forma_c == 'lumpsum' else (qty * price)
+                    'amount': amount
                 })
     except Exception as e:
         import traceback
@@ -1164,7 +1180,7 @@ def generar_cotizacion_eva_pdf(operacion, offer_validity="15 days", payment_term
             for item in items:
                 qty = item['qty']
                 price = item['price']
-                sub = qty * price
+                sub = item.get('amount') if item.get('amount') is not None else (qty * price)
                 subtotal_cat += sub
                 total_general += sub
                 

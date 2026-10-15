@@ -96,30 +96,47 @@ def generar_cotizacion_docx_pdf(op, offer_validity, payment_terms, delivery_time
         if items_list:
             importe_total = 0.0
             for idx, item in enumerate(items_list):
-                c_forma = item.get('forma_cotizacion', 'lumpsum')
+                c_forma = item.get('forma_cotizacion', 'general')
                 try:
                     c_qty = float(item.get('cantidad', 1))
                 except:
                     c_qty = 1.0
+
+                raw_price = item.get('precio_unitario')
+                if raw_price is None or str(raw_price).strip() == '':
+                    raw_price = item.get('precio', 0)
                 try:
-                    c_price = float(item.get('precio_unitario', 0))
+                    c_price = float(raw_price)
                 except:
                     c_price = 0.0
                 
-                if c_forma == 'hora_hombre':
-                    c_unidad = 'Hr'
+                # Unidad
+                if item.get('unidad') and str(item.get('unidad')).strip():
+                    c_unidad = str(item.get('unidad')).strip()
+                elif c_forma == 'hora_hombre':
+                    c_unidad = 'Hr' if lang == 'en' else 'Hs'
                 elif c_forma == 'dias':
                     c_unidad = 'Day' if lang == 'en' else 'Día'
+                elif c_forma == 'general':
+                    c_unidad = 'Unit' if lang == 'en' else 'Unid.'
                 else:
                     c_unidad = 'LS'
                 
-                c_importe = c_price if c_forma == 'lumpsum' else (c_qty * c_price)
+                # Importe
+                if item.get('importe') is not None and str(item.get('importe')).strip() != '':
+                    try:
+                        c_importe = float(item.get('importe'))
+                    except:
+                        c_importe = c_price if c_forma == 'lumpsum' else (c_qty * c_price)
+                else:
+                    c_importe = c_price if c_forma == 'lumpsum' else (c_qty * c_price)
+
                 importe_total += c_importe
                 
                 if lang == 'es':
-                    desc = item.get('nombre_es') or item.get('nombre') or item.get('nombre_en', '')
+                    desc = item.get('nombre_es') or item.get('descripcion') or item.get('nombre') or item.get('nombre_en', '')
                 else:
-                    desc = item.get('nombre_en') or item.get('nombre') or item.get('nombre_es', '')
+                    desc = item.get('nombre_en') or item.get('descripcion') or item.get('nombre') or item.get('nombre_es', '')
                 items_context.append({
                     'descripcion': desc,
                     'scope_of_work': desc,

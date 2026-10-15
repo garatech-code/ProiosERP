@@ -1669,7 +1669,7 @@ Sistema de Gestión Techship / Proios S.A.
         try:
             if template_type == 'eva':
                 from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
-                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value)
+                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value, ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json, lugar_entrega=lugar_entrega)
             else:
                 from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
                 pdf_content = generar_cotizacion_docx_pdf(
@@ -1745,7 +1745,7 @@ Sistema de Gestión Techship / Proios S.A.
         try:
             if template_type == 'eva':
                 from apps.operaciones.services_pdf import generar_cotizacion_eva_pdf
-                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value)
+                pdf_content = generar_cotizacion_eva_pdf(op, offer_validity, payment_terms, delivery_time, include_vat, scope_includes, scope_excludes, notes, attn, lang=lang, damage_location=damage_location, damage_frames=damage_frames, damage_area=damage_area, custom_items=custom_items, damage_subject=damage_subject, damage_location_title=damage_location_title, damage_frames_title=damage_frames_title, damage_area_title=damage_area_title, vat_percentage=vat_percentage, user=request.user, include_discount=include_discount, discount_type=discount_type, discount_value=discount_value, ubicacion=ubicacion, otros_gastos=otros_gastos, expensas=expensas_json, lugar_entrega=lugar_entrega)
             else:
                 from apps.operaciones.services_docx import generar_cotizacion_docx_pdf
                 pdf_content = generar_cotizacion_docx_pdf(
