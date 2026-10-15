@@ -269,7 +269,7 @@ class Operacion(models.Model):
     def tramitar_permisos_pna(self):
         pass
 
-    @transition(field=estado, source=[ESTADO_PERMISOS_PNA, ESTADO_COTIZADO], target=ESTADO_EN_EJECUCION)
+    @transition(field=estado, source=ESTADO_PERMISOS_PNA, target=ESTADO_EN_EJECUCION)
     def iniciar_ejecucion_servicio(self):
         pass
 
